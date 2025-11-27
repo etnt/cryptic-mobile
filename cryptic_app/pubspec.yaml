@@ -1,0 +1,72 @@
+name: cryptic_app
+description: End-to-end encrypted messaging client for Cryptic
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.4.0
+  riverpod_annotation: ^2.3.0
+
+  # Cryptography
+  pointycastle: ^3.9.0
+  cryptography: ^2.7.0
+
+  # Network
+  web_socket_channel: ^2.4.0
+  http: ^1.1.0
+
+  # Storage
+  flutter_secure_storage: ^9.0.0
+  sqflite_sqlcipher: ^3.0.0
+  path_provider: ^2.1.0
+
+  # Utilities
+  uuid: ^4.2.0
+  logger: ^2.0.0
+  intl: ^0.18.0
+  equatable: ^2.0.5
+  freezed_annotation: ^2.4.0
+  json_annotation: ^4.8.0
+
+  # UI
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # Code Generation
+  build_runner: ^2.4.0
+  freezed: ^2.4.0
+  json_serializable: ^6.7.0
+  riverpod_generator: ^2.3.0
+
+  # Testing
+  mockito: ^5.4.0
+  mocktail: ^1.0.0
+
+  # Linting
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/certificates/
+    - assets/images/
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700

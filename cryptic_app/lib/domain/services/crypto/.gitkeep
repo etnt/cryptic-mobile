@@ -1,0 +1,9 @@
+// lib/domain/services/crypto/README.md
+//
+// This folder contains cryptographic services:
+// - ed25519_service.dart - Signing operations
+// - x25519_service.dart - Key agreement
+// - chacha_service.dart - Symmetric encryption
+// - hkdf_service.dart - Key derivation
+// - x3dh_service.dart - X3DH key agreement protocol
+// - double_ratchet_service.dart - Double Ratchet implementation
