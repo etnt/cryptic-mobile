@@ -31,7 +31,7 @@ class CrypticApp extends ConsumerWidget {
         ),
         useMaterial3: true,
         // Card styling for message bubbles
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 1,
           margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
@@ -55,7 +55,7 @@ class CrypticApp extends ConsumerWidget {
           brightness: Brightness.dark,
         ),
         useMaterial3: true,
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 1,
           margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),

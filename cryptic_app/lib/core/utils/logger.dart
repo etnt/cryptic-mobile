@@ -25,12 +25,12 @@ abstract class AppLogger {
     // Hex encoded keys (64+ hex chars)
     RegExp(r'[0-9a-fA-F]{64,}'),
     // Passphrases in common formats
-    RegExp(r'passphrase["\s:=]+["\']?[^"\'\s,}]+', caseSensitive: false),
-    RegExp(r'password["\s:=]+["\']?[^"\'\s,}]+', caseSensitive: false),
+    RegExp('passphrase["\\s:=]+.+', caseSensitive: false),
+    RegExp('password["\\s:=]+.+', caseSensitive: false),
     // Private key markers
-    RegExp(r'private[_-]?key["\s:=]+[^,}\n]+', caseSensitive: false),
+    RegExp('private.?key["\\s:=]+.+', caseSensitive: false),
     // Secret key markers
-    RegExp(r'secret[_-]?key["\s:=]+[^,}\n]+', caseSensitive: false),
+    RegExp('secret.?key["\\s:=]+.+', caseSensitive: false),
   ];
 
   /// Initialize the logger with configuration.
