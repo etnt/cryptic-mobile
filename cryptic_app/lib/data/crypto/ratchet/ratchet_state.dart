@@ -300,4 +300,53 @@ class RatchetState {
       'last_updated': lastUpdated.toIso8601String(),
     };
   }
+
+  /// Removes expired keys from the skipped keys cache.
+  ///
+  /// Returns the number of keys removed.
+  int cleanupExpiredKeys() {
+    final now = DateTime.now();
+    final expiredKeys = <SkippedKeyId>[];
+
+    for (final entry in skippedKeys.entries) {
+      if (now.difference(entry.value.timestamp) > maxCacheAge) {
+        expiredKeys.add(entry.key);
+      }
+    }
+
+    for (final key in expiredKeys) {
+      skippedKeys.remove(key);
+    }
+
+    if (expiredKeys.isNotEmpty) {
+      lastUpdated = DateTime.now();
+    }
+
+    return expiredKeys.length;
+  }
+
+  /// Prunes the skipped keys cache if it exceeds the maximum size.
+  ///
+  /// Removes oldest entries first. Returns the number of keys removed.
+  int pruneSkippedKeysCache() {
+    if (skippedKeys.length <= maxCacheSize) return 0;
+
+    // Sort by timestamp (oldest first)
+    final sortedEntries = skippedKeys.entries.toList()
+      ..sort((a, b) => a.value.timestamp.compareTo(b.value.timestamp));
+
+    final toRemove = skippedKeys.length - maxCacheSize;
+    var removed = 0;
+
+    for (var i = 0; i < toRemove && i < sortedEntries.length; i++) {
+      skippedKeys.remove(sortedEntries[i].key);
+      removed++;
+    }
+
+    if (removed > 0) {
+      lastUpdated = DateTime.now();
+    }
+
+    return removed;
+  }
 }
