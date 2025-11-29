@@ -124,6 +124,40 @@ class KeyRepository {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Own Key Bundle (Private Keys)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Loads the own key bundle with all private keys.
+  ///
+  /// Constructs an [OwnKeyBundle] from the stored components:
+  /// - Identity key pair
+  /// - Signed prekey
+  /// - One-time prekeys
+  ///
+  /// Returns null if any required component is missing.
+  Future<OwnKeyBundle?> loadOwnKeyBundle() async {
+    final identity = await loadIdentityKeys();
+    if (identity == null) return null;
+
+    final signedPrekey = await loadSignedPrekey();
+    if (signedPrekey == null) return null;
+
+    final oneTimePrekeys = await loadOneTimePrekeys();
+
+    // Convert one-time prekeys list to map by keyId
+    final otpkMap = <int, OneTimePrekey>{};
+    for (final otpk in oneTimePrekeys) {
+      otpkMap[otpk.keyId] = otpk;
+    }
+
+    return OwnKeyBundle(
+      identity: identity,
+      signedPrekey: signedPrekey,
+      oneTimePrekeys: otpkMap,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // User Metadata
   // ─────────────────────────────────────────────────────────────────────────
 
