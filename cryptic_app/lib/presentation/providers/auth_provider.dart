@@ -3,10 +3,14 @@
 /// Manages the authentication flow including:
 /// - Username/passphrase entry
 /// - Key generation/loading
+/// - mTLS connection to server
 /// - Unlock state
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/engine/cryptic_engine.dart';
+import '../../data/services/authentication_service.dart';
 
 /// Authentication state.
 enum AuthState {
@@ -74,12 +78,33 @@ class AuthStatus {
 /// Notifier for authentication state.
 class AuthNotifier extends StateNotifier<AuthStatus> {
   /// Creates an auth notifier.
-  AuthNotifier() : super(AuthStatus.initial);
+  AuthNotifier({
+    AuthenticationService? authService,
+  })  : _authService = authService ?? AuthenticationService(),
+        super(AuthStatus.initial);
+
+  final AuthenticationService _authService;
+
+  /// The currently connected CrypticEngine (if authenticated).
+  CrypticEngine? _engine;
+
+  /// Get the current engine.
+  CrypticEngine? get engine => _engine;
+
+  /// Server configuration for connection.
+  ServerConnectionConfig _serverConfig = ServerConnectionConfig.localhost;
+
+  /// Update server configuration.
+  void setServerConfig(ServerConnectionConfig config) {
+    _serverConfig = config;
+  }
 
   /// Attempt to authenticate with username and passphrase.
   Future<bool> authenticate({
     required String username,
     required String passphrase,
+    String? serverHost,
+    int? serverPort,
   }) async {
     state = state.copyWith(
       state: AuthState.authenticating,
@@ -87,20 +112,31 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
     );
 
     try {
-      // TODO: Implement actual authentication logic
-      // - Check if keys exist
-      // - Load and decrypt keys with passphrase
-      // - Initialize engine
+      // Use provided server config or default
+      final config = (serverHost != null && serverPort != null)
+          ? ServerConnectionConfig(host: serverHost, port: serverPort)
+          : _serverConfig;
 
-      // Simulate authentication delay
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      state = AuthStatus(
-        state: AuthState.authenticated,
+      final result = await _authService.authenticate(
         username: username,
+        passphrase: passphrase,
+        serverConfig: config,
       );
 
-      return true;
+      if (result.success && result.engine != null) {
+        _engine = result.engine;
+        state = AuthStatus(
+          state: AuthState.authenticated,
+          username: username,
+        );
+        return true;
+      } else {
+        state = AuthStatus(
+          state: AuthState.failed,
+          error: result.error ?? 'Authentication failed',
+        );
+        return false;
+      }
     } catch (e) {
       state = AuthStatus(
         state: AuthState.failed,
@@ -114,6 +150,8 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
   Future<bool> setup({
     required String username,
     required String passphrase,
+    String? serverHost,
+    int? serverPort,
   }) async {
     state = state.copyWith(
       state: AuthState.authenticating,
@@ -121,20 +159,31 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
     );
 
     try {
-      // TODO: Implement actual setup logic
-      // - Generate new identity keys
-      // - Encrypt and save keys with passphrase
-      // - Initialize engine
+      // Use provided server config or default
+      final config = (serverHost != null && serverPort != null)
+          ? ServerConnectionConfig(host: serverHost, port: serverPort)
+          : _serverConfig;
 
-      // Simulate setup delay
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      state = AuthStatus(
-        state: AuthState.authenticated,
+      final result = await _authService.setup(
         username: username,
+        passphrase: passphrase,
+        serverConfig: config,
       );
 
-      return true;
+      if (result.success && result.engine != null) {
+        _engine = result.engine;
+        state = AuthStatus(
+          state: AuthState.authenticated,
+          username: username,
+        );
+        return true;
+      } else {
+        state = AuthStatus(
+          state: AuthState.failed,
+          error: result.error ?? 'Setup failed',
+        );
+        return false;
+      }
     } catch (e) {
       state = AuthStatus(
         state: AuthState.failed,
@@ -145,21 +194,50 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
   }
 
   /// Log out and clear authentication state.
-  void logout() {
+  Future<void> logout() async {
+    if (_engine != null) {
+      await _engine!.dispose();
+      _engine = null;
+    }
     state = AuthStatus.initial;
   }
 
   /// Check if user needs initial setup.
   Future<void> checkAuthState() async {
-    // TODO: Check if identity keys exist
-    // If not, set state to needsSetup
-    state = state.copyWith(state: AuthState.unauthenticated);
+    final hasCerts = await _authService.hasCertificates();
+    if (!hasCerts) {
+      state = state.copyWith(
+        state: AuthState.needsSetup,
+        error: 'No certificates found',
+      );
+      return;
+    }
+
+    final hasKeys = await _authService.hasIdentityKeys();
+    if (!hasKeys) {
+      state = state.copyWith(state: AuthState.needsSetup);
+    } else {
+      state = state.copyWith(state: AuthState.unauthenticated);
+    }
   }
 }
 
 /// Provider for authentication state.
 final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>((ref) {
   return AuthNotifier();
+});
+
+/// Provider for the authenticated engine.
+///
+/// Returns the CrypticEngine if authenticated, null otherwise.
+final authenticatedEngineProvider = Provider<CrypticEngine?>((ref) {
+  final authNotifier = ref.watch(authProvider.notifier);
+  final authStatus = ref.watch(authProvider);
+  
+  if (authStatus.isAuthenticated) {
+    return authNotifier.engine;
+  }
+  return null;
 });
 
 /// Provider for whether user is authenticated.

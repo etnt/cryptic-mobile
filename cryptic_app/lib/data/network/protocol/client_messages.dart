@@ -88,17 +88,27 @@ class OneTimePrekey {
     required this.publicKey,
   });
 
-  /// Unique ID for this prekey.
+  /// Unique ID for this prekey (will be base64-encoded for wire format).
   final int keyId;
 
   /// X25519 public key (base64).
   final String publicKey;
 
   /// Convert to JSON map.
-  Map<String, dynamic> toJson() => {
-        'key_id': keyId,
-        'public_key': publicKey,
-      };
+  ///
+  /// The server expects:
+  /// - `id`: base64-encoded 8-byte random ID
+  /// - `public_key`: base64-encoded X25519 public key
+  Map<String, dynamic> toJson() {
+    // Convert keyId to 8-byte binary and base64-encode it
+    final idBytes = Uint8List(8);
+    final view = ByteData.view(idBytes.buffer);
+    view.setInt64(0, keyId, Endian.big);
+    return {
+      'id': base64Encode(idBytes),
+      'public_key': publicKey,
+    };
+  }
 
   /// Create from raw bytes.
   factory OneTimePrekey.fromBytes({
@@ -305,13 +315,25 @@ class RatchetMessage extends ProtocolMessage {
   }
 }
 
-/// Request list of registered users.
+/// Request list of registered users (admin only).
 class ListUsersMessage extends ProtocolMessage {
   /// Creates a list users request.
   ListUsersMessage();
 
   @override
   String get type => ClientMessageType.listUsers.value;
+
+  @override
+  Map<String, dynamic> toJson() => {'type': type};
+}
+
+/// Request list of online users (non-admin).
+class OnlineUsersMessage extends ProtocolMessage {
+  /// Creates an online users request.
+  OnlineUsersMessage();
+
+  @override
+  String get type => ClientMessageType.onlineUsers.value;
 
   @override
   Map<String, dynamic> toJson() => {'type': type};

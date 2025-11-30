@@ -35,8 +35,11 @@ enum ClientMessageType {
   /// Send ratchet message (ongoing conversation).
   ratchet('ratchet'),
 
-  /// Request list of registered users.
+  /// Request list of registered users (admin only).
   listUsers('list_users'),
+
+  /// Request list of online users (non-admin).
+  onlineUsers('online_users'),
 
   /// Send a message (higher-level, engine encrypts).
   sendMessage('send_message');

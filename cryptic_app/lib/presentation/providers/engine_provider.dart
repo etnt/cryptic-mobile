@@ -7,36 +7,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/engine/cryptic_engine.dart';
 import '../../data/engine/engine_state.dart';
-import '../../data/network/websocket/websocket_client.dart';
 import '../../data/storage/repositories/key_repository.dart';
 import '../../data/storage/repositories/session_repository.dart';
-
-/// Provider for the WebSocket client.
-///
-/// Override this in tests or when configuring for different servers.
-final webSocketClientProvider = Provider<WebSocketClient>((ref) {
-  throw UnimplementedError(
-    'webSocketClientProvider must be overridden with a configured WebSocketClient',
-  );
-});
+import 'auth_provider.dart';
 
 /// Provider for the key repository.
 ///
 /// Override this in tests or when using different storage backends.
-final keyRepositoryProvider = Provider<KeyRepository>((ref) {
-  throw UnimplementedError(
-    'keyRepositoryProvider must be overridden with a configured KeyRepository',
-  );
-});
+final keyRepositoryProvider = Provider<KeyRepository>((ref) => KeyRepository());
 
 /// Provider for the session repository.
 ///
 /// Override this in tests or when using different storage backends.
-final sessionRepositoryProvider = Provider<SessionRepository>((ref) {
-  throw UnimplementedError(
-    'sessionRepositoryProvider must be overridden with a configured SessionRepository',
-  );
-});
+final sessionRepositoryProvider =
+    Provider<SessionRepository>((ref) => SessionRepository());
 
 /// Provider for the server configuration.
 final serverConfigProvider = Provider<ServerConfig>((ref) {
@@ -49,35 +33,15 @@ final serverConfigProvider = Provider<ServerConfig>((ref) {
 
 /// Provider for the current username.
 ///
-/// Must be set before the engine can be used.
-final usernameProvider = StateProvider<String?>((ref) => null);
+/// Derived from auth state.
+final usernameProvider =
+    Provider<String?>((ref) => ref.watch(currentUsernameProvider));
 
 /// Provider for the CrypticEngine.
 ///
-/// Creates and manages the engine lifecycle.
-final engineProvider = Provider<CrypticEngine?>((ref) {
-  final username = ref.watch(usernameProvider);
-  if (username == null) return null;
-
-  final serverConfig = ref.watch(serverConfigProvider);
-  final keyRepository = ref.watch(keyRepositoryProvider);
-  final sessionRepository = ref.watch(sessionRepositoryProvider);
-  final webSocketClient = ref.watch(webSocketClientProvider);
-
-  final engine = CrypticEngine(
-    username: username,
-    serverConfig: serverConfig,
-    keyRepository: keyRepository,
-    sessionRepository: sessionRepository,
-    webSocketClient: webSocketClient,
-  );
-
-  ref.onDispose(() {
-    engine.dispose();
-  });
-
-  return engine;
-});
+/// Uses the authenticated engine from auth_provider.
+final engineProvider =
+    Provider<CrypticEngine?>((ref) => ref.watch(authenticatedEngineProvider));
 
 /// Provider for the engine state.
 ///
@@ -85,7 +49,7 @@ final engineProvider = Provider<CrypticEngine?>((ref) {
 final engineStateProvider = StreamProvider<EngineState>((ref) {
   final engine = ref.watch(engineProvider);
   if (engine == null) {
-    return Stream.value(const EngineState());
+    return Stream.value(EngineState.initial);
   }
   return engine.stateChanges;
 });
@@ -93,7 +57,7 @@ final engineStateProvider = StreamProvider<EngineState>((ref) {
 /// Provider for the engine's current state (non-stream).
 final currentEngineStateProvider = Provider<EngineState>((ref) {
   final engine = ref.watch(engineProvider);
-  return engine?.state ?? const EngineState();
+  return engine?.state ?? EngineState.initial;
 });
 
 /// Provider for engine events.

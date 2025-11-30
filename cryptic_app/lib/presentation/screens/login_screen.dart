@@ -1,6 +1,6 @@
 /// Login screen.
 ///
-/// Handles user authentication with username and passphrase.
+/// Handles user authentication with username, passphrase, and server config.
 library;
 
 import 'package:flutter/material.dart';
@@ -28,13 +28,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passphraseController = TextEditingController();
+  final _serverHostController = TextEditingController(text: 'localhost');
+  final _serverPortController = TextEditingController(text: '8443');
   bool _obscurePassphrase = true;
   bool _isNewUser = false;
+  bool _showServerConfig = false;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passphraseController.dispose();
+    _serverHostController.dispose();
+    _serverPortController.dispose();
     super.dispose();
   }
 
@@ -42,14 +47,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authNotifier = ref.read(authProvider.notifier);
+    final serverHost = _serverHostController.text.trim();
+    final serverPort = int.tryParse(_serverPortController.text.trim()) ?? 8443;
+    
     final success = _isNewUser
         ? await authNotifier.setup(
             username: _usernameController.text.trim(),
             passphrase: _passphraseController.text,
+            serverHost: serverHost,
+            serverPort: serverPort,
           )
         : await authNotifier.authenticate(
             username: _usernameController.text.trim(),
             passphrase: _passphraseController.text,
+            serverHost: serverHost,
+            serverPort: serverPort,
           );
 
     if (success && mounted) {
@@ -65,7 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: LoadingOverlay(
         isLoading: authState.isAuthenticating,
-        message: _isNewUser ? 'Setting up...' : 'Authenticating...',
+        message: _isNewUser ? 'Connecting & setting up...' : 'Connecting...',
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -162,8 +174,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       obscureText: _obscurePassphrase,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _submit(),
+                      textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a passphrase';
@@ -174,6 +185,104 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ),
+                    const SizedBox(height: 16),
+
+                    // Server configuration toggle
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _showServerConfig = !_showServerConfig;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _showServerConfig
+                                  ? Icons.expand_less
+                                  : Icons.expand_more,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Server Configuration',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Server config fields (collapsible)
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 200),
+                      crossFadeState: _showServerConfig
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: TextFormField(
+                                  controller: _serverHostController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Server Host',
+                                    prefixIcon: Icon(Icons.dns_outlined),
+                                    hintText: 'localhost',
+                                  ),
+                                  textInputAction: TextInputAction.next,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _serverPortController,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Port',
+                                    hintText: '8443',
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _submit(),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Required';
+                                    }
+                                    final port = int.tryParse(value.trim());
+                                    if (port == null || port < 1 || port > 65535) {
+                                      return 'Invalid';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Using bundled certificates',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                      secondChild: const SizedBox.shrink(),
+                    ),
                     const SizedBox(height: 24),
 
                     // Submit button
@@ -182,7 +291,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          _isNewUser ? 'Create Account' : 'Unlock',
+                          _isNewUser ? 'Create & Connect' : 'Connect',
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),

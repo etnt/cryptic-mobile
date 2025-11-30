@@ -116,6 +116,7 @@ void main() {
         expect(ProtocolCodec.isKnownClientType('x3dh'), true);
         expect(ProtocolCodec.isKnownClientType('ratchet'), true);
         expect(ProtocolCodec.isKnownClientType('list_users'), true);
+        expect(ProtocolCodec.isKnownClientType('online_users'), true);
       });
 
       test('should return false for unknown types', () {

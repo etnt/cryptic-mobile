@@ -13,6 +13,7 @@ void main() {
       expect(ClientMessageType.x3dh.value, 'x3dh');
       expect(ClientMessageType.ratchet.value, 'ratchet');
       expect(ClientMessageType.listUsers.value, 'list_users');
+      expect(ClientMessageType.onlineUsers.value, 'online_users');
       expect(ClientMessageType.sendMessage.value, 'send_message');
     });
 
@@ -96,7 +97,8 @@ void main() {
       expect(json['type'], 'upload_prekey_bundle');
       expect(json['username'], 'alice');
       expect(json['one_time_prekeys'], hasLength(3));
-      expect(json['one_time_prekeys'][0]['key_id'], 1);
+      // Server expects 'id' as base64-encoded 8-byte integer
+      expect(json['one_time_prekeys'][0]['id'], isA<String>());
       expect(json['one_time_prekeys'][0]['public_key'], 'key1');
     });
   });
@@ -217,6 +219,17 @@ void main() {
       final json = message.toJson();
 
       expect(json['type'], 'list_users');
+      expect(json.length, 1);
+    });
+  });
+
+  group('OnlineUsersMessage', () {
+    test('should serialize correctly', () {
+      final message = OnlineUsersMessage();
+
+      final json = message.toJson();
+
+      expect(json['type'], 'online_users');
       expect(json.length, 1);
     });
   });

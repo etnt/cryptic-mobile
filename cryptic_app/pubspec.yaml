@@ -58,17 +58,16 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Assets will be added as needed
-  # assets:
-  #   - assets/certificates/
-  #   - assets/images/
+  # Assets
+  assets:
+    - assets/certificates/
 
   # Custom fonts (uncomment when font files are added)
   # fonts:
   #   - family: Roboto
   #     fonts:
   #       - asset: assets/fonts/Roboto-Regular.ttf
-  #       - asset: assets/fonts/Roboto-Medium.ttf
+  #       - asset: assets/fonts/Roboto-Regular.ttf
   #         weight: 500
   #       - asset: assets/fonts/Roboto-Bold.ttf
   #         weight: 700

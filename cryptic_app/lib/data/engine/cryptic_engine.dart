@@ -248,8 +248,19 @@ class CrypticEngine {
     }
   }
 
-  /// Request the list of registered users.
+  /// Request the list of online users.
+  ///
+  /// Uses `online_users` command (available to all users).
+  /// For admin-only `list_users`, use [requestAllUsers].
   Future<void> requestUserList() async {
+    if (!isConnected) return;
+
+    final message = protocol.OnlineUsersMessage();
+    _webSocketClient.send(message);
+  }
+
+  /// Request the list of all registered users (admin only).
+  Future<void> requestAllUsers() async {
     if (!isConnected) return;
 
     final message = protocol.ListUsersMessage();
