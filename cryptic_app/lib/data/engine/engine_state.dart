@@ -178,6 +178,7 @@ class PeerSession {
 /// - Initialization and connection status
 /// - User identity
 /// - Active sessions
+/// - Registered users list
 /// - Error information
 class EngineState {
   /// Creates an engine state.
@@ -187,6 +188,7 @@ class EngineState {
     this.identity,
     this.serverConfig,
     this.sessions = const {},
+    this.users = const [],
     this.error,
     this.keysUploaded = false,
     this.lastConnectedAt,
@@ -210,6 +212,9 @@ class EngineState {
 
   /// Active sessions by peer username.
   final Map<String, PeerSession> sessions;
+
+  /// List of registered usernames.
+  final List<String> users;
 
   /// Last error (if any).
   final String? error;
@@ -256,6 +261,7 @@ class EngineState {
     UserIdentity? identity,
     ServerConfig? serverConfig,
     Map<String, PeerSession>? sessions,
+    List<String>? users,
     String? error,
     bool clearError = false,
     bool? keysUploaded,
@@ -268,6 +274,7 @@ class EngineState {
       identity: identity ?? this.identity,
       serverConfig: serverConfig ?? this.serverConfig,
       sessions: sessions ?? this.sessions,
+      users: users ?? this.users,
       error: clearError ? null : (error ?? this.error),
       keysUploaded: keysUploaded ?? this.keysUploaded,
       lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,

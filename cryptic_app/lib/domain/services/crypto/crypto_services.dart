@@ -2,14 +2,12 @@
 //
 // Crypto services barrel file - exports all crypto services
 //
-// TODO(M2): Implement crypto services:
-// - Ed25519Service - Signing operations
-// - X25519Service - Key agreement
-// - ChaChaService - Symmetric encryption
-// - HkdfService - Key derivation
-
-/// Placeholder for crypto services module.
-/// 
-/// This barrel file will export all cryptographic service implementations
-/// once they are created in M2 (Crypto Primitives milestone).
+// Note: Crypto primitives are implemented in lib/data/crypto/
+// This file provides domain-level service abstractions if needed.
 library crypto_services;
+
+// Crypto primitives are exposed through the data layer:
+// - lib/data/crypto/primitives/ - Low-level crypto operations
+// - lib/data/crypto/x3dh/ - X3DH key agreement
+// - lib/data/crypto/ratchet/ - Double Ratchet protocol
+// - lib/data/crypto/keys/ - Key management
