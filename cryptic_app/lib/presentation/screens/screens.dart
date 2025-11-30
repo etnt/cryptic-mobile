@@ -1,16 +1,10 @@
-// lib/presentation/screens/screens.dart
-//
-// Screens barrel file
-//
-// TODO(M7): Implement screens:
-// - LoginScreen - Username/passphrase entry
-// - ConversationListScreen - List of chats
-// - ChatScreen - Message thread view
-// - SettingsScreen - App settings
-// - UserListScreen - Available users
-
-/// Placeholder for screens module.
+/// Screens barrel file.
 ///
-/// This barrel file will export all screen widget implementations
-/// once they are created in M7 (Chat UI milestone).
+/// Exports all screen widgets for the presentation layer.
 library screens;
+
+export 'chat_screen.dart';
+export 'conversations_screen.dart';
+export 'login_screen.dart';
+export 'splash_screen.dart';
+export 'users_screen.dart';

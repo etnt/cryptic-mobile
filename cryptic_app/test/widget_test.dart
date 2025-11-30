@@ -31,5 +31,8 @@ void main() {
 
     // Verify the app renders correctly
     expect(find.byType(MaterialApp), findsOneWidget);
+
+    // Pump and settle to let all timers complete (splash screen animation)
+    await tester.pumpAndSettle(const Duration(seconds: 2));
   });
 }
