@@ -1,13 +1,30 @@
 # Cryptic Mobile
 > Mobile App for the Cryptic e2e encrypted chat system
 
-A Flutter-based mobile client for the [Cryptic](https://github.com/etnt/cryptic) end-to-end encrypted messaging system. Implements X3DH key agreement and Double Ratchet protocols for secure communication.
+A Flutter-based mobile client for the [Cryptic](https://github.com/etnt/cryptic)
+end-to-end encrypted messaging system. Implements X3DH key agreement and Double
+Ratchet protocols for secure communication.
+
+## Status
+
+✅ **M7 Integration Complete** - Bidirectional encrypted messaging working!
+
+| Feature | Status |
+|---------|--------|
+| X3DH Key Agreement | ✅ Working |
+| Double Ratchet Encryption | ✅ Working |
+| mTLS WebSocket Connection | ✅ Working |
+| Send/Receive Messages | ✅ Working |
+| Online Users List | ✅ Working |
+| Session Persistence | ✅ Working |
+| Message History (DB) | 🔄 Pending |
 
 ## Prerequisites
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.16.0
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.2.0
 - Xcode (for iOS development on macOS)
 - Android Studio (for Android development)
+- Running [Cryptic server](https://github.com/etnt/cryptic) with mTLS enabled
 
 ## Quick Start
 
