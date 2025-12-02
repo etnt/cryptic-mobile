@@ -3,9 +3,28 @@
 This document outlines the architecture for a Flutter mobile application that
 implements the Cryptic end-to-end encrypted messaging protocol.
 
+## Implementation Status (December 2025)
+
+**✅ M7 Integration Complete** - Bidirectional encrypted messaging working!
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| X3DH Key Agreement | ✅ Complete | Interoperates with Erlang server |
+| Double Ratchet | ✅ Complete | Blake2b KDF matching libsodium |
+| WebSocket Client | ✅ Complete | mTLS with client certificates |
+| Protocol Messages | ✅ Complete | JSON encoding/decoding |
+| Key Storage | ✅ Complete | Secure storage with passphrase |
+| Session Management | ✅ Complete | Persistent sessions |
+| Chat UI | ✅ Complete | Send/receive messages |
+| Users List | ✅ Complete | Online users from server |
+| Connection Status | ✅ Complete | Real-time status updates |
+| Message History | 🔄 Partial | In-memory only (DB pending) |
+| Settings Screen | 🔄 Planned | Basic structure only |
+| Notifications | 📋 Planned | Not yet implemented |
+
 ## Overview
 
-The Flutter app will be a faithful port of the Erlang client architecture,
+The Flutter app is a faithful port of the Erlang client architecture,
 maintaining the same cryptographic protocols (X3DH, Double Ratchet) and
 WebSocket communication while adapting to Flutter's reactive UI patterns.
 
@@ -14,155 +33,128 @@ WebSocket communication while adapting to Flutter's reactive UI patterns.
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         UI Layer (Flutter)                      │
-│  - ChatScreen, ContactsScreen, SettingsScreen                   │
-│  - State Management (Riverpod/Provider)                         │
+│  - ChatScreen, UsersScreen, LoginScreen                         │
+│  - State Management (Riverpod providers)                        │
 └─────────────────────────────────────────────────────────────────┘
                               ↕
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Business Logic Layer                       │
 │  - CrypticEngine (orchestrates crypto + network)                │
-│  - MessageService (send/receive messages)                       │
-│  - SessionManager (manage peer sessions)                        │
+│  - MessageProcessor (encrypt/decrypt messages)                  │
+│  - SessionManager (manage per-peer ratchet sessions)            │
 └─────────────────────────────────────────────────────────────────┘
                               ↕
 ┌────────────────────────────┬────────────────────────────────────┐
 │     Crypto Layer           │        Network Layer               │
-│  - X3DH Protocol           │  - WebSocket Client                │
-│  - Double Ratchet          │  - mTLS Certificate Handling       │
-│  - Key Management          │  - Message Encoding/Decoding       │
+│  - X3DH Protocol           │  - WebSocket Client (mTLS)         │
+│  - Double Ratchet          │  - Protocol Codec (JSON)           │
+│  - Key Management          │  - Client/Server Messages          │
 └────────────────────────────┴────────────────────────────────────┘
                               ↕
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Storage Layer                             │
 │  - Secure Key Storage (flutter_secure_storage)                  │
-│  - Message Database (sqflite_sqlcipher)                         │
-│  - Session State Persistence                                    │
+│  - Session Repository (persisted ratchet state)                 │
+│  - Message Database (sqflite_sqlcipher) - pending               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Project Structure
+## Project Structure (Actual Implementation)
 
 ```dart
 lib/
-├── main.dart                          // App entry point
+├── main.dart                          // App entry point with Riverpod
 ├── core/
 │   ├── config/
 │   │   └── app_config.dart           // Server URLs, ports, etc.
-│   ├── di/
-│   │   └── injection.dart            // Dependency injection setup
+│   ├── constants/
+│   │   └── crypto_constants.dart     // Crypto parameters (key sizes, etc.)
 │   └── utils/
-│       ├── logger.dart               // Logging utility
-│       └── extensions.dart           // Helper extensions
+│       └── logger.dart               // Logging utility
 │
 ├── domain/
 │   ├── models/
-│   │   ├── identity_keys.dart       // Identity key pairs (sign + DH)
-│   │   ├── prekey_bundle.dart       // X3DH prekey bundle
-│   │   ├── session_state.dart       // Double Ratchet session state
-│   │   ├── message.dart             // Plaintext message model
-│   │   └── encrypted_message.dart   // X3DH/Ratchet encrypted message
+│   │   ├── message.dart              // Plaintext message model
+│   │   └── user.dart                 // User model
 │   │
-│   ├── repositories/
-│   │   ├── crypto_repository.dart   // Abstract crypto operations
-│   │   ├── network_repository.dart  // Abstract network operations
-│   │   └── storage_repository.dart  // Abstract storage operations
-│   │
-│   └── usecases/
-│       ├── send_message.dart        // Use case: send encrypted message
-│       ├── receive_message.dart     // Use case: decrypt received message
-│       ├── initialize_session.dart  // Use case: X3DH handshake
-│       └── upload_keys.dart         // Use case: upload prekey bundles
+│   └── repositories/
+│       └── auth_repository.dart      // Authentication abstraction
 │
 ├── data/
 │   ├── crypto/
 │   │   ├── x3dh/
-│   │   │   ├── x3dh_engine.dart           // Port of cryptic_lib.erl X3DH functions
-│   │   │   ├── key_agreement.dart         // DH operations
-│   │   │   └── kdf.dart                   // HKDF key derivation
+│   │   │   ├── x3dh_engine.dart      // ✅ X3DH key agreement (Signal protocol)
+│   │   │   └── x3dh_result.dart      // X3DH operation result
 │   │   │
 │   │   ├── ratchet/
-│   │   │   ├── double_ratchet.dart        // Port of cryptic_double_ratchet.erl
-│   │   │   ├── kdf_chain.dart             // KDF chain step
-│   │   │   ├── message_keys.dart          // Message key derivation
-│   │   │   └── header_encryption.dart     // Header encryption
+│   │   │   ├── double_ratchet.dart   // ✅ Double Ratchet encryption
+│   │   │   ├── ratchet_message.dart  // Encrypted message format
+│   │   │   └── session_state.dart    // Ratchet session state
 │   │   │
 │   │   ├── primitives/
-│   │   │   ├── ed25519.dart               // Signing (via pointycastle)
-│   │   │   ├── x25519.dart                // DH key exchange (via pointycastle)
-│   │   │   ├── chacha20_poly1305.dart     // AEAD encryption
-│   │   │   └── hkdf.dart                  // HMAC-based KDF
+│   │   │   ├── ed25519_service.dart  // ✅ Ed25519 signing
+│   │   │   ├── x25519_service.dart   // ✅ X25519 key exchange
+│   │   │   ├── chacha20_poly1305_service.dart // ✅ AEAD encryption
+│   │   │   ├── hkdf_service.dart     // HMAC-based KDF (for X3DH)
+│   │   │   └── kdf_service.dart      // ✅ Blake2b KDF (for Double Ratchet)
 │   │   │
 │   │   └── keys/
-│   │       ├── key_generator.dart         // Generate identity/prekeys
-│   │       ├── key_serializer.dart        // Encode/decode keys
-│   │       └── key_validator.dart         // Validate key formats
+│   │       ├── identity_keys.dart    // ✅ Identity key pairs
+│   │       ├── key_bundle.dart       // ✅ X3DH key bundle
+│   │       ├── one_time_prekey.dart  // ✅ One-time prekeys
+│   │       └── signed_prekey.dart    // ✅ Signed prekeys
 │   │
 │   ├── network/
 │   │   ├── websocket/
-│   │   │   ├── websocket_client.dart      // Port of cryptic_ws_client.erl
-│   │   │   ├── connection_manager.dart    // Connection state, reconnection
-│   │   │   ├── message_queue.dart         // Queue messages when offline
-│   │   │   └── mtls_config.dart           // mTLS certificate setup
+│   │   │   └── websocket_client.dart // ✅ mTLS WebSocket client
 │   │   │
 │   │   └── protocol/
-│   │       ├── message_encoder.dart       // Encode messages to JSON
-│   │       ├── message_decoder.dart       // Decode JSON to models
-│   │       └── protocol_types.dart        // Message type constants
+│   │       ├── client_messages.dart  // ✅ Outgoing message types
+│   │       ├── server_messages.dart  // ✅ Incoming message types
+│   │       ├── protocol_message.dart // Message base class
+│   │       └── protocol_codec.dart   // JSON encoding/decoding
 │   │
 │   ├── storage/
-│   │   ├── secure_storage/
-│   │   │   ├── key_storage.dart           // Store identity keys securely
-│   │   │   ├── certificate_storage.dart   // Store mTLS certificates
-│   │   │   └── passphrase_storage.dart    // Store user passphrase (hashed)
-│   │   │
-│   │   ├── database/
-│   │   │   ├── database.dart              // SQLite database setup
-│   │   │   ├── daos/
-│   │   │   │   ├── message_dao.dart       // Message CRUD operations
-│   │   │   │   ├── session_dao.dart       // Session state CRUD
-│   │   │   │   └── contact_dao.dart       // Contact management
-│   │   │   │
-│   │   │   └── models/
-│   │   │       ├── message_entity.dart    // Database message model
-│   │   │       └── session_entity.dart    // Database session model
-│   │   │
-│   │   └── repositories_impl/
-│   │       ├── crypto_repository_impl.dart
-│   │       ├── network_repository_impl.dart
-│   │       └── storage_repository_impl.dart
+│   │   ├── secure_storage.dart       // ✅ Encrypted key storage
+│   │   └── session_storage.dart      // ✅ Session persistence
 │   │
-│   └── engine/
-│       ├── cryptic_engine.dart            // Port of cryptic_engine.erl
-│       ├── engine_state.dart              // Engine state management
-│       ├── session_manager.dart           // Manage multiple peer sessions
-│       └── message_processor.dart         // Process incoming/outgoing messages
+│   ├── engine/
+│   │   ├── cryptic_engine.dart       // ✅ Main orchestrator
+│   │   ├── engine_state.dart         // ✅ Engine state & events
+│   │   ├── session_manager.dart      // ✅ Per-peer session management
+│   │   └── message_processor.dart    // ✅ Message encryption/decryption
+│   │
+│   └── services/
+│       └── key_management_service.dart // Key generation utilities
 │
 ├── presentation/
 │   ├── providers/
-│   │   ├── engine_provider.dart           // Riverpod provider for engine
-│   │   ├── messages_provider.dart         // Message list state
-│   │   ├── contacts_provider.dart         // Contact list state
-│   │   └── connection_provider.dart       // WebSocket connection state
+│   │   ├── engine_provider.dart      // ✅ Engine Riverpod provider
+│   │   ├── auth_provider.dart        // ✅ Auth state provider
+│   │   └── messages_provider.dart    // Message list provider
 │   │
-│   ├── screens/
-│   │   ├── splash/
-│   │   │   └── splash_screen.dart         // App startup, key loading
-│   │   │
-│   │   ├── auth/
-│   │   │   ├── setup_screen.dart          // Initial setup (generate keys)
-│   │   │   └── unlock_screen.dart         // Passphrase entry
-│   │   │
-│   │   ├── chat/
-│   │   │   ├── chat_list_screen.dart      // List of conversations
-│   │   │   ├── chat_screen.dart           // Individual chat view
-│   │   │   └── widgets/
-│   │   │       ├── message_bubble.dart    // Message display
-│   │   │       ├── input_field.dart       // Message input
-│   │   │       └── typing_indicator.dart  // Typing animation
-│   │   │
-│   │   ├── contacts/
-│   │   │   ├── contacts_screen.dart       // User list from server
-│   │   │   └── contact_detail_screen.dart // Contact info
+│   └── screens/
+│       ├── splash_screen.dart        // ✅ App startup
+│       ├── login_screen.dart         // ✅ Username/passphrase entry
+│       ├── users_screen.dart         // ✅ Online users list
+│       ├── chat_screen.dart          // ✅ Chat conversation
+│       └── conversations_screen.dart // Conversation list (basic)
+│
+├── test/
+│   ├── data/
+│   │   └── network/
+│   │       └── protocol/
+│   │           ├── client_messages_test.dart  // Protocol tests
+│   │           └── protocol_codec_test.dart   // Codec tests
+│   │
+│   └── widget_test.dart
+│
+└── assets/
+    └── certificates/                  // mTLS certificates
+        ├── ca.crt                     // CA certificate
+        ├── client.crt                 // Client certificate
+        └── client.key                 // Client private key
+```
 │   │   │
 │   │   └── settings/
 │   │       ├── settings_screen.dart       // App settings
@@ -170,28 +162,13 @@ lib/
 │   │       └── server_config_screen.dart  // Server connection settings
 │   │
 │   └── widgets/
-│       ├── connection_status.dart         // WebSocket status indicator
-│       ├── error_dialog.dart              // Error display
-│       └── loading_overlay.dart           // Loading state
-│
-└── test/
-    ├── unit/
-    │   ├── crypto/
-    │   │   ├── x3dh_test.dart             // X3DH test vectors
-    │   │   └── double_ratchet_test.dart   // Double Ratchet test vectors
-    │   │
-    │   └── network/
-    │       └── protocol_test.dart         // Message encoding/decoding tests
-    │
-    ├── integration/
-    │   ├── engine_test.dart               // End-to-end engine tests
-    │   └── message_flow_test.dart         // Send/receive message flow
-    │
-    └── widget/
-        └── chat_screen_test.dart          // UI tests
-```
-
 ## Core Components
+
+> **Note**: The code samples below are illustrative. For the actual implementation,
+> see the source files in `lib/data/`. Key differences from typical Signal implementations:
+> - Uses Blake2b KDF (matching libsodium) instead of HKDF for ratchet chain keys
+> - Uses XOR mixing for root key updates instead of HKDF
+> - See [Critical Implementation Details](#critical-implementation-details) for specifics.
 
 ### 1. CrypticEngine (Port of `cryptic_engine.erl`)
 
@@ -1086,8 +1063,12 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Crypto
-  pointycastle: ^3.9.0              # Ed25519, X25519, ChaCha20-Poly1305
+  # State Management
+  flutter_riverpod: ^2.4.0          # Reactive state management
+  riverpod_annotation: ^2.3.0       # Riverpod code generation annotations
+  
+  # Cryptography
+  pointycastle: ^3.9.0              # Ed25519, X25519, ChaCha20-Poly1305, Blake2b
   cryptography: ^2.7.0              # Additional crypto utilities
   
   # Network
@@ -1095,25 +1076,30 @@ dependencies:
   http: ^1.1.0                      # HTTP for REST endpoints
   
   # Storage
-  flutter_secure_storage: ^9.0.0   # Secure key storage
-  sqflite_sqlcipher: ^3.0.0        # Encrypted SQLite
-  hive_flutter: ^1.1.0             # Alternative key-value store
-  
-  # State Management
-  flutter_riverpod: ^2.4.0         # Reactive state management
+  flutter_secure_storage: ^9.0.0    # Secure key storage (hardware-backed)
+  sqflite_sqlcipher: ^3.0.0         # Encrypted SQLite database
+  path_provider: ^2.1.0             # File paths
   
   # Utilities
   uuid: ^4.2.0                      # Generate message IDs
-  path_provider: ^2.1.0            # File paths
-  logger: ^2.0.0                   # Logging
-  intl: ^0.18.0                    # Date formatting
+  logger: ^2.0.0                    # Logging
+  intl: ^0.18.0                     # Date formatting
+  equatable: ^2.0.5                 # Value equality for models
+  freezed_annotation: ^2.4.0        # Immutable data classes
+  json_annotation: ^4.8.0           # JSON serialization
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  mockito: ^5.4.0                  # Mocking for tests
-  integration_test:
-    sdk: flutter
+  
+  # Code Generation
+  build_runner: ^2.4.0              # Code generation runner
+  freezed: ^2.4.0                   # Immutable data class generator
+  json_serializable: ^6.7.0         # JSON serialization generator
+  riverpod_generator: ^2.3.0        # Riverpod provider generator
+  
+  # Testing
+  mockito: ^5.4.0                   # Mocking for tests
 ```
 
 ## Testing Strategy
@@ -1213,15 +1199,146 @@ void main() {
 6. **Code Obfuscation**: Enable ProGuard/R8 for Android release builds
 7. **Root Detection**: Detect jailbroken/rooted devices and warn users
 
-## Next Steps
+## Implementation Progress
 
-1. **Phase 1**: Implement crypto primitives (X3DH, Double Ratchet)
-2. **Phase 2**: Implement WebSocket client with mTLS
-3. **Phase 3**: Implement storage layer (keys, sessions, messages)
-4. **Phase 4**: Implement CrypticEngine orchestration
-5. **Phase 5**: Build UI screens
-6. **Phase 6**: Testing and security audit
-7. **Phase 7**: App store deployment
+### Completed Phases
+
+1. ✅ **Phase 1**: Crypto primitives (X3DH, Double Ratchet)
+   - Ed25519 signing, X25519 key exchange
+   - ChaCha20-Poly1305 AEAD encryption
+   - Blake2b KDF (matching libsodium's `crypto_kdf_derive_from_key`)
+   - XOR-based root key mixing for ratchet
+
+2. ✅ **Phase 2**: WebSocket client with mTLS
+   - Certificate-based authentication
+   - Automatic reconnection handling
+   - Connection state management
+
+3. ✅ **Phase 3**: Storage layer (keys, sessions)
+   - Secure key storage with passphrase encryption
+   - Session state persistence
+   - Message database (SQLCipher) - structure ready
+
+4. ✅ **Phase 4**: CrypticEngine orchestration
+   - Event-driven architecture with streams
+   - Pending message queue for X3DH
+   - Session management per peer
+
+5. ✅ **Phase 5**: UI screens (core functionality)
+   - Login screen with passphrase
+   - Users list with online status
+   - Chat screen with message bubbles
+   - Connection status indicator
+
+### Remaining Work
+
+6. 🔄 **Phase 6**: Polish and extended features
+   - Message persistence to database
+   - Push notifications
+   - Settings screen
+   - Contact management
+   - Key verification UI
+
+7. 📋 **Phase 7**: Testing and deployment
+   - Unit tests for crypto
+   - Integration tests
+   - Security audit
+   - App store deployment
+
+## Critical Implementation Details
+
+### KDF Implementation (Blake2b)
+
+The Erlang server uses libsodium's `crypto_kdf_derive_from_key` which is Blake2b-based.
+This was the most critical discovery for interoperability:
+
+```dart
+// lib/data/crypto/primitives/kdf_service.dart
+// Must match libsodium's crypto_kdf_derive_from_key exactly
+
+Uint8List deriveKey({
+  required int length,      // Output key length (32 bytes)
+  required int subkeyId,    // Subkey identifier (8-byte LE integer)
+  required String context,  // 8-character context string
+  required Uint8List key,   // 32-byte master key
+}) {
+  // Salt = subkeyId as 8-byte little-endian + 8 bytes of zeros
+  final salt = Uint8List(16);
+  for (int i = 0; i < 8; i++) {
+    salt[i] = (subkeyId >> (i * 8)) & 0xFF;
+  }
+  
+  // Personalization = context (8 chars) + 8 bytes of zeros
+  final personal = Uint8List(16);
+  final contextBytes = utf8.encode(context.padRight(8).substring(0, 8));
+  personal.setAll(0, contextBytes);
+  
+  // Blake2b with salt and personalization
+  final blake2b = Blake2bDigest(
+    digestSize: length,
+    salt: salt,
+    personalization: personal,
+  );
+  blake2b.update(key, 0, key.length);
+  // ...
+}
+```
+
+### Double Ratchet Key Derivation
+
+The ratchet uses XOR mixing (not HKDF) for root key updates:
+
+```dart
+// Root key update uses XOR, not HKDF
+Uint8List _mixKeys(Uint8List rootKey, Uint8List dhOutput) {
+  final mixed = Uint8List(32);
+  for (int i = 0; i < 32; i++) {
+    mixed[i] = rootKey[i] ^ dhOutput[i];
+  }
+  return mixed;
+}
+
+// Then derive chain keys from mixed key
+(newRootKey, initChainKey, respChainKey) = _kdfService.deriveRatchetKeys(mixedKey);
+```
+
+### Chain Key Selection (Critical for Interop)
+
+The chain key selection depends on role and operation:
+
+```dart
+// On RECEIVE (after DH ratchet):
+//   - Use RespChainKey for receiving current message
+//   - Store InitChainKey for future sending
+newState = state.copyWith(
+  sendChainKey: initChainKey,   // For future sends
+  recvChainKey: respChainKey,   // For current receive
+);
+
+// On SEND (after receiving):
+//   - Use RespChainKey for sending
+newState = state.copyWith(
+  sendChainKey: respChainKey,   // For current send
+);
+```
+
+This matches the Erlang implementation in `cryptic_double_ratchet.erl`:
+- Initiator (Alice): Uses `init` chain for sending, `resp` chain for receiving
+- Responder (Bob): Uses `resp` chain for sending after first receive
+
+### Protocol Message Field Names
+
+The server uses specific field names that must match exactly:
+
+| Client Sends | Server Expects |
+|--------------|----------------|
+| `from` | ✓ (not `from_user`) |
+| `to` | ✓ (not `to_user`) |
+| `ephemeral_public` | ✓ (not `ephemeral_key`) |
+| `otpk_id` | ✓ (not `one_time_prekey_id`) |
+| `dh_step` | ✓ (must be included) |
+| `prev_chain_length` | ✓ (not `previous_chain_length`) |
+| `msg_number` | ✓ (not `message_number`) |
 
 ## UI Layout Design
 
