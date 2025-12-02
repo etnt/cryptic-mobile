@@ -13,7 +13,7 @@ import 'dart:typed_data';
 
 import '../../../core/errors/app_exceptions.dart';
 import '../primitives/chacha20_poly1305_service.dart';
-import '../primitives/hkdf_service.dart';
+import '../primitives/kdf_service.dart';
 import '../primitives/x25519_service.dart';
 import 'ratchet_message.dart';
 import 'ratchet_state.dart';
@@ -32,15 +32,15 @@ class DoubleRatchet {
   /// Creates a Double Ratchet engine.
   DoubleRatchet({
     X25519Service? x25519,
-    HkdfService? hkdf,
     ChaCha20Poly1305Service? chacha,
+    KdfService? kdf,
   })  : _x25519 = x25519 ?? X25519Service(),
-        _hkdf = hkdf ?? HkdfService(),
-        _chacha = chacha ?? ChaCha20Poly1305Service();
+        _chacha = chacha ?? ChaCha20Poly1305Service(),
+        _kdf = kdf ?? KdfService();
 
   final X25519Service _x25519;
-  final HkdfService _hkdf;
   final ChaCha20Poly1305Service _chacha;
+  final KdfService _kdf;
 
   /// Initializes ratchet state for the sender (Alice).
   ///
@@ -172,8 +172,12 @@ class DoubleRatchet {
     required RatchetMessage message,
     required RatchetState state,
   }) async {
+    print('[DoubleRatchet] decryptMessage: msg.dhStep=${message.dhStep}, msg.msgNum=${message.messageNumber}');
+    print('[DoubleRatchet] decryptMessage: state.dhRatchetStep=${state.dhRatchetStep}, state.recvMsgNum=${state.recvMessageNumber}');
+    
     // Check if DH ratchet step needed
     final dhRatchetNeeded = _needsDhRatchet(message, state);
+    print('[DoubleRatchet] decryptMessage: dhRatchetNeeded=$dhRatchetNeeded');
 
     var currentState = state;
 
@@ -212,13 +216,18 @@ class DoubleRatchet {
     }
 
     // Derive message key from receiving chain
+    print('[DoubleRatchet] decryptMessage: recvChainKey=${_bytesToHex(currentState.recvChainKey.sublist(0, 8))}...');
+    print('[DoubleRatchet] decryptMessage: recvMessageNumber=${currentState.recvMessageNumber}');
+    
     final (newChainKey, messageKey) = await _advanceReceivingChain(
       currentState.recvChainKey,
       currentState.recvMessageNumber,
     );
+    print('[DoubleRatchet] decryptMessage: messageKey=${_bytesToHex(messageKey.sublist(0, 8))}...');
 
     // Derive encryption key
     final encKey = await _deriveEncryptionKey(messageKey);
+    print('[DoubleRatchet] decryptMessage: encKey=${_bytesToHex(encKey.sublist(0, 8))}...');
 
     // Decrypt message
     final plaintext = await _chacha.decrypt(
@@ -258,37 +267,52 @@ class DoubleRatchet {
   // ==================== Private Methods ====================
 
   /// Derives a chain key from root key with context.
+  /// 
+  /// Uses Blake2b-based KDF to match Erlang server's kdf_derive_chain_key.
   Future<Uint8List> _deriveChainKey(Uint8List rootKey, String context) async {
-    return _hkdf.deriveKey(
-      inputKeyMaterial: rootKey,
-      info: context,
-      outputLength: 32,
+    // kdf_derive(32, 0, Context, RootKey) in Erlang
+    return _kdf.deriveKey(
+      length: 32,
+      subkeyId: 0,
+      context: context,
+      masterKey: rootKey,
     );
   }
 
   /// Advances sending chain and derives message key.
+  /// 
+  /// Uses Blake2b-based KDF to match Erlang server's advance_sending_chain.
   Future<(Uint8List, Uint8List)> _advanceSendingChain(
     Uint8List chainKey,
     int messageNumber,
   ) async {
-    // Use HMAC-style chain advancement
-    return _hkdf.deriveMessageKey(chainKey: chainKey);
+    // Match Erlang: MessageKey = kdf_derive(32, MsgNumber, "msg", ChainKey)
+    //              NewChainKey = kdf_derive(32, MsgNumber + 1, "chain", ChainKey)
+    return _kdf.deriveMessageKey(
+      chainKey: chainKey,
+      messageNumber: messageNumber,
+    );
   }
 
   /// Advances receiving chain and derives message key.
+  /// 
+  /// Uses Blake2b-based KDF to match Erlang server's advance_receiving_chain.
   Future<(Uint8List, Uint8List)> _advanceReceivingChain(
     Uint8List chainKey,
     int messageNumber,
   ) async {
-    return _hkdf.deriveMessageKey(chainKey: chainKey);
+    return _kdf.deriveMessageKey(
+      chainKey: chainKey,
+      messageNumber: messageNumber,
+    );
   }
 
   /// Derives encryption key from message key.
+  /// 
+  /// Uses Blake2b-based KDF to match Erlang server's kdf_mk.
   Future<Uint8List> _deriveEncryptionKey(Uint8List messageKey) async {
-    final (encKey, _) = await _hkdf.deriveEncryptionComponents(
-      messageKey: messageKey,
-    );
-    return encKey;
+    // Match Erlang: EncKey = kdf_derive(32, 0, "enc", MessageKey)
+    return _kdf.deriveEncryptionKey(messageKey: messageKey);
   }
 
   /// Checks if DH ratchet is needed on receive.
@@ -332,33 +356,50 @@ class DoubleRatchet {
     RatchetMessage message,
     RatchetState state,
   ) async {
+    print('[DoubleRatchet] _performDhRatchetOnReceive: message.dhStep=${message.dhStep}, state.dhRatchetStep=${state.dhRatchetStep}');
+    print('[DoubleRatchet] _performDhRatchetOnReceive: our dhSelf pubkey=${_bytesToHex(state.dhSelf.$1.sublist(0, 8))}...');
+    print('[DoubleRatchet] _performDhRatchetOnReceive: their dhPublic=${_bytesToHex(message.dhPublic.sublist(0, 8))}...');
+    
     // Store previous chain length
     final prevLength = state.recvMessageNumber;
 
-    // Generate new DH keypair
-    final newDhKeyPair = await _x25519.generateKeyPair();
-
-    // Compute shared secret with sender's new DH key
+    // Compute shared secret with sender's new DH key using OUR CURRENT private key
     final dhOutput = await _x25519.computeSharedSecret(
       privateKey: state.dhSelf.$2,
       publicKey: message.dhPublic,
     );
+    print('[DoubleRatchet] _performDhRatchetOnReceive: dhOutput=${_bytesToHex(dhOutput.sublist(0, 8))}...');
+
+    // Generate new DH keypair for our next send
+    final newDhKeyPair = await _x25519.generateKeyPair();
 
     // Derive new root key and chain keys
-    final (newRootKey, newChainKey) = await _hkdf.deriveRatchetKeys(
+    // Per Erlang: On receive, use InitChainKey for FUTURE sending, RespChainKey for RECEIVING
+    final (newRootKey, initChainKey, respChainKey) = await _kdf.deriveRatchetKeys(
       rootKey: state.rootKey,
       dhOutput: dhOutput,
     );
+    print('[DoubleRatchet] _performDhRatchetOnReceive: newRootKey=${_bytesToHex(newRootKey.sublist(0, 8))}...');
+    print('[DoubleRatchet] _performDhRatchetOnReceive: initChainKey (for future send)=${_bytesToHex(initChainKey.sublist(0, 8))}...');
+    print('[DoubleRatchet] _performDhRatchetOnReceive: respChainKey (for recv)=${_bytesToHex(respChainKey.sublist(0, 8))}...');
 
     return state.copyWith(
       rootKey: newRootKey,
-      recvChainKey: newChainKey,
+      sendChainKey: initChainKey,  // For FUTURE sending
+      sendMessageNumber: 0,
+      recvChainKey: respChainKey,  // For current RECEIVING
       recvMessageNumber: 0,
       prevRecvChainLength: prevLength,
       dhSelf: (newDhKeyPair.publicKey, newDhKeyPair.privateKey),
       dhRemote: message.dhPublic,
       dhRatchetStep: state.dhRatchetStep + 1,
+      sendingChainActive: true,
+      receivingChainActive: true,
     );
+  }
+  
+  String _bytesToHex(Uint8List bytes) {
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   /// Performs DH ratchet step on send.
@@ -366,21 +407,23 @@ class DoubleRatchet {
     // Generate new DH keypair
     final newDhKeyPair = await _x25519.generateKeyPair();
 
-    // Compute shared secret
+    // Compute shared secret using our NEW private key and their current public key
     final dhOutput = await _x25519.computeSharedSecret(
       privateKey: newDhKeyPair.privateKey,
       publicKey: state.dhRemote!,
     );
 
     // Derive new root key and chain keys
-    final (newRootKey, newChainKey) = await _hkdf.deriveRatchetKeys(
+    // Per Erlang: On send after receiving, use RespChainKey for sending
+    // (Bob uses responder chain for sending, Alice will derive same for receiving)
+    final (newRootKey, _, respChainKey) = await _kdf.deriveRatchetKeys(
       rootKey: state.rootKey,
       dhOutput: dhOutput,
     );
 
     return state.copyWith(
       rootKey: newRootKey,
-      sendChainKey: newChainKey,
+      sendChainKey: respChainKey,
       sendMessageNumber: 0,
       dhSelf: (newDhKeyPair.publicKey, newDhKeyPair.privateKey),
       dhRatchetStep: state.dhRatchetStep + 1,

@@ -91,6 +91,7 @@ class MessageProcessor {
         final SuccessMessage msg => await _handleSuccess(msg),
         final ErrorMessage msg => await _handleError(msg),
         final UsersMessage msg => await _handleUsers(msg),
+        final OnlineUsersResponseMessage msg => await _handleOnlineUsers(msg),
         final UserStatusMessage msg => await _handleUserStatus(msg),
         final KeyBundleMessage msg => await _handleKeyBundle(msg),
         final IncomingMessage msg => await _handleIncomingMessage(msg),
@@ -127,6 +128,14 @@ class MessageProcessor {
     return ProcessingSuccess(event: event);
   }
 
+  Future<ProcessingResult> _handleOnlineUsers(
+      OnlineUsersResponseMessage message) async {
+    print('[MessageProcessor] Handling online_users: ${message.users}');
+    final event = UsersListReceived(message.users);
+    _eventController.add(event);
+    return ProcessingSuccess(event: event);
+  }
+
   Future<ProcessingResult> _handleUserStatus(UserStatusMessage message) async {
     final event = UserStatusChanged(message.username, message.isOnline);
     _eventController.add(event);
@@ -155,10 +164,12 @@ class MessageProcessor {
 
   Future<ProcessingResult> _handleIncomingMessage(
     IncomingMessage message,
-  ) async =>
-      message.isX3dh
-          ? _handleX3dhMessage(message)
-          : _handleRatchetMessage(message);
+  ) async {
+    print('[MessageProcessor] Handling incoming message: type=${message.messageType}, from=${message.fromUser}, isX3dh=${message.isX3dh}');
+    return message.isX3dh
+        ? _handleX3dhMessage(message)
+        : _handleRatchetMessage(message);
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // X3DH Message Handling
@@ -224,29 +235,44 @@ class MessageProcessor {
 
   /// Builds an X3dhMessageBlob from incoming message data.
   ///
-  /// The server sends X3DH messages in a flattened format.
-  /// This reconstructs the full blob structure expected by X3dhEngine.
+  /// The server forwards the X3DH message with these fields:
+  /// - metadata: base64-encoded JSON metadata (contains all key info)
+  /// - signature: base64-encoded Ed25519 signature over metadata
+  /// - ciphertext: base64-encoded encrypted message
+  /// - nonce: base64-encoded encryption nonce
   X3dhMessageBlob _buildX3dhMessageBlob(
     IncomingX3dhMessage x3dh,
     Map<String, dynamic> rawData,
   ) {
-    // The server includes these fields in the raw message
-    final metadata = X3dhMetadata(
-      version: rawData['version'] as int? ?? 1,
-      type: 'X3DH_INIT',
-      senderId: _parseBase64OrDefault(rawData['sender_id']),
-      senderIdentityDhPublic: x3dh.identityKeyBytes,
-      senderIdentitySignPublic:
-          _parseBase64OrDefault(rawData['sender_identity_sign_public']),
-      recipientId: _parseBase64OrDefault(rawData['recipient_id']),
-      ephemeralPublic: x3dh.ephemeralKeyBytes,
-      otpkId: x3dh.usedOneTimePrekeyId != null
-          ? _intToBytes(x3dh.usedOneTimePrekeyId!)
-          : null,
-      messageId: _parseBase64OrDefault(rawData['message_id']),
-      timestamp: rawData['timestamp'] as int? ??
-          DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    );
+    // The server forwards the metadata as base64-encoded JSON
+    final metadataB64 = rawData['metadata'] as String?;
+    
+    X3dhMetadata metadata;
+    if (metadataB64 != null && metadataB64.isNotEmpty) {
+      // Decode the metadata: base64 -> UTF8 bytes -> JSON string -> Map
+      final metadataBytes = base64Decode(metadataB64);
+      final metadataJson = utf8.decode(metadataBytes);
+      final metadataMap = jsonDecode(metadataJson) as Map<String, dynamic>;
+      metadata = X3dhMetadata.fromMap(metadataMap);
+    } else {
+      // Fallback: try to construct metadata from individual fields (legacy)
+      metadata = X3dhMetadata(
+        version: rawData['version'] as int? ?? 1,
+        type: 'X3DH_INIT',
+        senderId: _parseBase64OrDefault(rawData['sender_id']),
+        senderIdentityDhPublic: x3dh.identityKeyBytes,
+        senderIdentitySignPublic:
+            _parseBase64OrDefault(rawData['sender_identity_sign_public']),
+        recipientId: _parseBase64OrDefault(rawData['recipient_id']),
+        ephemeralPublic: x3dh.ephemeralKeyBytes,
+        otpkId: x3dh.usedOneTimePrekeyId != null
+            ? _intToBytes(x3dh.usedOneTimePrekeyId!)
+            : null,
+        messageId: _parseBase64OrDefault(rawData['message_id']),
+        timestamp: rawData['timestamp'] as int? ??
+            DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      );
+    }
 
     return X3dhMessageBlob(
       metadata: metadata,
@@ -280,34 +306,45 @@ class MessageProcessor {
   Future<ProcessingResult> _handleRatchetMessage(
     IncomingMessage message,
   ) async {
+    print('[MessageProcessor] _handleRatchetMessage: from=${message.fromUser}');
     final ratchet = message.asRatchet();
     if (ratchet == null) {
+      print('[MessageProcessor] Failed to parse ratchet message');
       return ProcessingFailure('Failed to parse ratchet message');
     }
+    
+    print('[MessageProcessor] Parsed ratchet: from=${ratchet.fromUser}, dh_public=${ratchet.dhPublic.substring(0, 20)}..., dh_step=${ratchet.dhStep}, prev_chain=${ratchet.previousChainLength}, msg_num=${ratchet.messageNumber}');
 
     try {
       // Check if we have a session for this peer
       if (!_sessionManager.hasSession(ratchet.fromUser)) {
+        print('[MessageProcessor] No session for ${ratchet.fromUser}');
         return ProcessingFailure(
           'No session for ${ratchet.fromUser}',
         );
       }
+      
+      print('[MessageProcessor] Found session for ${ratchet.fromUser}');
 
       // Parse the ratchet message
       final ratchetMessage = RatchetMessage(
         dhPublic: ratchet.dhPublicBytes,
-        dhStep: 0, // Will be extracted from message
+        dhStep: ratchet.dhStep,
         prevChainLength: ratchet.previousChainLength,
         messageNumber: ratchet.messageNumber,
         ciphertext: ratchet.ciphertextBytes,
-        nonce: Uint8List(12), // Nonce included in ciphertext
+        nonce: ratchet.nonceBytes,
       );
+      
+      print('[MessageProcessor] RatchetMessage created, decrypting...');
 
       // Decrypt the message
       final plaintext = await _sessionManager.decryptMessage(
         peerUsername: ratchet.fromUser,
         message: ratchetMessage,
       );
+      
+      print('[MessageProcessor] Decrypted message: ${utf8.decode(plaintext)}');
 
       // Emit message received event
       final event = MessageReceived(
@@ -318,7 +355,9 @@ class MessageProcessor {
       _eventController.add(event);
 
       return ProcessingSuccess(event: event);
-    } catch (e) {
+    } catch (e, stack) {
+      print('[MessageProcessor] Failed to decrypt ratchet message: $e');
+      print('[MessageProcessor] Stack: $stack');
       return ProcessingFailure('Failed to decrypt ratchet message', e);
     }
   }

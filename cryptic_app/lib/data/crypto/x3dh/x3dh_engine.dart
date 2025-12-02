@@ -287,8 +287,9 @@ class X3dhEngine {
         privateKey: ephemeralKeyPair.privateKey,
         publicKey: recipientBundle.oneTimePrekey!.publicKey,
       );
-      // Convert key ID to bytes
-      otpkId = _intToBytes(recipientBundle.oneTimePrekey!.keyId);
+      // Use raw key ID bytes if available (from server), otherwise convert from int
+      otpkId = recipientBundle.oneTimePrekey!.keyIdBytes ?? 
+               _intToBytes(recipientBundle.oneTimePrekey!.keyId);
     }
 
     // 4. Derive session key from combined DH outputs

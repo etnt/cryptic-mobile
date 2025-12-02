@@ -20,17 +20,19 @@ void main() {
           messageId: 'id',
           fromUser: 'alice',
           toUser: 'bob',
-          identityKey: 'ik',
-          ephemeralKey: 'ek',
-          usedOneTimePrekeyId: 1,
+          ephemeralPublic: 'ek',
+          otpkId: 'otpk1',
           ciphertext: 'ct',
+          nonce: 'nonce',
+          signature: 'sig',
+          metadata: 'meta',
         );
 
         final json = ProtocolCodec.encode(message);
 
         expect(json, contains('"type":"x3dh"'));
         expect(json, contains('"message_id":"id"'));
-        expect(json, contains('"from_user":"alice"'));
+        expect(json, contains('"from":"alice"'));
       });
     });
 

@@ -64,9 +64,16 @@ class KeyBundle {
   factory KeyBundle.fromServerResponse(Map<String, dynamic> map) {
     OneTimePrekeyPublic? otpk;
     if (map.containsKey('one_time_prekey') && map['one_time_prekey'] != null) {
-      otpk = OneTimePrekeyPublic.fromMap(
-        map['one_time_prekey'] as Map<String, dynamic>,
-      );
+      final otpkMap = map['one_time_prekey'] as Map<String, dynamic>;
+      // Check if key_id is a String (base64 from server) or int (legacy/local)
+      if (otpkMap['key_id'] is String) {
+        otpk = OneTimePrekeyPublic.fromServerBundle(
+          otpkMap['key_id'] as String,
+          otpkMap['public_key'] as String,
+        );
+      } else {
+        otpk = OneTimePrekeyPublic.fromMap(otpkMap);
+      }
     }
 
     return KeyBundle(

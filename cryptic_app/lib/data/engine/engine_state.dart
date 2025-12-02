@@ -423,6 +423,16 @@ class EngineError extends EngineEvent {
   /// Error message.
   final String message;
 
+
   /// Underlying cause.
   final Object? cause;
+}
+
+/// Informational engine message.
+class EngineInfo extends EngineEvent {
+  /// Creates an engine info event.
+  EngineInfo(this.message);
+
+  /// Info message.
+  final String message;
 }

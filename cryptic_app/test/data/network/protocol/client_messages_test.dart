@@ -110,7 +110,7 @@ void main() {
       final json = message.toJson();
 
       expect(json['type'], 'get_key_bundle');
-      expect(json['username'], 'bob');
+      expect(json['user'], 'bob');  // Server expects 'user', not 'username'
     });
   });
 
@@ -120,54 +120,64 @@ void main() {
         messageId: 'uuid-123',
         fromUser: 'alice',
         toUser: 'bob',
-        identityKey: 'identity_base64',
-        ephemeralKey: 'ephemeral_base64',
-        usedOneTimePrekeyId: 5,
+        ephemeralPublic: 'ephemeral_base64',
+        otpkId: 'otpk_id_base64',
         ciphertext: 'encrypted_data',
+        nonce: 'nonce_base64',
+        signature: 'signature_base64',
+        metadata: 'metadata_base64',
       );
 
       final json = message.toJson();
 
       expect(json['type'], 'x3dh');
       expect(json['message_id'], 'uuid-123');
-      expect(json['from_user'], 'alice');
-      expect(json['to_user'], 'bob');
-      expect(json['identity_key'], 'identity_base64');
-      expect(json['ephemeral_key'], 'ephemeral_base64');
-      expect(json['used_one_time_prekey_id'], 5);
+      expect(json['from'], 'alice');
+      expect(json['to'], 'bob');
+      expect(json['ephemeral_public'], 'ephemeral_base64');
+      expect(json['otpk_id'], 'otpk_id_base64');
       expect(json['ciphertext'], 'encrypted_data');
+      expect(json['nonce'], 'nonce_base64');
+      expect(json['signature'], 'signature_base64');
+      expect(json['metadata'], 'metadata_base64');
     });
 
-    test('should omit null one-time prekey id', () {
+    test('should include null otpk_id when not provided', () {
       final message = X3dhMessage(
         messageId: 'uuid-456',
         fromUser: 'alice',
         toUser: 'bob',
-        identityKey: 'identity',
-        ephemeralKey: 'ephemeral',
-        usedOneTimePrekeyId: null,
+        ephemeralPublic: 'ephemeral',
+        otpkId: null,
         ciphertext: 'data',
+        nonce: 'nonce',
+        signature: 'sig',
+        metadata: 'meta',
       );
 
       final json = message.toJson();
 
-      expect(json.containsKey('used_one_time_prekey_id'), isFalse);
+      expect(json['otpk_id'], isNull);
     });
 
-    test('should create from bytes', () {
-      final message = X3dhMessage.fromBytes(
+    test('should create from message blob data', () {
+      final message = X3dhMessage.fromMessageBlob(
         messageId: 'msg-1',
         fromUser: 'alice',
         toUser: 'bob',
-        identityKey: utf8.encode('identity'),
-        ephemeralKey: utf8.encode('ephemeral'),
-        usedOneTimePrekeyId: 3,
+        ephemeralPublic: utf8.encode('ephemeral'),
+        otpkId: utf8.encode('otpk123'),
         ciphertext: utf8.encode('cipher'),
+        nonce: utf8.encode('nonce'),
+        signature: utf8.encode('signature'),
+        metadataJson: '{"version":1}',
       );
 
       expect(message.fromUser, 'alice');
-      expect(message.usedOneTimePrekeyId, 3);
-      expect(base64Decode(message.identityKey), utf8.encode('identity'));
+      expect(message.otpkId, isNotNull);
+      expect(base64Decode(message.ephemeralPublic), utf8.encode('ephemeral'));
+      // metadata should be base64 of the JSON string
+      expect(utf8.decode(base64Decode(message.metadata)), '{"version":1}');
     });
   });
 
@@ -178,37 +188,44 @@ void main() {
         fromUser: 'alice',
         toUser: 'bob',
         dhPublic: 'dh_key_base64',
-        previousChainLength: 5,
-        messageNumber: 3,
+        dhStep: 2,
+        prevChainLength: 5,
+        msgNumber: 3,
         ciphertext: 'encrypted',
+        nonce: 'nonce_base64',
       );
 
       final json = message.toJson();
 
       expect(json['type'], 'ratchet');
       expect(json['message_id'], 'msg-789');
-      expect(json['from_user'], 'alice');
-      expect(json['to_user'], 'bob');
+      expect(json['from'], 'alice');
+      expect(json['to'], 'bob');
       expect(json['dh_public'], 'dh_key_base64');
-      expect(json['previous_chain_length'], 5);
-      expect(json['message_number'], 3);
+      expect(json['dh_step'], 2);
+      expect(json['prev_chain_length'], 5);
+      expect(json['msg_number'], 3);
       expect(json['ciphertext'], 'encrypted');
+      expect(json['nonce'], 'nonce_base64');
     });
 
-    test('should create from bytes', () {
-      final message = RatchetMessage.fromBytes(
+    test('should create from crypto message', () {
+      final message = RatchetMessage.fromCryptoMessage(
         messageId: 'msg-1',
         fromUser: 'alice',
         toUser: 'bob',
         dhPublic: utf8.encode('dh_key'),
-        previousChainLength: 10,
-        messageNumber: 7,
+        dhStep: 1,
+        prevChainLength: 0,
+        msgNumber: 0,
         ciphertext: utf8.encode('cipher'),
+        nonce: utf8.encode('nonce'),
       );
 
-      expect(message.previousChainLength, 10);
-      expect(message.messageNumber, 7);
+      expect(message.fromUser, 'alice');
+      expect(message.dhStep, 1);
       expect(base64Decode(message.dhPublic), utf8.encode('dh_key'));
+      expect(base64Decode(message.nonce), utf8.encode('nonce'));
     });
   });
 

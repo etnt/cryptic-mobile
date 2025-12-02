@@ -40,6 +40,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.dispose();
   }
 
+  void _addIncomingMessage(MessageReceived event) {
+    final message = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      conversationId: widget.peerId,
+      senderId: event.fromUser,
+      content: event.plaintext,
+      timestamp: event.timestamp,
+      direction: MessageDirection.incoming,
+      status: MessageStatus.delivered,
+    );
+
+    setState(() {
+      _messages.add(message);
+    });
+
+    // Update conversation for last message display
+    ref.read(conversationsProvider.notifier).addMessage(widget.peerId, message);
+
+    // Scroll to bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -73,15 +95,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
-    // TODO(M8): Send via engine
-    // final engine = ref.read(engineProvider);
-    // await engine?.sendMessage(widget.peerId, text);
+    // Send via engine
+    final engine = ref.read(engineProvider);
+    print('[ChatScreen] Sending message to ${widget.peerId}: $text');
+    await engine?.sendMessage(widget.peerId, text);
+  }
+
+  Future<void> _resetSession() async {
+    final engine = ref.read(engineProvider);
+    if (engine == null) return;
+
+    print('[ChatScreen] Resetting session with ${widget.peerId}');
+    await engine.clearSession(widget.peerId);
+    
+    // Show confirmation
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Session with ${widget.peerId} reset'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final connectionStatus = ref.watch(connectionStatusProvider);
     final hasSession = ref.watch(hasSessionProvider(widget.peerId));
+
+    // Listen for incoming messages from this peer
+    ref.listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
+      next.whenData((event) {
+        if (event is MessageReceived && event.fromUser == widget.peerId) {
+          print('[ChatScreen] Received message from ${event.fromUser}: ${event.plaintext}');
+          _addIncomingMessage(event);
+        }
+      });
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -226,7 +277,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               title: const Text('Reset session'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO(M8): Reset session
+                _resetSession();
               },
             ),
             ListTile(

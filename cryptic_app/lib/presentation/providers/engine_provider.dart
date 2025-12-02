@@ -91,14 +91,16 @@ final engineStatusProvider = Provider<EngineStatus>((ref) {
 
 /// Provider for the list of registered users.
 final usersProvider = Provider<List<String>>((ref) {
-  final state = ref.watch(currentEngineStateProvider);
-  return state.users;
+  // Watch the stream-based state provider to get reactive updates
+  final asyncState = ref.watch(engineStateProvider);
+  return asyncState.valueOrNull?.users ?? [];
 });
 
 /// Provider for active sessions.
 final sessionsProvider = Provider<Map<String, PeerSession>>((ref) {
-  final state = ref.watch(currentEngineStateProvider);
-  return state.sessions;
+  // Watch the stream-based state provider to get reactive updates
+  final asyncState = ref.watch(engineStateProvider);
+  return asyncState.valueOrNull?.sessions ?? {};
 });
 
 /// Provider for checking if a session exists with a peer.

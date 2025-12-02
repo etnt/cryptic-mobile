@@ -66,8 +66,11 @@ enum ServerMessageType {
   /// Success response for operations.
   success('success'),
 
-  /// List of registered users.
+  /// List of registered users (response to list_users).
   users('users'),
+
+  /// List of online users (response to online_users).
+  onlineUsers('online_users'),
 
   /// Key bundle response (for X3DH).
   keyBundle('key_bundle'),

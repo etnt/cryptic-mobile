@@ -28,6 +28,7 @@ abstract class ServerMessage {
       ServerMessageType.welcome => WelcomeMessage.fromJson(json),
       ServerMessageType.success => SuccessMessage.fromJson(json),
       ServerMessageType.users => UsersMessage.fromJson(json),
+      ServerMessageType.onlineUsers => OnlineUsersResponseMessage.fromJson(json),
       ServerMessageType.keyBundle => KeyBundleMessage.fromJson(json),
       ServerMessageType.message => IncomingMessage.fromJson(json),
       ServerMessageType.messageSent => MessageSentMessage.fromJson(json),
@@ -43,7 +44,10 @@ abstract class ServerMessage {
     try {
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
       return fromJson(json);
-    } catch (_) {
+    } catch (e, stack) {
+      print('[ServerMessage] Error parsing JSON: $e');
+      print('[ServerMessage] Stack: $stack');
+      print('[ServerMessage] Raw JSON: ${jsonString.substring(0, jsonString.length > 200 ? 200 : jsonString.length)}...');
       return null;
     }
   }
@@ -130,6 +134,26 @@ class UsersMessage extends ServerMessage {
   }
 }
 
+/// List of online users (response to online_users command).
+class OnlineUsersResponseMessage extends ServerMessage {
+  /// Creates an online users response message.
+  OnlineUsersResponseMessage({required this.users});
+
+  /// List of online usernames.
+  final List<String> users;
+
+  @override
+  ServerMessageType get type => ServerMessageType.onlineUsers;
+
+  /// Parse from JSON.
+  factory OnlineUsersResponseMessage.fromJson(Map<String, dynamic> json) {
+    final usersList = json['users'] as List<dynamic>? ?? [];
+    return OnlineUsersResponseMessage(
+      users: usersList.map((u) => u.toString()).toList(),
+    );
+  }
+}
+
 /// Signed prekey from key bundle.
 class SignedPrekey {
   /// Creates a signed prekey.
@@ -172,22 +196,33 @@ class ReceivedOneTimePrekey {
     required this.publicKey,
   });
 
-  /// Unique key ID.
-  final int keyId;
+  /// Unique key ID (base64 encoded binary from server).
+  final String keyId;
 
   /// X25519 public key (base64).
   final String publicKey;
 
-  /// Parse from JSON.
+  /// Parse from JSON (legacy format with key_id/public_key).
   factory ReceivedOneTimePrekey.fromJson(Map<String, dynamic> json) {
     return ReceivedOneTimePrekey(
-      keyId: json['key_id'] as int? ?? 0,
+      keyId: (json['key_id'] as int? ?? 0).toString(),
       publicKey: json['public_key'] as String? ?? '',
+    );
+  }
+  
+  /// Parse from server JSON format (id/public as base64 strings).
+  factory ReceivedOneTimePrekey.fromServerJson(Map<String, dynamic> json) {
+    return ReceivedOneTimePrekey(
+      keyId: json['id'] as String? ?? '',  // Server sends 'id' as base64
+      publicKey: json['public'] as String? ?? '',  // Server sends 'public'
     );
   }
 
   /// Get public key as bytes.
   Uint8List get publicKeyBytes => base64Decode(publicKey);
+  
+  /// Get key ID as bytes.
+  Uint8List get keyIdBytes => base64Decode(keyId);
 }
 
 /// Key bundle response for X3DH.
@@ -220,19 +255,35 @@ class KeyBundleMessage extends ServerMessage {
   ServerMessageType get type => ServerMessageType.keyBundle;
 
   /// Parse from JSON.
+  /// 
+  /// Server sends:
+  /// - user (not username)
+  /// - identity_sign_public (not identity_sign_key)
+  /// - identity_dh_public (not identity_dh_key)  
+  /// - signed_prekey (base64 string, not nested object)
+  /// - signed_prekey_signature (separate field)
+  /// - one_time_prekey: { id: base64, public: base64 } or null
   factory KeyBundleMessage.fromJson(Map<String, dynamic> json) {
-    final signedPrekeyJson = json['signed_prekey'] as Map<String, dynamic>?;
     final oneTimePrekeyJson = json['one_time_prekey'] as Map<String, dynamic>?;
-
+    
+    // Server sends signed_prekey and signed_prekey_signature as separate base64 strings
+    // We need to construct a SignedPrekey from them
+    // Note: Server doesn't send key_id for signed prekey in this response,
+    // but we can extract it from the key_id field or default to 1
+    final signedPrekeyPublic = json['signed_prekey'] as String? ?? '';
+    final signedPrekeySignature = json['signed_prekey_signature'] as String? ?? '';
+    
     return KeyBundleMessage(
-      username: json['username'] as String? ?? '',
-      identitySignKey: json['identity_sign_key'] as String? ?? '',
-      identityDhKey: json['identity_dh_key'] as String? ?? '',
-      signedPrekey: signedPrekeyJson != null
-          ? SignedPrekey.fromJson(signedPrekeyJson)
-          : SignedPrekey(keyId: 0, publicKey: '', signature: ''),
+      username: json['user'] as String? ?? '',  // Server sends 'user'
+      identitySignKey: json['identity_sign_public'] as String? ?? '',  // Server sends 'identity_sign_public'
+      identityDhKey: json['identity_dh_public'] as String? ?? '',  // Server sends 'identity_dh_public'
+      signedPrekey: SignedPrekey(
+        keyId: 1,  // Server doesn't send keyId for signed prekey in bundle response
+        publicKey: signedPrekeyPublic,
+        signature: signedPrekeySignature,
+      ),
       oneTimePrekey: oneTimePrekeyJson != null
-          ? ReceivedOneTimePrekey.fromJson(oneTimePrekeyJson)
+          ? ReceivedOneTimePrekey.fromServerJson(oneTimePrekeyJson)
           : null,
     );
   }
@@ -270,14 +321,32 @@ class IncomingMessage extends ServerMessage {
   ServerMessageType get type => ServerMessageType.message;
 
   /// Parse from JSON.
+  /// 
+  /// The server sends incoming encrypted messages in this format:
+  /// ```json
+  /// {
+  ///   "type": "message",
+  ///   "from": "sender",
+  ///   "to": "recipient",
+  ///   "message": {
+  ///     "message_type": "x3dh" or "ratchet",
+  ///     ... encrypted message fields
+  ///   }
+  /// }
+  /// ```
   factory IncomingMessage.fromJson(Map<String, dynamic> json) {
-    final msgTypeStr = json['message_type'] as String? ?? 'ratchet';
+    // The actual message data is nested under 'message' key
+    final msgData = json['message'] as Map<String, dynamic>? ?? json;
+    
+    // message_type is inside the nested message, not at root level
+    final msgTypeStr = msgData['message_type'] as String? ?? 'ratchet';
+    
     return IncomingMessage(
       messageType:
           EncryptedMessageType.fromValue(msgTypeStr) ?? EncryptedMessageType.ratchet,
-      fromUser: json['from_user'] as String? ?? '',
-      toUser: json['to_user'] as String? ?? '',
-      rawData: json,
+      fromUser: msgData['from'] as String? ?? '',
+      toUser: msgData['to'] as String? ?? '',
+      rawData: msgData,
     );
   }
 
@@ -319,13 +388,23 @@ class IncomingX3dhMessage {
   final String ciphertext;
 
   /// Parse from incoming message raw data.
+  /// 
+  /// Server sends X3DH messages with these field names:
+  /// - from (not from_user)
+  /// - to (not to_user)
+  /// - ephemeral_public (not ephemeral_key or identity_key)
+  /// - otpk_id (not used_one_time_prekey_id)
+  /// - ciphertext
+  /// - nonce
+  /// - signature
+  /// - metadata
   factory IncomingX3dhMessage.fromRawData(Map<String, dynamic> data) {
     return IncomingX3dhMessage(
-      fromUser: data['from_user'] as String? ?? '',
-      toUser: data['to_user'] as String? ?? '',
-      identityKey: data['identity_key'] as String? ?? '',
-      ephemeralKey: data['ephemeral_key'] as String? ?? '',
-      usedOneTimePrekeyId: data['used_one_time_prekey_id'] as int?,
+      fromUser: data['from'] as String? ?? '',
+      toUser: data['to'] as String? ?? '',
+      identityKey: data['identity_key'] as String? ?? '',  // May need to check actual field name
+      ephemeralKey: data['ephemeral_public'] as String? ?? '',
+      usedOneTimePrekeyId: null,  // Server sends otpk_id as base64, handle separately
       ciphertext: data['ciphertext'] as String? ?? '',
     );
   }
@@ -347,9 +426,11 @@ class IncomingRatchetMessage {
     required this.fromUser,
     required this.toUser,
     required this.dhPublic,
+    required this.dhStep,
     required this.previousChainLength,
     required this.messageNumber,
     required this.ciphertext,
+    required this.nonce,
   });
 
   /// Sender username.
@@ -361,6 +442,9 @@ class IncomingRatchetMessage {
   /// Current ratchet DH public key (base64).
   final String dhPublic;
 
+  /// DH ratchet step number.
+  final int dhStep;
+
   /// Length of previous sending chain.
   final int previousChainLength;
 
@@ -370,15 +454,20 @@ class IncomingRatchetMessage {
   /// Encrypted ciphertext (base64).
   final String ciphertext;
 
+  /// Nonce for decryption (base64).
+  final String nonce;
+
   /// Parse from incoming message raw data.
   factory IncomingRatchetMessage.fromRawData(Map<String, dynamic> data) {
     return IncomingRatchetMessage(
-      fromUser: data['from_user'] as String? ?? '',
-      toUser: data['to_user'] as String? ?? '',
+      fromUser: data['from'] as String? ?? '',
+      toUser: data['to'] as String? ?? '',
       dhPublic: data['dh_public'] as String? ?? '',
-      previousChainLength: data['previous_chain_length'] as int? ?? 0,
-      messageNumber: data['message_number'] as int? ?? 0,
+      dhStep: data['dh_step'] as int? ?? 0,
+      previousChainLength: data['prev_chain_length'] as int? ?? 0,
+      messageNumber: data['msg_number'] as int? ?? 0,
       ciphertext: data['ciphertext'] as String? ?? '',
+      nonce: data['nonce'] as String? ?? '',
     );
   }
 
@@ -387,6 +476,9 @@ class IncomingRatchetMessage {
 
   /// Get ciphertext as bytes.
   Uint8List get ciphertextBytes => base64Decode(ciphertext);
+
+  /// Get nonce as bytes.
+  Uint8List get nonceBytes => base64Decode(nonce);
 }
 
 /// Message sent acknowledgment.

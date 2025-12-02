@@ -164,24 +164,37 @@ class GetKeyBundleMessage extends ProtocolMessage {
   @override
   Map<String, dynamic> toJson() => {
         'type': type,
-        'username': username,
+        'user': username,  // Server expects 'user', not 'username'
       };
 }
 
 /// Send X3DH initial message to establish a session.
+///
+/// Server expects these fields:
+/// - `from` - sender username
+/// - `to` - recipient username
+/// - `message_id` - base64 encoded message ID
+/// - `ephemeral_public` - base64 encoded ephemeral public key
+/// - `otpk_id` - base64 encoded one-time prekey ID (or null)
+/// - `ciphertext` - base64 encoded encrypted content
+/// - `nonce` - base64 encoded encryption nonce
+/// - `signature` - base64 encoded Ed25519 signature over metadata
+/// - `metadata` - base64 encoded serialized metadata JSON
 class X3dhMessage extends ProtocolMessage {
   /// Creates an X3DH message.
   X3dhMessage({
     required this.messageId,
     required this.fromUser,
     required this.toUser,
-    required this.identityKey,
-    required this.ephemeralKey,
-    this.usedOneTimePrekeyId,
+    required this.ephemeralPublic,
+    this.otpkId,
     required this.ciphertext,
+    required this.nonce,
+    required this.signature,
+    required this.metadata,
   });
 
-  /// Unique message ID for acknowledgment tracking.
+  /// Unique message ID for acknowledgment tracking (base64).
   final String messageId;
 
   /// Sender username.
@@ -190,61 +203,81 @@ class X3dhMessage extends ProtocolMessage {
   /// Recipient username.
   final String toUser;
 
-  /// Sender's identity DH public key (base64).
-  final String identityKey;
-
   /// Ephemeral X25519 public key for this message (base64).
-  final String ephemeralKey;
+  final String ephemeralPublic;
 
-  /// ID of the one-time prekey used (null if none available).
-  final int? usedOneTimePrekeyId;
+  /// ID of the one-time prekey used (base64, null if none available).
+  final String? otpkId;
 
   /// Encrypted message content (base64).
   final String ciphertext;
+
+  /// Encryption nonce (base64).
+  final String nonce;
+
+  /// Ed25519 signature over the metadata (base64).
+  final String signature;
+
+  /// Serialized metadata JSON (base64).
+  final String metadata;
 
   @override
   String get type => ClientMessageType.x3dh.value;
 
   @override
   Map<String, dynamic> toJson() {
-    final json = <String, dynamic>{
+    return <String, dynamic>{
       'type': type,
       'message_id': messageId,
-      'from_user': fromUser,
-      'to_user': toUser,
-      'identity_key': identityKey,
-      'ephemeral_key': ephemeralKey,
+      'from': fromUser,
+      'to': toUser,
+      'ephemeral_public': ephemeralPublic,
+      'otpk_id': otpkId,
       'ciphertext': ciphertext,
+      'nonce': nonce,
+      'signature': signature,
+      'metadata': metadata,
     };
-    if (usedOneTimePrekeyId != null) {
-      json['used_one_time_prekey_id'] = usedOneTimePrekeyId;
-    }
-    return json;
   }
 
-  /// Create from raw X3DH output.
-  factory X3dhMessage.fromBytes({
+  /// Create from X3DH message blob output.
+  factory X3dhMessage.fromMessageBlob({
     required String messageId,
     required String fromUser,
     required String toUser,
-    required Uint8List identityKey,
-    required Uint8List ephemeralKey,
-    int? usedOneTimePrekeyId,
+    required Uint8List ephemeralPublic,
+    Uint8List? otpkId,
     required Uint8List ciphertext,
+    required Uint8List nonce,
+    required Uint8List signature,
+    required String metadataJson,
   }) {
     return X3dhMessage(
       messageId: messageId,
       fromUser: fromUser,
       toUser: toUser,
-      identityKey: base64Encode(identityKey),
-      ephemeralKey: base64Encode(ephemeralKey),
-      usedOneTimePrekeyId: usedOneTimePrekeyId,
+      ephemeralPublic: base64Encode(ephemeralPublic),
+      otpkId: otpkId != null ? base64Encode(otpkId) : null,
       ciphertext: base64Encode(ciphertext),
+      nonce: base64Encode(nonce),
+      signature: base64Encode(signature),
+      metadata: base64Encode(utf8.encode(metadataJson)),
     );
   }
 }
 
 /// Send a ratchet message in an established session.
+///
+/// Server expects these fields (from cryptic_messages.erl):
+/// - `from` - sender username
+/// - `to` - recipient username
+/// - `message_id` - base64 message ID
+/// - `dh_public` - base64 DH public key
+/// - `dh_step` - DH ratchet step number
+/// - `prev_chain_length` - length of previous chain
+/// - `msg_number` - message number in current chain
+/// - `ciphertext` - base64 encrypted data
+/// - `nonce` - base64 encryption nonce
 class RatchetMessage extends ProtocolMessage {
   /// Creates a ratchet message.
   RatchetMessage({
@@ -252,12 +285,14 @@ class RatchetMessage extends ProtocolMessage {
     required this.fromUser,
     required this.toUser,
     required this.dhPublic,
-    required this.previousChainLength,
-    required this.messageNumber,
+    required this.dhStep,
+    required this.prevChainLength,
+    required this.msgNumber,
     required this.ciphertext,
+    required this.nonce,
   });
 
-  /// Unique message ID for acknowledgment tracking.
+  /// Unique message ID for acknowledgment tracking (base64).
   final String messageId;
 
   /// Sender username.
@@ -269,14 +304,20 @@ class RatchetMessage extends ProtocolMessage {
   /// Current ratchet DH public key (base64).
   final String dhPublic;
 
-  /// Length of previous sending chain.
-  final int previousChainLength;
+  /// DH ratchet step number.
+  final int dhStep;
 
-  /// Message number in current chain.
-  final int messageNumber;
+  /// Length of previous receiving chain.
+  final int prevChainLength;
+
+  /// Message number in current sending chain.
+  final int msgNumber;
 
   /// Encrypted message content (base64).
   final String ciphertext;
+
+  /// Encryption nonce (base64).
+  final String nonce;
 
   @override
   String get type => ClientMessageType.ratchet.value;
@@ -285,32 +326,38 @@ class RatchetMessage extends ProtocolMessage {
   Map<String, dynamic> toJson() => {
         'type': type,
         'message_id': messageId,
-        'from_user': fromUser,
-        'to_user': toUser,
+        'from': fromUser,
+        'to': toUser,
         'dh_public': dhPublic,
-        'previous_chain_length': previousChainLength,
-        'message_number': messageNumber,
+        'dh_step': dhStep,
+        'prev_chain_length': prevChainLength,
+        'msg_number': msgNumber,
         'ciphertext': ciphertext,
+        'nonce': nonce,
       };
 
-  /// Create from raw ratchet output.
-  factory RatchetMessage.fromBytes({
+  /// Create from crypto layer RatchetMessage.
+  factory RatchetMessage.fromCryptoMessage({
     required String messageId,
     required String fromUser,
     required String toUser,
     required Uint8List dhPublic,
-    required int previousChainLength,
-    required int messageNumber,
+    required int dhStep,
+    required int prevChainLength,
+    required int msgNumber,
     required Uint8List ciphertext,
+    required Uint8List nonce,
   }) {
     return RatchetMessage(
       messageId: messageId,
       fromUser: fromUser,
       toUser: toUser,
       dhPublic: base64Encode(dhPublic),
-      previousChainLength: previousChainLength,
-      messageNumber: messageNumber,
+      dhStep: dhStep,
+      prevChainLength: prevChainLength,
+      msgNumber: msgNumber,
       ciphertext: base64Encode(ciphertext),
+      nonce: base64Encode(nonce),
     );
   }
 }

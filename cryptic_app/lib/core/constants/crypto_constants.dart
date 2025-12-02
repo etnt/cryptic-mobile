@@ -38,7 +38,8 @@ abstract class CryptoConstants {
   static const int hkdfSaltSize = 32;
 
   /// Info string for X3DH root key derivation.
-  static const String x3dhInfo = 'X3DH';
+  /// Must match Erlang server: <<"X3DH SessionKey">>
+  static const String x3dhInfo = 'X3DH SessionKey';
 
   /// Info string for Double Ratchet chain key derivation.
   static const String ratchetChainInfo = 'CrypticRatchet';
