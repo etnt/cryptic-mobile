@@ -42,9 +42,14 @@ flutter run
 ## Development Commands
 
 ```bash
+# List and launch emulators
+flutter emulators                                    # List available emulators
+flutter emulators --launch <emulator_id>            # Start an emulator
+flutter devices                                      # Check connected devices
+
 # Run on specific platform
 flutter run -d ios          # iOS Simulator
-flutter run -d android      # Android Emulator
+flutter run -d android      # Android Emulator (must be running)
 flutter run -d chrome       # Web browser
 
 # Code quality

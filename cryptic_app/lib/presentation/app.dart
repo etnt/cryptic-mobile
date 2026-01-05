@@ -12,6 +12,7 @@ import 'providers/auth_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/users_screen.dart';
 
 /// App navigation state.
 enum AppScreen {
@@ -80,7 +81,7 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
             });
           },
         ),
-      AppScreen.home => const ConversationsScreen(),
+      AppScreen.home => const UsersScreen(),
     };
   }
 }

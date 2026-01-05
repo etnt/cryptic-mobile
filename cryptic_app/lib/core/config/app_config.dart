@@ -35,9 +35,13 @@ class AppConfig {
   });
 
   /// Development configuration (localhost).
+  /// 
+  /// Note: Uses '10.0.2.2' which is the Android emulator's alias for the host
+  /// machine's localhost. For iOS Simulator, 'localhost' also works, but
+  /// '10.0.2.2' is automatically resolved on both platforms.
   static const AppConfig development = AppConfig._(
     environment: Environment.development,
-    serverHost: 'localhost',
+    serverHost: '10.0.2.2',
     serverPort: 8443,
     useTls: true,
     logLevel: LogLevel.debug,

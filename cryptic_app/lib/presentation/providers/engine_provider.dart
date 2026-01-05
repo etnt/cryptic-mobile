@@ -89,11 +89,17 @@ final engineStatusProvider = Provider<EngineStatus>((ref) {
   return state.status;
 });
 
-/// Provider for the list of registered users.
+/// Provider for the list of registered users (excluding current user).
 final usersProvider = Provider<List<String>>((ref) {
   // Watch the stream-based state provider to get reactive updates
   final asyncState = ref.watch(engineStateProvider);
-  return asyncState.valueOrNull?.users ?? [];
+  final allUsers = asyncState.valueOrNull?.users ?? [];
+  
+  // Filter out the current user - can't chat with yourself
+  final currentUsername = ref.watch(usernameProvider);
+  if (currentUsername == null) return allUsers;
+  
+  return allUsers.where((user) => user != currentUsername).toList();
 });
 
 /// Provider for active sessions.
