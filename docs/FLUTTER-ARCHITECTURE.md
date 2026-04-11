@@ -19,6 +19,7 @@ implements the Cryptic end-to-end encrypted messaging protocol.
 | Users List | ✅ Complete | Online users from server |
 | Connection Status | ✅ Complete | Real-time status updates |
 | Message History | 🔄 Partial | In-memory only (DB pending) |
+| Mobile Enrollment | ✅ Complete | QR scan → Ed25519 CSR → cert |
 | Settings Screen | 🔄 Planned | Basic structure only |
 | Notifications | 📋 Planned | Not yet implemented |
 
@@ -114,6 +115,12 @@ lib/
 │   │       ├── protocol_message.dart // Message base class
 │   │       └── protocol_codec.dart   // JSON encoding/decoding
 │   │
+│   ├── enrollment/
+│   │   ├── enrollment_payload.dart   // ✅ QR envelope & payload models
+│   │   ├── enrollment_crypto.dart    // ✅ Argon2id, HMAC, AES, Ed25519
+│   │   ├── csr_generator.dart        // ✅ RSA-2048 keypair + PKCS#10 CSR
+│   │   └── enrollment_service.dart   // ✅ Full enrollment orchestrator
+│   │
 │   ├── storage/
 │   │   ├── secure_storage.dart       // ✅ Encrypted key storage
 │   │   └── session_storage.dart      // ✅ Session persistence
@@ -138,7 +145,12 @@ lib/
 │       ├── login_screen.dart         // ✅ Username/passphrase entry
 │       ├── users_screen.dart         // ✅ Online users list
 │       ├── chat_screen.dart          // ✅ Chat conversation
-│       └── conversations_screen.dart // Conversation list (basic)
+│       ├── conversations_screen.dart // Conversation list (basic)
+│       └── enrollment/
+│           ├── enrollment_flow_screen.dart    // ✅ Flow orchestrator
+│           ├── qr_scanner_screen.dart         // ✅ QR code scanning
+│           ├── passphrase_screen.dart         // ✅ Passphrase entry
+│           └── enrollment_progress_screen.dart // ✅ Progress display
 │
 ├── test/
 │   ├── data/
@@ -2262,6 +2274,67 @@ echo "Release ${VERSION} complete!"
 echo "APK: https://downloads.cryptic.app/v${VERSION}/"
 echo "IPFS: $(cat ipfs-cids.txt | grep 'added' | tail -1 | awk '{print $2}')"
 ```
+
+## Mobile Enrollment Architecture
+
+Mobile devices are onboarded without GPG via a QR-code-based Ed25519 enrollment
+flow. See [Mobile Enrollment Plan](MOBILE-ENROLLMENT-PLAN.md) for the full
+protocol specification.
+
+### Enrollment Flow
+
+```
+Admin (cryptic-onboard)          Server                    Mobile App
+─────────────────────────       ────────                  ──────────
+Generate Ed25519 keypair
+   │
+   ├─ POST /ca/v1/admin/       Register enrollment
+   │  register-enrollment  ──▶  identity (pub key)
+   │
+   ├─ Encrypt payload with
+   │  Argon2id + AES-256-CBC
+   │
+   └─ Generate QR code          ◀── Hand QR to user ──▶  Scan QR
+                                                          │
+                                                     Enter passphrase
+                                                          │
+                                                     Decrypt payload
+                                                          │
+                                                     Verify CA cert
+                                                          │
+                                                     Generate RSA-2048
+                                                     keypair + CSR
+                                                          │
+                                                     Sign CSR with Ed25519
+                                                          │
+                                                     POST /ca/v1/     Issue cert,
+                                                     mobile-csr  ──▶  mark consumed
+                                                          │
+                                                     Store cert + key
+                                                          │
+                                                     Connect WebSocket
+```
+
+### Server Endpoints (Enrollment)
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `POST /ca/v1/admin/register-enrollment` | mTLS (admin) | Register Ed25519 public key |
+| `POST /ca/v1/mobile-csr` | Ed25519 signature | Submit CSR, receive certificate |
+| `GET /ca/v1/ca-cert` | None | Download CA certificate |
+
+### Key Files
+
+| Layer | File | Purpose |
+|-------|------|---------|
+| **Server** | `cryptic_ca_mobile_handler.erl` | Mobile CSR endpoint |
+| **Server** | `cryptic_ca_admin_handler.erl` | Admin enrollment registration |
+| **Server** | `cryptic_ca_store.erl` | Enrollment identity CRUD |
+| **Tooling** | `bin/cryptic-onboard` | `create-mobile-enrollment` command |
+| **Mobile** | `lib/data/enrollment/enrollment_service.dart` | Enrollment orchestrator |
+| **Mobile** | `lib/data/enrollment/enrollment_crypto.dart` | QR decryption + Ed25519 signing |
+| **Mobile** | `lib/data/enrollment/csr_generator.dart` | RSA keypair + PKCS#10 CSR |
+| **Mobile** | `lib/presentation/screens/enrollment/` | UI screens |
 
 ## References
 

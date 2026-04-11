@@ -9,6 +9,7 @@ A Flutter-based end-to-end encrypted messaging client for the Cryptic secure mes
 - **Forward secrecy** with one-time prekeys
 - **Secure key storage** using platform-native secure storage (iOS Keychain / Android Keystore)
 - **Encrypted local database** using SQLCipher
+- **QR-based mobile enrollment** — scan a QR code + passphrase to onboard (no GPG needed on device)
 
 ## Prerequisites
 
@@ -74,7 +75,17 @@ flutter run -d A2A02E78-F63D-4000-A309-18B0A4FF3351
 
 ### 4. Certificate Setup
 
-The app requires mTLS client certificates. Place your certificates in:
+Certificates can be obtained in two ways:
+
+**Option A — QR Enrollment (recommended for mobile):**
+
+An admin creates an enrollment package with `cryptic-onboard create-mobile-enrollment`.
+On first launch the app presents a QR scanner → passphrase screen → automatic
+certificate generation and installation. No manual file copying needed.
+
+**Option B — Manual certificate placement:**
+
+Place pre-existing certificates in:
 ```
 assets/certificates/
 ├── ca.crt          # CA certificate
@@ -119,6 +130,7 @@ lib/
 ├── data/           # Crypto, network, storage implementations
 │   ├── crypto/     # X3DH, Double Ratchet, primitives
 │   ├── engine/     # CrypticEngine orchestrator
+│   ├── enrollment/ # QR enrollment (payload, crypto, CSR, service)
 │   ├── network/    # WebSocket client, protocol codec
 │   └── storage/    # Secure storage, SQLCipher database
 ├── domain/         # Entities, repositories, use cases
@@ -147,6 +159,7 @@ lib/
 
 - [Architecture Guide](../docs/FLUTTER-ARCHITECTURE.md)
 - [Implementation Plan](../docs/FLUTTER-IMPLEMENTATION-PLAN.md)
+- [Mobile Enrollment Plan](../docs/MOBILE-ENROLLMENT-PLAN.md)
 - [Agent Integration Guide](../AGENTS.md)
 
 ## License

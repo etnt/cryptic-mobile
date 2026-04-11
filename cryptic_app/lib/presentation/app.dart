@@ -9,7 +9,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/logger.dart';
 import 'providers/auth_provider.dart';
+import 'providers/enrollment_provider.dart';
 import 'screens/conversations_screen.dart';
+import 'screens/enrollment/enrollment_flow_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/users_screen.dart';
@@ -18,6 +20,8 @@ import 'screens/users_screen.dart';
 enum AppScreen {
   /// Splash/loading screen.
   splash,
+  /// Enrollment flow (no certificates yet).
+  enrollment,
   /// Login/setup screen.
   login,
   /// Main conversations screen.
@@ -69,6 +73,15 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
     return switch (_currentScreen) {
       AppScreen.splash => SplashScreen(
           onInitialized: (needsSetup) {
+            setState(() {
+              _currentScreen =
+                  needsSetup ? AppScreen.enrollment : AppScreen.login;
+            });
+          },
+        ),
+      AppScreen.enrollment => EnrollmentFlowScreen(
+          onComplete: () {
+            ref.read(enrollmentProvider.notifier).reset();
             setState(() {
               _currentScreen = AppScreen.login;
             });

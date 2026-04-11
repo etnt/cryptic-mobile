@@ -17,7 +17,40 @@ Ratchet protocols for secure communication.
 | Send/Receive Messages | ✅ Working |
 | Online Users List | ✅ Working |
 | Session Persistence | ✅ Working |
+| Mobile Enrollment (QR + Ed25519) | ✅ Working |
 | Message History (DB) | 🔄 Pending |
+
+## Mobile Enrollment
+
+New devices are onboarded via QR code scanning — no GPG required on mobile.
+An admin generates an enrollment package with the `cryptic-onboard` tool, which
+produces an encrypted QR code. The mobile app scans it, decrypts with a
+passphrase, and uses the embedded Ed25519 key to authenticate a certificate
+signing request.
+
+See [Mobile Enrollment Plan](docs/MOBILE-ENROLLMENT-PLAN.md) for the full
+design and protocol details.
+
+### Admin: Create enrollment package
+
+```bash
+# Interactive
+cd cryptic
+./bin/cryptic-onboard create-mobile-enrollment
+
+# Batch
+./bin/cryptic-onboard create-mobile-enrollment \
+  --username dave --server https://relay.example.com:8443 \
+  --passphrase 's3cret' --admin-cert admin.crt --admin-key admin.key \
+  --ca-cert ca.crt --batch
+```
+
+### Mobile: Scan & enroll
+
+1. Open the Cryptic app (first launch → enrollment screen)
+2. Scan the QR code
+3. Enter the passphrase
+4. The app generates keys, requests a certificate, and connects
 
 ## Prerequisites
 
@@ -83,6 +116,8 @@ cryptic_app/
 
 - [Architecture](docs/FLUTTER-ARCHITECTURE.md) - System design and crypto protocols
 - [Implementation Plan](docs/FLUTTER-IMPLEMENTATION-PLAN.md) - Development roadmap
+- [Mobile Enrollment Plan](docs/MOBILE-ENROLLMENT-PLAN.md) - QR-based Ed25519 enrollment design
+- [Server Agent Guide](AGENTS.md) - Event bus architecture for client integration
 
 ## License
 

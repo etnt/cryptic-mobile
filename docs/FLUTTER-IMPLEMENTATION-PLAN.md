@@ -40,8 +40,9 @@ implementation.
 | **M4: Storage Layer** | Weeks 6–7 | Secure key storage (`flutter_secure_storage`), SQLCipher message DB, DAOs, repository implementations | Keys persist across restarts; DB encrypted; CRUD unit tests passing |
 | **M5: Engine Orchestration** | Weeks 7–9 | `CrypticEngine`, `SessionManager`, `MessageProcessor`, domain use-cases wired | Engine integration tests: X3DH handshake + ratchet round-trip; state survives restart |
 | **M6: UI & UX** | Weeks 9–11 | All screens (splash, auth, chat, contacts, settings), Riverpod providers, theming | Chat flow usable on device; dark theme default; accessibility labels present |
-| **M7: Integration & Hardening** | Weeks 11–12 | End-to-end integration tests, security review, in-app update mechanism | Two-device chat succeeds; penetration findings triaged; update check wired |
-| **M8: Release & Distribution** | Week 13 | Signed builds (APK, IPA), distribution pipeline (self-host, F-Droid), docs | RC signed with checksums; installation docs published; smoke tests on physical devices |
+| **M7: Enrollment & Certificate Management** | Weeks 11–13 | GPG enrollment flow, QR code scanner, admin tooling, automatic cert renewal | QR enrollment succeeds; certs auto-renew; admin tools documented |
+| **M8: Integration & Hardening** | Weeks 14–15 | End-to-end integration tests, security review, in-app update mechanism | Two-device chat succeeds; penetration findings triaged; update check wired |
+| **M9: Release & Distribution** | Week 16 | Signed builds (APK, IPA), distribution pipeline (self-host, F-Droid), docs | RC signed with checksums; installation docs published; smoke tests on physical devices |
 
 ---
 
@@ -118,7 +119,201 @@ implementation.
 | Theming | `AppColors`, `AppTextStyles`, dark/light/system support | `lib/core/theme/*.dart` |
 | Accessibility | Semantic labels, large text support, color contrast | Verified with Flutter a11y tools |
 
-### 3.7 Quality & Security (M7)
+### 3.7 Enrollment & Certificate Management (M7)
+
+**Context**: The Cryptic server requires GPG-signed CSRs for issuing short-lived mTLS certificates with automatic renewal. This milestone implements a hybrid approach where admin-generated GPG keys are securely transferred to mobile devices via QR code enrollment.
+
+#### 3.7.1 Admin Tooling
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| Extend cryptic-onboard script | Add `create-enrollment` subcommand to existing `./cryptic/bin/cryptic-onboard` script | `cryptic/bin/cryptic-onboard` |
+| GPG key generation for user | Reuse existing `generate_gpg_key()` function with batch mode for admin use | Modified function with optional parameters |
+| Enrollment package creator | New function: `create_enrollment_package()` - Bundle GPG keys, username, server config into encrypted JSON; generate QR code | New function in cryptic-onboard |
+| Encryption schema | Use ChaCha20-Poly1305 with 256-bit key derived from admin passphrase (Argon2id); include salt, nonce | Encrypted payload format spec |
+| QR code format | JSON: `{"v":1, "salt":"base64", "nonce":"base64", "ciphertext":"base64"}`; max 2953 bytes (QR version 40-L) | QR payload schema doc |
+| Batch enrollment | Add `batch-enroll` subcommand; read CSV input, generate multiple enrollment packages | New function in cryptic-onboard |
+| Admin documentation | Guide: use cryptic-onboard commands, print/share QR codes securely | `docs/ADMIN-ENROLLMENT.md` |
+
+**Encrypted Payload Schema** (before QR encoding):
+```erlang
+#{
+    version => 1,
+    username => <<"alice">>,
+    server => #{
+        host => <<"cryptic.example.com">>,
+        port => 8443,
+        ca_cert => <<"-----BEGIN CERTIFICATE-----\n...">>,
+        enrollment_token => <<"admin-generated-uuid">>
+    },
+    gpg_keypair => #{
+        public_key => <<"-----BEGIN PGP PUBLIC KEY BLOCK-----\n...">>,
+        private_key => <<"-----BEGIN PGP PRIVATE KEY BLOCK-----\n...">>,
+        key_id => <<"ABCD1234EFGH5678">>,
+        passphrase => null  % Optional: encrypt private key itself
+    },
+    issued_at => 1736102400,
+    expires_at => 1767638400  % 1 year validity
+}
+```
+
+#### 3.7.2 Mobile Enrollment Flow
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| QR code scanner UI | Camera permission, QR detection using `mobile_scanner` package, preview overlay | `lib/presentation/screens/enrollment/qr_scanner_screen.dart` |
+| Passphrase prompt | Ask user for admin-provided decryption passphrase; show hint if available | `lib/presentation/screens/enrollment/passphrase_input_screen.dart` |
+| Enrollment package parser | Decrypt QR payload, validate schema, extract GPG keys and server config | `lib/data/enrollment/enrollment_parser.dart` |
+| GPG key import | Parse PGP armored keys, validate key integrity, store in secure storage | `lib/data/crypto/gpg/gpg_key_manager.dart` |
+| Certificate request flow | Generate Ed25519 identity keys, create CSR, sign with GPG key, upload to server | `lib/data/enrollment/certificate_requester.dart` |
+| Enrollment state machine | States: `scanning` → `decrypting` → `importing_keys` → `requesting_cert` → `complete` / `error` | `lib/domain/entities/enrollment_state.dart` |
+| Error handling | Invalid QR, wrong passphrase, expired enrollment, server rejection | User-friendly error messages |
+
+**Mobile UI Flow**:
+1. **Welcome Screen**: "Scan Enrollment QR Code" button
+2. **QR Scanner**: Camera preview with alignment guides
+3. **Passphrase Input**: "Enter passphrase provided by administrator"
+4. **Processing**: Loading indicator with status updates
+5. **Success**: "Enrollment complete! You can now start chatting."
+6. **Error**: Specific error message + retry button
+
+#### 3.7.3 GPG Integration
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| OpenPGP library | Integrate `openpgp` Dart package (or `pointycastle` PGP impl) | `pubspec.yaml` dependency |
+| GPG key storage | Store GPG private key in `flutter_secure_storage`; separate from Ed25519 identity keys | `lib/data/storage/secure_storage/gpg_storage.dart` |
+| CSR signing | Generate PKCS#10 CSR with Ed25519 public key; sign CSR bytes with GPG key | `lib/data/crypto/gpg/csr_signer.dart` |
+| Signature verification | Server-side: verify GPG signature on CSR using stored public key | Erlang: `cryptic_gpg_verifier.erl` |
+| Key rotation plan | Document process for rotating compromised GPG keys; re-enrollment flow | `docs/KEY-ROTATION.md` |
+
+**CSR Signing Flow**:
+```dart
+// 1. Generate Ed25519 identity keys (for X3DH/messaging)
+final identityKeys = await generateIdentityKeys();
+
+// 2. Create CSR with identity public key
+final csr = createCSR(
+  publicKey: identityKeys.publicKey,
+  username: username,
+  commonName: 'cryptic-user-$username',
+);
+
+// 3. Sign CSR with GPG private key
+final gpgKey = await loadGPGKey();
+final signature = gpgKey.sign(csr.toDer());
+
+// 4. Upload to server
+final cert = await uploadSignedCSR(
+  username: username,
+  csr: csr.toDer(),
+  signature: signature,
+  gpgKeyId: gpgKey.keyId,
+);
+```
+
+#### 3.7.4 Server-Side Enrollment Endpoint
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| Enrollment API | New endpoint: `POST /api/enroll` accepting signed CSR, username, token | `apps/cryptic_server/src/cryptic_enroll_handler.erl` |
+| Token validation | Verify enrollment token matches admin-generated value; one-time use | Token storage in Mnesia |
+| GPG signature verification | Extract GPG key ID from signature, lookup public key, verify signature on CSR | Use `gpgme` Erlang NIF or `:public_key` module |
+| Certificate issuance | Generate short-lived X.509 cert (7 days validity) signed by server CA | Existing cert generation code |
+| User provisioning | Create user account, store GPG public key, initialize key bundle storage | Database schema update |
+| Rate limiting | Prevent brute-force enrollment attempts; lockout after 5 failed attempts | Token attempt counter |
+
+**Endpoint Specification**:
+```erlang
+% POST /api/enroll
+% Body: #{
+%   username => <<"alice">>,
+%   enrollment_token => <<"uuid">>,
+%   csr => <<"-----BEGIN CERTIFICATE REQUEST-----...">>,
+%   gpg_signature => <<"-----BEGIN PGP SIGNATURE-----...">>,
+%   gpg_key_id => <<"ABCD1234">>
+% }
+% Response: #{
+%   certificate => <<"-----BEGIN CERTIFICATE-----...">>,
+%   expires_at => 1736188800,
+%   ca_cert => <<"-----BEGIN CERTIFICATE-----...">>
+% }
+```
+
+#### 3.7.5 Automatic Certificate Renewal
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| Renewal scheduler | Background task checks cert expiry; renew when <2 days remaining | `lib/data/certificate/renewal_scheduler.dart` |
+| CSR regeneration | Create new CSR with same Ed25519 keys, sign with GPG key | Reuse CSR signing code |
+| Renewal endpoint | Server: `POST /api/renew` validates existing cert + signed CSR | `cryptic_renew_handler.erl` |
+| Retry logic | Exponential backoff on failure; alert user if renewal fails repeatedly | UI notification + retry button |
+| Offline handling | Queue renewal request; retry when connectivity restored | Store pending renewal flag |
+| Testing | Mock time progression; verify renewal triggered at correct threshold | `test/integration/cert_renewal_test.dart` |
+
+**Renewal Flow**:
+```dart
+class CertificateRenewalScheduler {
+  Timer? _timer;
+  
+  void start() {
+    _timer = Timer.periodic(Duration(hours: 6), (_) async {
+      final cert = await loadCurrentCertificate();
+      final daysUntilExpiry = cert.expiresAt.difference(DateTime.now()).inDays;
+      
+      if (daysUntilExpiry <= 2) {
+        await renewCertificate();
+      }
+    });
+  }
+  
+  Future<void> renewCertificate() async {
+    try {
+      final csr = await generateCSR(); // Same Ed25519 keys
+      final signature = await signCSRWithGPG(csr);
+      final newCert = await apiClient.renewCertificate(csr, signature);
+      await saveCertificate(newCert);
+      logger.info('Certificate renewed successfully');
+    } catch (e) {
+      logger.error('Certificate renewal failed: $e');
+      scheduleRetry();
+    }
+  }
+}
+```
+
+#### 3.7.6 Security Considerations
+
+| Task | Description | Outputs |
+|------|-------------|---------|
+| QR code security | Encrypt payload; never encode raw private keys; short-lived enrollment tokens | Security audit doc |
+| Passphrase strength | Require ≥16 characters for enrollment decryption; use Argon2id with high cost | Configurable parameters |
+| Key storage audit | Verify GPG keys only accessible via secure storage; never logged or cached | Penetration test |
+| Man-in-the-middle | Validate server CA cert during enrollment; pin CA fingerprint in QR payload | Certificate pinning |
+| Revocation mechanism | Admin tool to revoke compromised GPG keys; server rejects revoked keys | `tools/admin/revoke_key.erl` |
+| Enrollment expiry | QR codes valid for 48 hours; tokens expire after first use or timeout | Server-side expiry checks |
+
+#### 3.7.7 Testing Strategy
+
+| Test Type | Scope | Examples |
+|-----------|-------|----------|
+| Unit | Individual components | QR parser, GPG signer, CSR generator |
+| Integration | End-to-end enrollment | QR scan → import → cert issuance → login |
+| Security | Threat scenarios | Expired QR, tampered payload, revoked key, wrong passphrase |
+| Performance | Large-scale operations | 1000 enrollment packages, concurrent renewals |
+| Recovery | Error handling | Network failure during enrollment, interrupted renewal |
+
+**Test Cases**:
+- [ ] Valid QR code enrollment completes successfully
+- [ ] Invalid passphrase rejected with clear error
+- [ ] Expired enrollment token rejected by server
+- [ ] Tampered QR payload fails decryption
+- [ ] Certificate renewal succeeds 2 days before expiry
+- [ ] Renewal retries after network failure
+- [ ] Revoked GPG key rejected by server
+- [ ] QR code with invalid schema version rejected
+
+### 3.8 Quality & Security (M8)
 
 | Task | Description | Outputs |
 |------|-------------|---------|
@@ -130,7 +325,7 @@ implementation.
 | Dependency audit | Run `flutter pub outdated`, check for CVEs | Documented in release notes |
 | Update mechanism | Version endpoint fetch, checksum validation, optional force-update | `lib/core/update/update_checker.dart` |
 
-### 3.8 Release Engineering (M8)
+### 3.9 Release Engineering (M9)
 
 | Task | Description | Outputs |
 |------|-------------|---------|
@@ -149,20 +344,26 @@ implementation.
 
 | Dependency | Purpose | Notes |
 |------------|---------|-------|
-| `pointycastle: ^3.9.0` | Ed25519, X25519, ChaCha20-Poly1305 | Core crypto |
-| `cryptography: ^2.7.0` | HKDF, additional primitives | Supplement pointycastle |
+| `pointycastle: ^3.9.0` | Ed25519, X25519, ChaCha20-Poly1305, RSA | Core crypto |
+| `cryptography: ^2.7.0` | HKDF, Argon2id, additional primitives | Supplement pointycastle |
+| `openpgp: ^2.0.0` | GPG key parsing, signing, verification | For CSR signing |
+| `mobile_scanner: ^3.5.0` | QR code scanning | Camera access, ML Kit |
 | `web_socket_channel: ^2.4.0` | WebSocket client | mTLS via `SecureSocket` |
 | `flutter_secure_storage: ^9.0.0` | Hardware-backed key storage | iOS Keychain / Android Keystore |
 | `sqflite_sqlcipher: ^3.0.0` | Encrypted SQLite | Passphrase-derived key |
 | `flutter_riverpod: ^2.4.0` | State management | Preferred over Provider |
-| `uuid: ^4.2.0` | Message IDs | UUIDv4 |
+| `uuid: ^4.2.0` | Message IDs, enrollment tokens | UUIDv4 |
 | `path_provider: ^2.1.0` | File paths | For DB location |
 | `logger: ^2.0.0` | Logging | Structured, redacted |
 | `intl: ^0.18.0` | Date formatting | i18n ready |
+| `qr_flutter: ^4.1.0` | QR code generation | Admin tooling |
 
 ### 4.2 Infrastructure Requirements
-
-| Requirement | Description | Owner |
+enrollment API, test users, seeded messages | Backend team |
+| Enrollment endpoint | `/api/enroll`, `/api/renew` with GPG signature verification | Backend team |
+| mTLS certificates | Short-lived certs (7 day validity); CA bundle | Backend team |
+| GPG infrastructure | Key generation, storage of public keys, signature verification | Backend team |
+| Admin workstation | Secure system for generating GPG keys and enrollment QRs | Admin
 |-------------|-------------|-------|
 | Cryptic staging server | mTLS endpoint, test users, seeded messages | Backend team |
 | mTLS certificates | Client certs for each test user; CA bundle | Backend team |
@@ -208,6 +409,8 @@ implementation.
 ---
 
 ## 6. Risk & Mitigation
+| **GPG enrollment UX** | High | Medium | Clear admin docs; test QR scanning in various lighting; fallback manual import |
+| **Cert renewal failure** | Medium | High | Robust retry with backoff; user notification; manual renewal option |
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
@@ -223,13 +426,20 @@ implementation.
 
 ## 7. Deliverables Checklist
 
-### 7.1 Code Artifacts
+### 7.GPG enrollment flow (QR scanner, key import, cert request)
+- [ ] Automatic certificate renewal with retry logic
+- [ ] Admin tooling (GPG key generation, enrollment QR creation)
+- [ ] Server enrollment/renewal endpoints with signature verification
+- [ ] Secure key storage (identity keys, GPG
 
 - [ ] Architecture-compliant project skeleton (`lib/core`, `lib/data`, `lib/domain`, `lib/presentation`)
 - [ ] Crypto primitives with Erlang-vector unit tests
 - [ ] X3DH engine (initiator + responder flows)
 - [ ] Double Ratchet engine (DH ratchet, chain advancement, skipped keys)
-- [ ] mTLS WebSocket client with reconnect, heartbeat, offline queue
+- [ ] mTLS WADMIN-ENROLLMENT.md` – admin guide for creating enrollment QRs
+- [ ] `docs/ENROLLMENT-PROTOCOL.md` – QR format spec, encryption schema
+- [ ] `docs/KEY-ROTATION.md` – GPG key rotation and revocation process
+- [ ] `docs/ebSocket client with reconnect, heartbeat, offline queue
 - [ ] Protocol encoder/decoder for all message types
 - [ ] Secure key storage (identity keys, certs)
 - [ ] Encrypted SQLite database with DAOs
@@ -245,13 +455,193 @@ implementation.
 - [ ] Inline Dartdoc for public APIs
 
 ### 7.3 Release Assets
-
-- [ ] Signed Android APK (arm64, armeabi-v7a)
-- [ ] Signed iOS IPA / TestFlight build
-- [ ] SHA-256 checksums + GPG signature
-- [ ] F-Droid repository metadata (if open-sourcing)
+enrollment API implementation | Backend team | Day 2 |
+| 4 | Design and spec enrollment QR code format | Mobile + Backend | Day 3 |
+| 5 | Set up admin GPG key generation tooling | Backend team | Week 2 |
+| 6 | Export Erlang crypto test vectors | Backend team | Day 3 |
+| 7 | Add core dependencies to `pubspec.yaml` (including `openpgp`, `mobile_scanner`) | Mobile dev | Day 3 |
+| 8 | Set up project board with milestones & tasks | PM | Day 1 |
+| 9 ] F-Droid repository metadata (if open-sourcing)
 - [ ] Version API endpoint for in-app updates
+9. Enrollment Implementation Roadmap
 
+This section provides a step-by-step guide for implementing the hybrid GPG enrollment approach (Option 3).
+
+### Phase 1: Admin Tooling (Weeks 11–12)
+
+**Goal**: Enable administrators to generate enrollment packages for new users.
+
+#### Week 11: Core Tooling
+1. **Day 1-2**: Extend cryptic-onboard for admin enrollment
+   - Add `create-enrollment` subcommand to `cryptic/bin/cryptic-onboard`
+   - Modify `generate_gpg_key()` to support batch/non-interactive mode
+   - Add parameters: `--username`, `--server`, `--output-dir`
+   - Test: Generate keys for test users, verify with `gpg --import`
+
+2. **Day 3-4**: Enrollment package encryption
+   - Add `create_enrollment_package()` function to cryptic-onboard
+   - Define JSON schema for enrollment data
+   - Implement encryption using `openssl enc -chacha20-poly1305` and `argon2`
+   - Add `--passphrase` option (prompt or from stdin)
+   - Test: Encrypt/decrypt with various passphrases
+
+3. **Day 5**: QR code generation
+   - Add QR code generation using `qrencode` command
+   - Generate QR codes from encrypted JSON (version 40-L)
+   - Export as PNG for printing (default: `<username>_enrollment.png`)
+   - Test: Scan generated QR with phone camera app
+
+#### Week 12: Batch Processing & Documentation
+1. **Day 1-2**: Batch enrollment tool
+   - Add `batch-enroll` subcommand to cryptic-onboard
+   - CSV input: username, passphrase hint
+   - Generate multiple enrollment packages
+   - Create HTML page with embedded QR codes for printing
+
+2. **Day 3**: Admin documentation
+   - Write `docs/ADMIN-ENROLLMENT.md`
+   - Document dependencies (curl, openssl, gpg, jq, qrencode, argon2)
+   - Provide usage examples and security best practices
+   - Create troubleshooting guide
+
+3. **Day 4-5**: Testing & validation
+   - Integration test: Generate enrollment → scan → verify decryption
+   - Security review of admin tooling
+   - Test with various passphrases and server configurations
+   - Prepare demo for mobile team
+
+### Phase 2: Server Implementation (Week 12–13)
+
+**Goal**: Add enrollment and renewal endpoints with GPG signature verification.
+
+#### Week 12: Enrollment Endpoint
+1. **Day 1-2**: Database schema
+   - Add `enrollment_tokens` table (token, username, expires_at, used)
+   - Add `user_gpg_keys` table (username, key_id, public_key)
+   - Migration scripts
+
+2. **Day 3-4**: Enrollment handler
+   - Create `apps/cryptic_server/src/cryptic_enroll_handler.erl`
+   - Parse incoming enrollment request
+   - Validate enrollment token (not expired, not used)
+   - Verify GPG signature on CSR
+   - Issue short-lived certificate (7 days)
+   - Store user account and GPG public key
+
+3. **Day 5**: Token management
+   - API for admin to generate enrollment tokens
+   - Token expiry logic (48 hours)
+   - Rate limiting (5 attempts per token)
+
+#### Week 13: Renewal Endpoint
+1. **Day 1-2**: Renewal handler
+   - Create `apps/cryptic_server/src/cryptic_renew_handler.erl`
+   - Validate existing certificate (not expired, matches username)
+   - Verify GPG signature on new CSR
+   - Issue renewed certificate with same Ed25519 keys
+
+2. **Day 3**: Revocation mechanism
+   - Admin API to revoke GPG keys
+   - Server rejects requests signed with revoked keys
+   - Logging and alerting
+
+3. **Day 4-5**: Integration testing
+   - End-to-end test: Enroll → renew → revoke
+   - Performance test: 100 concurrent enrollments
+   - Security audit
+
+### Phase 3: Mobile Implementation (Week 13)
+
+**Goal**: Implement QR scanning, key import, and certificate management in Flutter app.
+
+#### Week 13: Enrollment Flow
+1. **Day 1**: Dependencies and UI scaffold
+   - Add `mobile_scanner: ^3.5.0` and `openpgp: ^2.0.0` to `pubspec.yaml`
+   - Create enrollment screens directory structure
+   - Design UI mockups
+
+2. **Day 2**: QR scanner
+   - Implement `QRScannerScreen` with camera preview
+   - Handle permissions (camera)
+   - Parse QR code data and validate format
+
+3. **Day 3**: Decryption and parsing
+   - Implement `EnrollmentParser` class
+   - Passphrase input UI
+   - Decrypt payload with Argon2id + ChaCha20-Poly1305
+   - Validate JSON schema
+
+4. **Day 4**: Key import and CSR signing
+   - Parse PGP armored keys using `openpgp` package
+   - Store GPG keys in `flutter_secure_storage`
+   - Generate Ed25519 identity keys
+   - Create and sign CSR with GPG key
+
+5. **Day 5**: Certificate request and finalization
+   - Upload signed CSR to enrollment endpoint
+   - Store received certificate
+   - Complete enrollment flow
+   - Navigate to main app
+
+### Phase 4: Certificate Renewal (Week 14)
+
+**Goal**: Implement automatic certificate renewal background task.
+
+#### Week 14: Renewal Implementation
+1. **Day 1-2**: Renewal scheduler
+   - Create `CertificateRenewalScheduler` class
+   - Periodic check (every 6 hours)
+   - Trigger renewal when <2 days until expiry
+
+2. **Day 3**: Renewal logic
+   - Generate new CSR with existing Ed25519 keys
+   - Sign CSR with stored GPG key
+   - Upload to renewal endpoint
+   - Replace old certificate
+
+3. **Day 4**: Error handling
+   - Retry logic with exponential backoff
+   - User notification for repeated failures
+   - Manual renewal option in settings
+
+4. **Day 5**: Testing
+   - Unit tests for renewal scheduler
+   - Integration test: Mock time, verify renewal triggered
+   - Test offline handling (queue renewal)
+
+### Phase 5: Integration & Testing (Week 15)
+
+**Goal**: End-to-end validation and security hardening.
+
+#### Week 15: Full Validation
+1. **Day 1**: Admin flow testing
+   - Generate enrollment package
+   - Print QR code
+   - Test with multiple passphrases
+
+2. **Day 2**: Mobile enrollment testing
+   - Scan QR code in various conditions
+   - Test wrong passphrase, expired token
+   - Verify keys stored securely
+
+3. **Day 3**: Renewal testing
+   - Advance time to trigger renewal
+   - Test renewal with/without network
+   - Verify certificate replaced
+
+4. **Day 4**: Security audit
+   - Penetration testing (tampered QR, MITM)
+   - Verify no key leakage in logs
+   - Test revocation mechanism
+
+5. **Day 5**: Documentation
+   - Write `docs/ENROLLMENT-PROTOCOL.md`
+   - Update user guide with enrollment instructions
+   - Create demo video for admins
+
+---
+
+## 
 ---
 
 ## 8. Next Actions (Kickoff Week)
