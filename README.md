@@ -7,29 +7,31 @@ Ratchet protocols for secure communication.
 
 ## Status
 
-✅ **M7 Integration Complete** - Bidirectional encrypted messaging working!
+✅ **M8 Mobile Enrollment Complete** — QR-based onboarding, mTLS, and encrypted chat working end-to-end!
 
 | Feature | Status |
 |---------|--------|
 | X3DH Key Agreement | ✅ Working |
 | Double Ratchet Encryption | ✅ Working |
-| mTLS WebSocket Connection | ✅ Working |
+| mTLS WebSocket Connection | ✅ Working (ECDSA P-256 client certs) |
 | Send/Receive Messages | ✅ Working |
 | Online Users List | ✅ Working |
 | Session Persistence | ✅ Working |
 | Mobile Enrollment (QR + Ed25519) | ✅ Working |
+| Certificate Renewal | 🔄 Pending (Phase 4) |
 | Message History (DB) | 🔄 Pending |
 
 ## Mobile Enrollment
 
 New devices are onboarded via QR code scanning — no GPG required on mobile.
 An admin generates an enrollment package with the `cryptic-onboard` tool, which
-produces an encrypted QR code. The mobile app scans it, decrypts with a
-passphrase, and uses the embedded Ed25519 key to authenticate a certificate
-signing request.
+produces an encrypted QR code. The mobile app scans it (or pastes from
+clipboard on simulators), decrypts with a passphrase, and uses the embedded
+Ed25519 key to sign an ECDSA P-256 certificate signing request. The server
+issues an mTLS client certificate and the app connects immediately.
 
 See [Mobile Enrollment Plan](docs/MOBILE-ENROLLMENT-PLAN.md) for the full
-design and protocol details.
+design, protocol details, and known issues.
 
 ### Admin: Create enrollment package
 
@@ -55,9 +57,10 @@ cd cryptic
 ## Prerequisites
 
 - [Flutter SDK](https://docs.flutter.dev/get-started/install) ≥ 3.2.0
-- Xcode (for iOS development on macOS)
+- Xcode (for iOS development on macOS) — iOS deployment target 16.0+
 - Android Studio (for Android development)
 - Running [Cryptic server](https://github.com/etnt/cryptic) with mTLS enabled
+- `zbarimg` (optional, for extracting QR data to clipboard during development)
 
 ## Quick Start
 
@@ -68,8 +71,22 @@ cd cryptic_app
 # Install dependencies
 flutter pub get
 
-# Run on connected device or simulator
-flutter run
+# Run on iOS simulator
+flutter run -d <simulator-id> --no-hot
+
+# Or list available devices first
+flutter devices
+```
+
+### First-time enrollment (iOS Simulator)
+
+Since the iOS simulator has no camera, use the clipboard paste workflow:
+
+```bash
+# Extract QR data to clipboard (macOS)
+zbarimg --raw -q path/to/enrollment.png | tr -d '\n' | pbcopy
+
+# Then in the app: tap "Paste from Clipboard" → enter passphrase → Enroll
 ```
 
 ## Development Commands
@@ -104,12 +121,18 @@ flutter build web           # Web app
 ```
 cryptic_app/
 ├── lib/
-│   ├── core/           # Config, constants, errors, utilities
-│   ├── data/           # Repositories, data sources, DTOs
-│   ├── domain/         # Models, services, use cases
-│   └── presentation/   # UI (screens, widgets, providers)
-├── test/               # Unit tests
-└── pubspec.yaml        # Dependencies
+│   ├── core/               # Config, constants, errors, utilities
+│   ├── data/
+│   │   ├── crypto/         # X3DH, Double Ratchet, key management
+│   │   ├── engine/         # CrypticEngine, session management
+│   │   ├── enrollment/     # QR enrollment (CSR, crypto, service)
+│   │   ├── network/        # WebSocket, protocol codec, mTLS
+│   │   ├── services/       # Authentication service
+│   │   └── storage/        # Secure storage, key/session repos
+│   ├── domain/             # Models, use cases
+│   └── presentation/       # UI (screens, widgets, providers)
+├── test/                   # Unit tests
+└── pubspec.yaml            # Dependencies
 ```
 
 ## Documentation

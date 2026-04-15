@@ -1,8 +1,8 @@
 # Mobile Enrollment Plan — Ed25519 Approach
 
-> **Version**: 1.0  
+> **Version**: 1.1  
 > **Date**: April 2026  
-> **Status**: Draft  
+> **Status**: Implemented (Phase 1–3 complete, Phase 4 pending)  
 > **Related**: [`FLUTTER-ARCHITECTURE.md`](./FLUTTER-ARCHITECTURE.md),
 > [`AGENTS.md`](../AGENTS.md)
 
@@ -140,9 +140,14 @@ only 64 hex characters in the QR.
 
 ### 3.5 Generate TLS Key & CSR
 
-1. **Generate an RSA-2048 or ECDSA keypair** for the mTLS certificate.
-   (The key type must match what the server CA expects for X.509 issuance;
-   currently the server uses RSA.)
+> **Implementation note (April 2026)**: ECDSA P-256 was chosen for the TLS
+> client certificate. Ed25519 was attempted first but failed with
+> `NO_COMMON_SIGNATURE_ALGORITHMS` during mTLS handshake — BoringSSL (used
+> by Dart/Flutter on iOS) does not support Ed25519 client certificates in
+> TLS 1.3. P-256 has universal support across BoringSSL, OpenSSL, and
+> Erlang OTP SSL.
+
+1. **Generate an ECDSA P-256 keypair** for the mTLS certificate.
 2. **Build a PKCS#10 CSR**:
    - Subject: `CN=dave`
    - Public key: the TLS public key from step 1
@@ -229,40 +234,63 @@ New handler: `cryptic_ca_mobile_handler.erl`
 
 ### 4.1 Enrollment Plaintext (before encryption)
 
+> **Implementation note**: The `cryptic-onboard` tool generates verbose
+> field names rather than the compact format originally planned. The mobile
+> app parses both formats, but the server currently produces only the
+> verbose format shown below.
+
+**Actual server format (verbose):**
+
+```json
+{
+  "version": 2,
+  "username": "dave",
+  "server_host": "cryptic.example.com",
+  "server_port": 8443,
+  "enrollment_sec": "<base64 — 48-byte Ed25519 secret key in DER PKCS#8>",
+  "enrollment_pub": "<base64 — 32-byte Ed25519 public key>",
+  "ca_fingerprint": "<64 hex chars — SHA-256 of CA certificate DER>",
+  "expires_at": 1749600000
+}
+```
+
+**Originally planned format (compact):**
+
 ```json
 {
   "v": 2,
   "u": "dave",
-  "s": {
-    "h": "cryptic.example.com",
-    "p": 8443
-  },
+  "s": { "h": "cryptic.example.com", "p": 8443 },
   "ek": "<base64, 88 chars — 64-byte Ed25519 secret key>",
   "cf": "<64 hex chars — SHA-256 of CA certificate DER>",
   "x": 1749600000
 }
 ```
 
-| Field | Description | Size |
-|-------|-------------|------|
-| `v` | Payload version (2 = Ed25519 mobile) | 1 byte |
-| `u` | Username | variable |
-| `s.h` | Server hostname | variable |
-| `s.p` | Server port | 2–5 chars |
-| `ek` | Ed25519 secret key (64 bytes, base64) | 88 chars |
-| `cf` | CA certificate SHA-256 fingerprint (hex) | 64 chars |
-| `x` | Expiry, Unix timestamp | 10 chars |
+| Field (verbose) | Field (compact) | Description | Size |
+|-----------------|-----------------|-------------|------|
+| `version` | `v` | Payload version (2 = Ed25519 mobile) | 1 byte |
+| `username` | `u` | Username | variable |
+| `server_host` | `s.h` | Server hostname | variable |
+| `server_port` | `s.p` | Server port | 2–5 chars |
+| `enrollment_sec` | `ek` | Ed25519 secret key (DER PKCS#8 or raw 64 bytes) | 64–88 chars |
+| `enrollment_pub` | — | Ed25519 public key (32 bytes, base64) | 44 chars |
+| `ca_fingerprint` | `cf` | CA certificate SHA-256 fingerprint (hex) | 64 chars |
+| `expires_at` | `x` | Expiry, Unix timestamp | 10 chars |
 
-Estimated plaintext size: **~300–350 bytes** (depending on hostname length).
+Estimated plaintext size: **~400–500 bytes** (verbose) / **~300–350 bytes** (compact).
 
 ### 4.2 Encrypted QR Payload
+
+> **Implementation note**: The server uses `ct` for the ciphertext field
+> (not `ciphertext`). The mobile app recognizes `ct`.
 
 ```json
 {
   "v": 2,
   "salt": "<32 hex chars>",
   "iv": "<32 hex chars>",
-  "ciphertext": "<base64 of AES-256-CBC encrypted plaintext>",
+  "ct": "<base64 of AES-256-CBC encrypted plaintext>",
   "hmac": "<64 hex chars — HMAC-SHA256 over ciphertext>"
 }
 ```
@@ -492,12 +520,16 @@ Outputs per user: `{username}_enrollment.png` + `{username}_enrollment.json`
 ```yaml
 # pubspec.yaml additions
 dependencies:
-  mobile_scanner: ^6.0.0    # QR code scanning (camera)
+  mobile_scanner: ^7.2.0    # QR code scanning (camera, Apple Vision API)
+  pointycastle: ^3.9.0      # ECDSA P-256 keypair + CSR ASN.1 encoding
 ```
 
-No new crypto dependencies — all needed operations are in existing
-`pointycastle` and `cryptography` packages. `Argon2` support via
-`cryptography` package (already a dependency).
+> **Implementation note**: `mobile_scanner` was upgraded from v6 to v7
+> because v6 depended on Google MLKit which does not support arm64 iOS
+> simulators. v7 uses Apple's native Vision API instead. iOS deployment
+> target was raised to 16.0 for compatibility.
+
+`Argon2` support via `cryptography` package (already a dependency).
 
 ### 8.2 New Files
 
@@ -660,39 +692,61 @@ communicated separately.
 
 ## 10. Implementation Phases
 
-### Phase 1: Server Endpoints (Erlang)
+### Phase 1: Server Endpoints (Erlang) — COMPLETE ✓
 
-1. Add `enrollment_identity` record to `cryptic_ca.hrl`
-2. Add `enrollment_identities` table creation to `cryptic_ca_store.erl`
-3. Implement CRUD operations in `cryptic_ca_store.erl`
-4. Create `cryptic_ca_mobile_handler.erl` for `POST /ca/v1/mobile-csr`
-5. Add admin registration endpoint for enrollment keys
-6. Register new routes in Cowboy configuration
-7. Unit tests for signature verification and enrollment flow
+1. ✅ Add `enrollment_identity` record to `cryptic_ca.hrl`
+2. ✅ Add `enrollment_identities` table creation to `cryptic_ca_store.erl`
+3. ✅ Implement CRUD operations in `cryptic_ca_store.erl`
+4. ✅ Create `cryptic_ca_mobile_handler.erl` for `POST /ca/v1/mobile-csr`
+5. ✅ Add admin registration endpoint for enrollment keys
+6. ✅ Register new routes in Cowboy configuration
+7. Unit tests for signature verification and enrollment flow (not yet added)
 
-### Phase 2: Admin Tooling (Shell Script)
+**Server-side fixes applied during integration:**
+- `cryptic_ca_cert.erl`: Fixed `extract_public_key_for_verification/1` to
+  return `{ed_pub, ed25519, PublicKey}` format required by
+  `public_key:verify/4`.
+- `cryptic_ca_cert.erl`: Fixed `convert_subject_pk_info/1` for Ed25519
+  to set parameters to `asn1_NOVALUE` (absent per RFC 8410) instead of
+  `{namedCurve, OID}` which caused an ASN.1 encoder `case_clause` crash.
 
-1. Add `create-mobile-enrollment` subcommand to `cryptic-onboard`
-2. Ed25519 key generation via `openssl genpkey -algorithm ed25519`
-3. CA fingerprint fetching and embedding
-4. Server registration via `POST /ca/v1/admin/register-enrollment`
-5. QR generation with the v2 payload format
-6. Test: generate enrollment → verify QR size → decrypt → verify signature
+### Phase 2: Admin Tooling (Shell Script) — COMPLETE ✓
 
-### Phase 3: Mobile Enrollment (Flutter)
+1. ✅ `cryptic-onboard` generates v2 QR codes with Ed25519 enrollment keys
+2. ✅ Ed25519 key generation via `openssl genpkey -algorithm ed25519`
+3. ✅ CA fingerprint fetching and embedding
+4. ✅ Server registration via admin API
+5. ✅ QR generation with the v2 payload format
+6. ✅ Tested: generate enrollment → scan QR → decrypt → enroll → chat
 
-1. Add `mobile_scanner` dependency
-2. Implement `enrollment_payload.dart` (model + JSON parsing)
-3. Implement `enrollment_crypto.dart` (Argon2id + AES decrypt, Ed25519 sign)
-4. Implement `csr_generator.dart` (PKCS#10 CSR generation)
-5. Implement `enrollment_service.dart` (orchestrator)
-6. Build enrollment UI screens (QR scanner, passphrase input, progress)
-7. Wire into app startup flow (check for existing certificate → show
-   enrollment or chat)
-8. Test end-to-end: admin creates package → mobile scans → cert issued →
-   chat works
+**Note**: The tool outputs verbose field names in the encrypted payload
+(e.g., `enrollment_sec` instead of `ek`). See Section 4.1.
 
-### Phase 4: Certificate Renewal
+### Phase 3: Mobile Enrollment (Flutter) — COMPLETE ✓
+
+1. ✅ Add `mobile_scanner` v7.2.0 dependency (Apple Vision API)
+2. ✅ Implement `enrollment_payload.dart` (verbose field name parsing)
+3. ✅ Implement `enrollment_crypto.dart` (Argon2id + AES-256-CBC decrypt,
+   HMAC-SHA256 verification, Ed25519 CSR signing)
+4. ✅ Implement `csr_generator.dart` (**ECDSA P-256**, not Ed25519/RSA —
+   see Section 3.5 note)
+5. ✅ Implement `enrollment_service.dart` (orchestrator)
+6. ✅ Build enrollment UI screens (QR scanner with clipboard paste fallback,
+   passphrase input, step-by-step progress)
+7. ✅ Wire into app startup flow (splash → check certs → enrollment or login)
+8. ✅ End-to-end tested: admin creates QR → mobile scans → cert issued →
+   mTLS connects → send and receive encrypted messages
+
+**Key deviations from plan:**
+- TLS client certificate uses **ECDSA P-256** (not RSA-2048 or Ed25519)
+  due to mTLS compatibility across TLS stacks.
+- QR scanner includes **clipboard paste fallback** for simulator testing
+  (camera not available on iOS simulator).
+- iOS deployment target raised to **16.0** for mobile_scanner v7.
+- `pointycastle` used for manual ASN.1 DER construction of PKCS#10 CSR
+  (no library supports ECDSA P-256 CSR generation out of the box in Dart).
+
+### Phase 4: Certificate Renewal — NOT STARTED
 
 1. Add `POST /ca/v1/renew` endpoint to server
 2. Implement `CertificateRenewalScheduler` in Flutter app
@@ -718,14 +772,55 @@ communicated separately.
    re-enrollment if certificate is lost. Decision: start with erase +
    mTLS renewal; add re-enrollment later if needed.
 
-2. **RSA vs ECDSA for TLS cert?** The existing server CA issues RSA certs.
-   If we want Ed25519 TLS certs, the CA issuance code may need updating.
-   Decision: match whatever the existing CA supports.
+2. ~~**RSA vs ECDSA for TLS cert?**~~ **RESOLVED**: ECDSA P-256 chosen.
+   Ed25519 was attempted but BoringSSL (Flutter/iOS) does not support
+   Ed25519 client certificates for mTLS. P-256 works across BoringSSL,
+   OpenSSL, and Erlang OTP SSL.
 
 3. **Multiple devices per user?** Each device gets its own enrollment
    package and its own mTLS certificate. The X3DH identity keys are
    per-device. Multi-device sync is a separate future feature.
 
-4. **Backward compatibility?** The server should continue supporting GPG
+4. **Backward compatibility?** The server continues supporting GPG
    enrollment (`POST /ca/v1/csr`) for PC clients. The mobile endpoint
-   (`POST /ca/v1/mobile-csr`) is additive.
+   (`POST /ca/v1/mobile-csr`) is additive. ✓ Confirmed working.
+
+## 13. Known Issues & Outstanding Work
+
+### Bugs / Issues
+
+1. **WebSocket disconnects on unhandled session state**: When alice sends a
+   ratchet message to rune but no X3DH session has been established (e.g.,
+   after a fresh install), the server may close the connection. The mobile
+   app should gracefully handle incoming ratchet messages for unknown
+   sessions.
+
+2. **Erlang jsx char-list encoding**: The server's `jsx:encode` serializes
+   Erlang character lists (e.g., usernames) as JSON integer arrays
+   (`[97,108,105,99,101]` for "alice") instead of strings. This was fixed
+   in all mobile-side message parsers with a `_asString()` helper, but the
+   root cause is on the server side — atom-keyed maps with string values
+   should use binaries (`<<"alice">>`) not lists (`"alice"`).
+
+3. **X3DH identity keys regenerated on every launch**: The mobile app
+   uploads fresh identity keys and 100 one-time prekeys on each connection.
+   This breaks existing sessions with other users. Keys should be persisted
+   and only uploaded once (or when the prekey supply is depleted).
+
+### Not Yet Implemented
+
+4. **Certificate renewal** (Phase 4): Short-lived certificates will expire
+   and the app has no auto-renewal mechanism yet.
+
+5. **Server-side unit tests**: The enrollment endpoint works but has no
+   dedicated test suite.
+
+6. **Compact QR payload format**: The current QR uses verbose field names
+   (`enrollment_sec`, `ca_fingerprint`, etc.) producing a larger payload
+   than the planned compact format. Consider updating `cryptic-onboard` to
+   use compact field names for smaller QR codes.
+
+7. **Error handling for consumed enrollments**: When a user re-enrolls
+   after a simulator reset/app reinstall, the server rejects with "identity
+   consumed". The admin currently must manually reset the enrollment status
+   in the database. Consider adding an admin API to re-activate enrollments.
