@@ -13,6 +13,18 @@ import 'dart:typed_data';
 /// - Chain/message counters
 /// - Encrypted payload
 class RatchetMessage {
+
+  /// Creates from a map (e.g., from JSON/WebSocket).
+  factory RatchetMessage.fromMap(Map<String, dynamic> map) {
+    return RatchetMessage(
+      dhPublic: base64Decode(map['dh_public'] as String),
+      dhStep: map['dh_step'] as int,
+      prevChainLength: map['prev_chain_length'] as int,
+      messageNumber: map['msg_number'] as int,
+      ciphertext: base64Decode(map['ciphertext'] as String),
+      nonce: base64Decode(map['nonce'] as String),
+    );
+  }
   /// Creates a ratchet message.
   const RatchetMessage({
     required this.dhPublic,
@@ -42,8 +54,7 @@ class RatchetMessage {
   final Uint8List nonce;
 
   /// Converts to a map for JSON serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'dh_public': base64Encode(dhPublic),
       'dh_step': dhStep,
       'prev_chain_length': prevChainLength,
@@ -51,17 +62,4 @@ class RatchetMessage {
       'ciphertext': base64Encode(ciphertext),
       'nonce': base64Encode(nonce),
     };
-  }
-
-  /// Creates from a map (e.g., from JSON/WebSocket).
-  factory RatchetMessage.fromMap(Map<String, dynamic> map) {
-    return RatchetMessage(
-      dhPublic: base64Decode(map['dh_public'] as String),
-      dhStep: map['dh_step'] as int,
-      prevChainLength: map['prev_chain_length'] as int,
-      messageNumber: map['msg_number'] as int,
-      ciphertext: base64Decode(map['ciphertext'] as String),
-      nonce: base64Decode(map['nonce'] as String),
-    );
-  }
 }

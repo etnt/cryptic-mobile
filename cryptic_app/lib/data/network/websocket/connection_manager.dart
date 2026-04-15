@@ -181,7 +181,6 @@ class ConnectionManager {
   /// Must be called before [connect].
   void initialize() {
     _messageQueue = MessageQueue(
-      maxSize: 1000,
       maxAge: const Duration(hours: 24),
     );
 
@@ -212,7 +211,7 @@ class ConnectionManager {
     _cancelReconnect();
     _stopHeartbeat();
     await _client.disconnect();
-    _eventController.add(DisconnectedEvent(willReconnect: false));
+    _eventController.add(DisconnectedEvent());
   }
 
   /// Send a protocol message.
@@ -259,9 +258,9 @@ class ConnectionManager {
         _onConnected();
       case ConnectionStateEvent(state: ConnectionState.disconnected):
         _onDisconnected();
-      case ConnectionStateEvent(state: ConnectionState.error, error: var err):
+      case ConnectionStateEvent(state: ConnectionState.error, error: final err):
         _onError(err);
-      case MessageReceivedEvent(message: var msg):
+      case MessageReceivedEvent(message: final msg):
         _eventController.add(ServerMessageEvent(msg));
       case RawMessageEvent():
         // Ignore raw messages
@@ -289,7 +288,7 @@ class ConnectionManager {
       _scheduleReconnect();
     } else {
       _eventController.add(
-        DisconnectedEvent(willReconnect: false),
+        DisconnectedEvent(),
       );
     }
   }
@@ -309,7 +308,7 @@ class ConnectionManager {
       _scheduleReconnect();
     } else {
       _eventController.add(
-        DisconnectedEvent(reason: error.toString(), willReconnect: false),
+        DisconnectedEvent(reason: error.toString()),
       );
     }
   }

@@ -104,8 +104,7 @@ class ChatMessage {
     String? failureReason,
     bool? isDeleted,
     String? replyToId,
-  }) {
-    return ChatMessage(
+  }) => ChatMessage(
       id: id ?? this.id,
       conversationId: conversationId ?? this.conversationId,
       senderId: senderId ?? this.senderId,
@@ -119,7 +118,6 @@ class ChatMessage {
       isDeleted: isDeleted ?? this.isDeleted,
       replyToId: replyToId ?? this.replyToId,
     );
-  }
 
   /// Whether this message is from the current user.
   bool get isOutgoing => direction == MessageDirection.outgoing;

@@ -84,7 +84,7 @@ void main() {
         when(mockStorage.readAll()).thenAnswer((_) async => {
               'key1': 'value1',
               'key2': 'value2',
-            });
+            },);
 
         final result = await service.readAll();
 

@@ -148,9 +148,7 @@ class EncryptedPreferences {
   }
 
   /// Gets a string preference.
-  Future<String?> getString(String key) async {
-    return await _secureStorage.read(key: key);
-  }
+  Future<String?> getString(String key) async => await _secureStorage.read(key: key);
 
   /// Sets a string preference.
   Future<void> setString(String key, String value) async {
@@ -184,7 +182,7 @@ class EncryptedPreferences {
 
   /// Whether to show message previews in notifications.
   Future<bool> get showMessagePreviews =>
-      getBool(PreferenceKeys.showMessagePreviews, defaultValue: false);
+      getBool(PreferenceKeys.showMessagePreviews);
 
   /// Sets show message previews.
   Future<void> setShowMessagePreviews(bool value) =>
@@ -204,7 +202,7 @@ class EncryptedPreferences {
 
   /// Whether read receipts are enabled.
   Future<bool> get readReceiptsEnabled =>
-      getBool(PreferenceKeys.readReceiptsEnabled, defaultValue: false);
+      getBool(PreferenceKeys.readReceiptsEnabled);
 
   /// Sets read receipts enabled.
   Future<void> setReadReceiptsEnabled(bool value) =>
@@ -212,7 +210,7 @@ class EncryptedPreferences {
 
   /// Whether typing indicators are enabled.
   Future<bool> get typingIndicatorsEnabled =>
-      getBool(PreferenceKeys.typingIndicatorsEnabled, defaultValue: false);
+      getBool(PreferenceKeys.typingIndicatorsEnabled);
 
   /// Sets typing indicators enabled.
   Future<void> setTypingIndicatorsEnabled(bool value) =>
@@ -220,7 +218,7 @@ class EncryptedPreferences {
 
   /// Whether last seen is visible.
   Future<bool> get lastSeenVisible =>
-      getBool(PreferenceKeys.lastSeenVisible, defaultValue: false);
+      getBool(PreferenceKeys.lastSeenVisible);
 
   /// Sets last seen visible.
   Future<void> setLastSeenVisible(bool value) =>
@@ -248,7 +246,7 @@ class EncryptedPreferences {
 
   /// Font size scale.
   Future<double> get fontSizeScale =>
-      getDouble(PreferenceKeys.fontSizeScale, defaultValue: 1.0);
+      getDouble(PreferenceKeys.fontSizeScale, defaultValue: 1);
 
   /// Sets font size scale.
   Future<void> setFontSizeScale(double scale) =>
@@ -296,7 +294,7 @@ class EncryptedPreferences {
 
   /// Message retention in days (0 = forever).
   Future<int> get messageRetentionDays =>
-      getInt(PreferenceKeys.messageRetentionDays, defaultValue: 0);
+      getInt(PreferenceKeys.messageRetentionDays);
 
   /// Sets message retention days.
   Future<void> setMessageRetentionDays(int days) =>
@@ -312,7 +310,7 @@ class EncryptedPreferences {
 
   /// Whether to auto-download media.
   Future<bool> get autoDownloadMedia =>
-      getBool(PreferenceKeys.autoDownloadMedia, defaultValue: false);
+      getBool(PreferenceKeys.autoDownloadMedia);
 
   /// Sets auto-download media.
   Future<void> setAutoDownloadMedia(bool value) =>
@@ -368,8 +366,7 @@ class EncryptedPreferences {
   }
 
   /// Gets all preferences as a map (for debugging).
-  Future<Map<String, dynamic>> getAllPreferences() async {
-    return {
+  Future<Map<String, dynamic>> getAllPreferences() async => {
       'biometric_enabled': await biometricEnabled,
       'auto_lock_timeout': await autoLockTimeout,
       'show_message_previews': await showMessagePreviews,
@@ -390,5 +387,4 @@ class EncryptedPreferences {
       'onboarding_completed': await onboardingCompleted,
       'last_app_version': await lastAppVersion,
     };
-  }
 }

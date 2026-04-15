@@ -87,11 +87,9 @@ class KeyStorageService {
   }
 
   /// Checks if identity keys exist.
-  Future<bool> hasIdentityKeys() async {
-    return await _secureStorage.containsKey(
+  Future<bool> hasIdentityKeys() async => await _secureStorage.containsKey(
       key: KeyStorageKeys.identityKeys,
     );
-  }
 
   /// Deletes the identity key pair.
   Future<void> deleteIdentityKeyPair() async {
@@ -244,11 +242,9 @@ class KeyStorageService {
   }
 
   /// Checks if a session exists for a peer.
-  Future<bool> hasSession({required String peerUsername}) async {
-    return await _secureStorage.containsKey(
+  Future<bool> hasSession({required String peerUsername}) async => await _secureStorage.containsKey(
       key: KeyStorageKeys.sessionKey(peerUsername),
     );
-  }
 
   /// Deletes a session for a peer.
   Future<void> deleteSession({required String peerUsername}) async {
@@ -260,7 +256,7 @@ class KeyStorageService {
   /// Lists all peers with stored sessions.
   Future<List<String>> listSessionPeers() async {
     final allKeys = await _secureStorage.readAll();
-    final prefix = KeyStorageKeys.sessionPrefix;
+    const prefix = KeyStorageKeys.sessionPrefix;
 
     return allKeys.keys
         .where((k) => k.startsWith(prefix))
@@ -289,9 +285,7 @@ class KeyStorageService {
   }
 
   /// Loads the current username.
-  Future<String?> loadUsername() async {
-    return await _secureStorage.read(key: KeyStorageKeys.username);
-  }
+  Future<String?> loadUsername() async => await _secureStorage.read(key: KeyStorageKeys.username);
 
   /// Saves server connection info.
   Future<void> saveServerInfo({
@@ -342,7 +336,5 @@ class KeyStorageService {
   }
 
   /// Checks if the storage has been initialized with keys.
-  Future<bool> isInitialized() async {
-    return await hasIdentityKeys();
-  }
+  Future<bool> isInitialized() async => await hasIdentityKeys();
 }

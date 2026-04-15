@@ -179,7 +179,7 @@ class CrypticEngine {
 
     _updateState(_state.copyWith(
       connectionStatus: ConnectionStatus.connecting,
-    ));
+    ),);
     _emitEvent(ConnectionStatusChanged(ConnectionStatus.connecting));
 
     try {
@@ -202,7 +202,7 @@ class CrypticEngine {
     await _webSocketClient.disconnect();
     _updateState(_state.copyWith(
       connectionStatus: ConnectionStatus.disconnected,
-    ));
+    ),);
     _emitEvent(ConnectionStatusChanged(ConnectionStatus.disconnected));
   }
 
@@ -321,9 +321,7 @@ class CrypticEngine {
   }
 
   /// Check if a session exists with a peer.
-  bool hasSession(String peerUsername) {
-    return _sessionManager.hasSession(peerUsername);
-  }
+  bool hasSession(String peerUsername) => _sessionManager.hasSession(peerUsername);
 
   /// Get list of peers with active sessions.
   List<String> get sessionPeers => _sessionManager.peerUsernames;
@@ -458,7 +456,7 @@ class CrypticEngine {
     final protocolPrekeys = prekeys.map((pk) => protocol.OneTimePrekey.fromBytes(
       keyId: pk.keyId,
       publicKey: pk.publicKey,
-    )).toList();
+    ),).toList();
 
     final message = protocol.UploadPrekeyBundleMessage(
       username: _username,
@@ -492,8 +490,8 @@ class CrypticEngine {
 
   Future<void> _handleKeyBundleReceived(KeyBundleMessage message) async {
     print('[Engine] _handleKeyBundleReceived: Got bundle for ${message.username}');
-    print('[Engine] _handleKeyBundleReceived: identitySignKey=${message.identitySignKey?.substring(0, 20)}...');
-    print('[Engine] _handleKeyBundleReceived: identityDhKey=${message.identityDhKey?.substring(0, 20)}...');
+    print('[Engine] _handleKeyBundleReceived: identitySignKey=${message.identitySignKey.substring(0, 20)}...');
+    print('[Engine] _handleKeyBundleReceived: identityDhKey=${message.identityDhKey.substring(0, 20)}...');
     print('[Engine] _handleKeyBundleReceived: signedPrekey.keyId=${message.signedPrekey.keyId}');
     print('[Engine] _handleKeyBundleReceived: oneTimePrekey=${message.oneTimePrekey != null ? "present, keyId=${message.oneTimePrekey!.keyId}" : "null"}');
     

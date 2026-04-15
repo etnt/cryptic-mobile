@@ -1,8 +1,7 @@
 // Test for domain use cases
 
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:cryptic_app/domain/usecases/use_case.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('UseCaseResult', () {

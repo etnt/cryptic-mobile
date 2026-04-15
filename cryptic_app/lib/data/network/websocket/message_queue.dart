@@ -23,9 +23,7 @@ class QueueEntry {
   final DateTime enqueuedAt;
 
   /// Check if this entry has expired.
-  bool isExpired(Duration maxAge) {
-    return DateTime.now().difference(enqueuedAt) > maxAge;
-  }
+  bool isExpired(Duration maxAge) => DateTime.now().difference(enqueuedAt) > maxAge;
 }
 
 /// Priority levels for queued messages.
@@ -87,7 +85,7 @@ class MessageQueue {
     _queue.add(QueueEntry(
       message: message,
       enqueuedAt: DateTime.now(),
-    ));
+    ),);
 
     return true;
   }
@@ -150,14 +148,12 @@ class MessageQueue {
   }
 
   /// Get queue statistics.
-  QueueStats get stats {
-    return QueueStats(
+  QueueStats get stats => QueueStats(
       length: _queue.length,
       maxSize: maxSize,
       oldestAge: oldestMessageAge,
       isFull: isFull,
     );
-  }
 }
 
 /// Statistics about the message queue.
@@ -166,8 +162,7 @@ class QueueStats {
   const QueueStats({
     required this.length,
     required this.maxSize,
-    this.oldestAge,
-    required this.isFull,
+    required this.isFull, this.oldestAge,
   });
 
   /// Number of messages in queue.
@@ -183,11 +178,9 @@ class QueueStats {
   final bool isFull;
 
   @override
-  String toString() {
-    return 'QueueStats(length: $length/$maxSize, '
+  String toString() => 'QueueStats(length: $length/$maxSize, '
         'oldest: ${oldestAge?.inSeconds ?? 0}s, '
         'full: $isFull)';
-  }
 }
 
 /// A priority-aware message queue.
@@ -224,13 +217,11 @@ class PriorityMessageQueue {
   }
 
   /// Remove and return all messages in priority order.
-  List<ProtocolMessage> dequeueAll() {
-    return [
+  List<ProtocolMessage> dequeueAll() => [
       ..._highQueue.dequeueAll(),
       ..._normalQueue.dequeueAll(),
       ..._lowQueue.dequeueAll(),
     ];
-  }
 
   /// Clear all queues.
   void clear() {

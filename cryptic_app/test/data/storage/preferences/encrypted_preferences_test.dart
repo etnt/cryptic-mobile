@@ -137,14 +137,14 @@ void main() {
         when(mockStorage.write(
           key: PreferenceKeys.biometricEnabled,
           value: 'true',
-        )).thenAnswer((_) async {});
+        ),).thenAnswer((_) async {});
 
         await prefs.setBiometricEnabled(true);
 
         verify(mockStorage.write(
           key: PreferenceKeys.biometricEnabled,
           value: 'true',
-        )).called(1);
+        ),).called(1);
       });
 
       test('autoLockTimeout defaults to 60', () async {
@@ -305,14 +305,14 @@ void main() {
         when(mockStorage.write(
           key: anyNamed('key'),
           value: anyNamed('value'),
-        )).thenAnswer((_) async {});
+        ),).thenAnswer((_) async {});
 
         await prefs.recordAppOpened();
 
         verify(mockStorage.write(
           key: PreferenceKeys.lastOpenedAt,
           value: anyNamed('value'),
-        )).called(1);
+        ),).called(1);
       });
 
       test('lastOpenedAt returns null when never opened', () async {
@@ -340,7 +340,7 @@ void main() {
               'cryptic_pref_key1': 'value1',
               'cryptic_pref_key2': 'value2',
               'cryptic_other_key': 'value3',
-            });
+            },);
         when(mockStorage.delete(key: anyNamed('key')))
             .thenAnswer((_) async {});
 

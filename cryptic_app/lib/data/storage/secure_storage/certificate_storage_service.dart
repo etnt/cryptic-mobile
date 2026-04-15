@@ -32,6 +32,21 @@ abstract class CertStorageKeys {
 
 /// Metadata about stored certificates.
 class CertificateMetadata {
+
+  /// Creates from map.
+  factory CertificateMetadata.fromMap(Map<String, dynamic> map) {
+    return CertificateMetadata(
+      username: map['username'] as String,
+      serverHost: map['server_host'] as String,
+      serverPort: map['server_port'] as int,
+      importedAt:
+          DateTime.fromMillisecondsSinceEpoch(map['imported_at'] as int),
+      expiresAt: map['expires_at'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(map['expires_at'] as int)
+          : null,
+      fingerprint: map['fingerprint'] as String?,
+    );
+  }
   /// Creates certificate metadata.
   const CertificateMetadata({
     required this.username,
@@ -61,8 +76,7 @@ class CertificateMetadata {
   final String? fingerprint;
 
   /// Converts to map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'username': username,
       'server_host': serverHost,
       'server_port': serverPort,
@@ -70,22 +84,6 @@ class CertificateMetadata {
       'expires_at': expiresAt?.millisecondsSinceEpoch,
       'fingerprint': fingerprint,
     };
-  }
-
-  /// Creates from map.
-  factory CertificateMetadata.fromMap(Map<String, dynamic> map) {
-    return CertificateMetadata(
-      username: map['username'] as String,
-      serverHost: map['server_host'] as String,
-      serverPort: map['server_port'] as int,
-      importedAt:
-          DateTime.fromMillisecondsSinceEpoch(map['imported_at'] as int),
-      expiresAt: map['expires_at'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(map['expires_at'] as int)
-          : null,
-      fingerprint: map['fingerprint'] as String?,
-    );
-  }
 
   /// Checks if the certificate has expired.
   bool get isExpired {
@@ -153,19 +151,13 @@ class CertificateStorageService {
   }
 
   /// Loads the client certificate (PEM).
-  Future<String?> loadClientCertificate() async {
-    return await _secureStorage.read(key: CertStorageKeys.clientCert);
-  }
+  Future<String?> loadClientCertificate() async => await _secureStorage.read(key: CertStorageKeys.clientCert);
 
   /// Loads the client private key (PEM).
-  Future<String?> loadClientKey() async {
-    return await _secureStorage.read(key: CertStorageKeys.clientKey);
-  }
+  Future<String?> loadClientKey() async => await _secureStorage.read(key: CertStorageKeys.clientKey);
 
   /// Loads the CA certificate (PEM).
-  Future<String?> loadCaCertificate() async {
-    return await _secureStorage.read(key: CertStorageKeys.caCert);
-  }
+  Future<String?> loadCaCertificate() async => await _secureStorage.read(key: CertStorageKeys.caCert);
 
   /// Loads certificate metadata.
   Future<CertificateMetadata?> loadMetadata() async {
@@ -175,9 +167,7 @@ class CertificateStorageService {
   }
 
   /// Checks if certificates are stored.
-  Future<bool> hasCertificates() async {
-    return await _secureStorage.containsKey(key: CertStorageKeys.clientCert);
-  }
+  Future<bool> hasCertificates() async => await _secureStorage.containsKey(key: CertStorageKeys.clientCert);
 
   /// Deletes all stored certificates.
   Future<void> deleteCertificates() async {
@@ -204,7 +194,7 @@ class CertificateStorageService {
     }
 
     try {
-      final context = SecurityContext(withTrustedRoots: false);
+      final context = SecurityContext();
 
       // Load CA for server verification
       context.setTrustedCertificatesBytes(utf8.encode(caCert));
@@ -302,7 +292,7 @@ class CertificateStorageService {
     final metadata = await loadMetadata();
 
     if (clientCert == null || clientKey == null || caCert == null) {
-      throw StorageException('No certificates to export');
+      throw const StorageException('No certificates to export');
     }
 
     final directory = await getApplicationDocumentsDirectory();

@@ -21,16 +21,16 @@ abstract class AppLogger {
   // Patterns that should be redacted from logs
   static final List<RegExp> _sensitivePatterns = [
     // Base64 encoded keys (32+ chars of base64)
-    RegExp(r'[A-Za-z0-9+/]{32,}={0,2}'),
+    RegExp('[A-Za-z0-9+/]{32,}={0,2}'),
     // Hex encoded keys (64+ hex chars)
-    RegExp(r'[0-9a-fA-F]{64,}'),
+    RegExp('[0-9a-fA-F]{64,}'),
     // Passphrases in common formats
-    RegExp('passphrase["\\s:=]+.+', caseSensitive: false),
-    RegExp('password["\\s:=]+.+', caseSensitive: false),
+    RegExp(r'passphrase["\s:=]+.+', caseSensitive: false),
+    RegExp(r'password["\s:=]+.+', caseSensitive: false),
     // Private key markers
-    RegExp('private.?key["\\s:=]+.+', caseSensitive: false),
+    RegExp(r'private.?key["\s:=]+.+', caseSensitive: false),
     // Secret key markers
-    RegExp('secret.?key["\\s:=]+.+', caseSensitive: false),
+    RegExp(r'secret.?key["\s:=]+.+', caseSensitive: false),
   ];
 
   /// Initialize the logger with configuration.

@@ -94,8 +94,7 @@ class ConnectionStatusBanner extends StatelessWidget {
     );
   }
 
-  (Color, IconData, String) _getStatusInfo() {
-    return switch (status) {
+  (Color, IconData, String) _getStatusInfo() => switch (status) {
       ConnectionStatus.disconnected => (
           AppColors.disconnected,
           Icons.cloud_off,
@@ -122,5 +121,4 @@ class ConnectionStatusBanner extends StatelessWidget {
           'Connection error',
         ),
     };
-  }
 }

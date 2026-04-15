@@ -68,8 +68,7 @@ class UploadIdentityKeysMessage extends ProtocolMessage {
     required int signedPrekeyId,
     required Uint8List signedPrekeyPublic,
     required Uint8List signedPrekeySignature,
-  }) {
-    return UploadIdentityKeysMessage(
+  }) => UploadIdentityKeysMessage(
       username: username,
       identitySignPublic: base64Encode(identitySignPublic),
       identityDhPublic: base64Encode(identityDhPublic),
@@ -77,11 +76,21 @@ class UploadIdentityKeysMessage extends ProtocolMessage {
       signedPrekeyPublic: base64Encode(signedPrekeyPublic),
       signedPrekeySignature: base64Encode(signedPrekeySignature),
     );
-  }
 }
 
 /// One-time prekey for upload.
 class OneTimePrekey {
+
+  /// Create from raw bytes.
+  factory OneTimePrekey.fromBytes({
+    required int keyId,
+    required Uint8List publicKey,
+  }) {
+    return OneTimePrekey(
+      keyId: keyId,
+      publicKey: base64Encode(publicKey),
+    );
+  }
   /// Creates a one-time prekey.
   OneTimePrekey({
     required this.keyId,
@@ -103,22 +112,11 @@ class OneTimePrekey {
     // Convert keyId to 8-byte binary and base64-encode it
     final idBytes = Uint8List(8);
     final view = ByteData.view(idBytes.buffer);
-    view.setInt64(0, keyId, Endian.big);
+    view.setInt64(0, keyId);
     return {
       'id': base64Encode(idBytes),
       'public_key': publicKey,
     };
-  }
-
-  /// Create from raw bytes.
-  factory OneTimePrekey.fromBytes({
-    required int keyId,
-    required Uint8List publicKey,
-  }) {
-    return OneTimePrekey(
-      keyId: keyId,
-      publicKey: base64Encode(publicKey),
-    );
   }
 }
 
@@ -181,17 +179,38 @@ class GetKeyBundleMessage extends ProtocolMessage {
 /// - `signature` - base64 encoded Ed25519 signature over metadata
 /// - `metadata` - base64 encoded serialized metadata JSON
 class X3dhMessage extends ProtocolMessage {
+
+  /// Create from X3DH message blob output.
+  factory X3dhMessage.fromMessageBlob({
+    required String messageId,
+    required String fromUser,
+    required String toUser,
+    required Uint8List ephemeralPublic,
+    Uint8List? otpkId,
+    required Uint8List ciphertext,
+    required Uint8List nonce,
+    required Uint8List signature,
+    required String metadataJson,
+  }) {
+    return X3dhMessage(
+      messageId: messageId,
+      fromUser: fromUser,
+      toUser: toUser,
+      ephemeralPublic: base64Encode(ephemeralPublic),
+      otpkId: otpkId != null ? base64Encode(otpkId) : null,
+      ciphertext: base64Encode(ciphertext),
+      nonce: base64Encode(nonce),
+      signature: base64Encode(signature),
+      metadata: base64Encode(utf8.encode(metadataJson)),
+    );
+  }
   /// Creates an X3DH message.
   X3dhMessage({
     required this.messageId,
     required this.fromUser,
     required this.toUser,
     required this.ephemeralPublic,
-    this.otpkId,
-    required this.ciphertext,
-    required this.nonce,
-    required this.signature,
-    required this.metadata,
+    required this.ciphertext, required this.nonce, required this.signature, required this.metadata, this.otpkId,
   });
 
   /// Unique message ID for acknowledgment tracking (base64).
@@ -225,8 +244,7 @@ class X3dhMessage extends ProtocolMessage {
   String get type => ClientMessageType.x3dh.value;
 
   @override
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
+  Map<String, dynamic> toJson() => <String, dynamic>{
       'type': type,
       'message_id': messageId,
       'from': fromUser,
@@ -238,32 +256,6 @@ class X3dhMessage extends ProtocolMessage {
       'signature': signature,
       'metadata': metadata,
     };
-  }
-
-  /// Create from X3DH message blob output.
-  factory X3dhMessage.fromMessageBlob({
-    required String messageId,
-    required String fromUser,
-    required String toUser,
-    required Uint8List ephemeralPublic,
-    Uint8List? otpkId,
-    required Uint8List ciphertext,
-    required Uint8List nonce,
-    required Uint8List signature,
-    required String metadataJson,
-  }) {
-    return X3dhMessage(
-      messageId: messageId,
-      fromUser: fromUser,
-      toUser: toUser,
-      ephemeralPublic: base64Encode(ephemeralPublic),
-      otpkId: otpkId != null ? base64Encode(otpkId) : null,
-      ciphertext: base64Encode(ciphertext),
-      nonce: base64Encode(nonce),
-      signature: base64Encode(signature),
-      metadata: base64Encode(utf8.encode(metadataJson)),
-    );
-  }
 }
 
 /// Send a ratchet message in an established session.
@@ -279,6 +271,31 @@ class X3dhMessage extends ProtocolMessage {
 /// - `ciphertext` - base64 encrypted data
 /// - `nonce` - base64 encryption nonce
 class RatchetMessage extends ProtocolMessage {
+
+  /// Create from crypto layer RatchetMessage.
+  factory RatchetMessage.fromCryptoMessage({
+    required String messageId,
+    required String fromUser,
+    required String toUser,
+    required Uint8List dhPublic,
+    required int dhStep,
+    required int prevChainLength,
+    required int msgNumber,
+    required Uint8List ciphertext,
+    required Uint8List nonce,
+  }) {
+    return RatchetMessage(
+      messageId: messageId,
+      fromUser: fromUser,
+      toUser: toUser,
+      dhPublic: base64Encode(dhPublic),
+      dhStep: dhStep,
+      prevChainLength: prevChainLength,
+      msgNumber: msgNumber,
+      ciphertext: base64Encode(ciphertext),
+      nonce: base64Encode(nonce),
+    );
+  }
   /// Creates a ratchet message.
   RatchetMessage({
     required this.messageId,
@@ -335,31 +352,6 @@ class RatchetMessage extends ProtocolMessage {
         'ciphertext': ciphertext,
         'nonce': nonce,
       };
-
-  /// Create from crypto layer RatchetMessage.
-  factory RatchetMessage.fromCryptoMessage({
-    required String messageId,
-    required String fromUser,
-    required String toUser,
-    required Uint8List dhPublic,
-    required int dhStep,
-    required int prevChainLength,
-    required int msgNumber,
-    required Uint8List ciphertext,
-    required Uint8List nonce,
-  }) {
-    return RatchetMessage(
-      messageId: messageId,
-      fromUser: fromUser,
-      toUser: toUser,
-      dhPublic: base64Encode(dhPublic),
-      dhStep: dhStep,
-      prevChainLength: prevChainLength,
-      msgNumber: msgNumber,
-      ciphertext: base64Encode(ciphertext),
-      nonce: base64Encode(nonce),
-    );
-  }
 }
 
 /// Request list of registered users (admin only).

@@ -13,7 +13,6 @@ abstract final class AppTheme {
   static ThemeData get light {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
-      brightness: Brightness.light,
       primary: AppColors.primary,
       secondary: AppColors.secondary,
       surface: AppColors.surfaceLight,
@@ -27,13 +26,13 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: AppColors.backgroundLight,
 
       // App bar
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surfaceLight,
         foregroundColor: AppColors.textPrimaryLight,
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryLight,
@@ -119,13 +118,13 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: AppColors.backgroundDark,
 
       // App bar
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
         scrolledUnderElevation: 1,
         centerTitle: true,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: AppColors.textPrimaryDark,

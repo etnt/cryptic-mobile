@@ -39,8 +39,11 @@ class EnrollmentCrypto {
     EnrollmentEnvelope envelope,
     String passphrase,
   ) async {
-    // Step 1: Derive keys from passphrase
-    final derived = await _deriveKeys(passphrase, envelope.salt);
+    // Step 1: Derive keys from passphrase.
+    // The CLI argon2 tool receives the hex string as raw ASCII bytes,
+    // so we must pass the hex string (not hex-decoded bytes) as the salt.
+    final saltBytes = Uint8List.fromList(utf8.encode(envelope.saltHex));
+    final derived = await _deriveKeys(passphrase, saltBytes);
     final encKey = derived.sublist(0, 32);
     final hmacKey = derived.sublist(32, 64);
 

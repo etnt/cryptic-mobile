@@ -84,7 +84,7 @@ void main() {
 
   group('ServerConfig', () {
     test('should create with required fields', () {
-      final config = ServerConfig(
+      const config = ServerConfig(
         host: 'example.com',
         port: 8443,
       );
@@ -95,7 +95,7 @@ void main() {
     });
 
     test('should allow custom path', () {
-      final config = ServerConfig(
+      const config = ServerConfig(
         host: 'example.com',
         port: 8443,
         path: '/custom',
@@ -105,17 +105,16 @@ void main() {
     });
 
     test('wsUrl should build correct URL', () {
-      final config = ServerConfig(
+      const config = ServerConfig(
         host: 'example.com',
         port: 8443,
-        path: '/ws',
       );
 
       expect(config.wsUrl, 'wss://example.com:8443/ws');
     });
 
     test('copyWith should update specified fields', () {
-      final config = ServerConfig(
+      const config = ServerConfig(
         host: 'localhost',
         port: 8080,
       );
@@ -127,9 +126,9 @@ void main() {
     });
 
     test('equality should work correctly', () {
-      final config1 = ServerConfig(host: 'example.com', port: 8443);
-      final config2 = ServerConfig(host: 'example.com', port: 8443);
-      final config3 = ServerConfig(host: 'other.com', port: 8443);
+      const config1 = ServerConfig(host: 'example.com', port: 8443);
+      const config2 = ServerConfig(host: 'example.com', port: 8443);
+      const config3 = ServerConfig(host: 'other.com', port: 8443);
 
       expect(config1, equals(config2));
       expect(config1.hashCode, equals(config2.hashCode));
@@ -137,7 +136,7 @@ void main() {
     });
 
     test('toString should include all fields', () {
-      final config = ServerConfig(host: 'example.com', port: 8443);
+      const config = ServerConfig(host: 'example.com', port: 8443);
       expect(config.toString(), contains('example.com'));
       expect(config.toString(), contains('8443'));
     });
@@ -145,7 +144,7 @@ void main() {
 
   group('PeerSession', () {
     test('should create with required fields', () {
-      final session = PeerSession(
+      const session = PeerSession(
         peerUsername: 'bob',
         hasSession: true,
       );
@@ -173,7 +172,7 @@ void main() {
     });
 
     test('copyWith should update specified fields', () {
-      final session = PeerSession(
+      const session = PeerSession(
         peerUsername: 'bob',
         hasSession: false,
       );
@@ -219,7 +218,7 @@ void main() {
         connectionStatus: ConnectionStatus.connected,
         identity: identity,
         sessions: {
-          'bob': PeerSession(peerUsername: 'bob', hasSession: true),
+          'bob': const PeerSession(peerUsername: 'bob', hasSession: true),
         },
       );
 
@@ -256,7 +255,7 @@ void main() {
     test('withSession should add new session', () {
       const state = EngineState.initial;
 
-      final session = PeerSession(
+      const session = PeerSession(
         peerUsername: 'bob',
         hasSession: true,
       );
@@ -268,7 +267,7 @@ void main() {
     });
 
     test('withSession should update existing session', () {
-      final session1 = PeerSession(
+      const session1 = PeerSession(
         peerUsername: 'bob',
         hasSession: false,
       );
@@ -283,10 +282,10 @@ void main() {
     });
 
     test('withoutSession should remove session', () {
-      final state = EngineState(
+      const state = EngineState(
         sessions: {
-          'bob': PeerSession(peerUsername: 'bob', hasSession: true),
-          'alice': PeerSession(peerUsername: 'alice', hasSession: true),
+          'bob': const PeerSession(peerUsername: 'bob', hasSession: true),
+          'alice': const PeerSession(peerUsername: 'alice', hasSession: true),
         },
       );
 
@@ -298,7 +297,7 @@ void main() {
     });
 
     test('withError should set error and failed status', () {
-      final state = EngineState(status: EngineStatus.ready);
+      const state = EngineState(status: EngineStatus.ready);
 
       final updated = state.withError('Something went wrong');
 
@@ -308,7 +307,7 @@ void main() {
     });
 
     test('clearingError should remove error', () {
-      final state = EngineState(
+      const state = EngineState(
         status: EngineStatus.failed,
         error: 'Previous error',
       );
@@ -320,7 +319,7 @@ void main() {
     });
 
     test('toString should include key info', () {
-      final state = EngineState(
+      const state = EngineState(
         status: EngineStatus.ready,
         connectionStatus: ConnectionStatus.connected,
       );
@@ -349,7 +348,7 @@ void main() {
     });
 
     test('SessionUpdated should carry session', () {
-      final session = PeerSession(peerUsername: 'bob', hasSession: true);
+      const session = PeerSession(peerUsername: 'bob', hasSession: true);
       final event = SessionUpdated(session);
       expect(event.session, session);
     });

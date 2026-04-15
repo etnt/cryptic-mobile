@@ -19,6 +19,17 @@ import '../../../core/errors/app_exceptions.dart';
 /// The signature proves ownership of the prekey, preventing
 /// man-in-the-middle attacks on initial key agreement.
 class SignedPrekey {
+
+  /// Creates from a deserialized map.
+  factory SignedPrekey.fromMap(Map<String, dynamic> map) {
+    return SignedPrekey(
+      keyId: map['key_id'] as int,
+      publicKey: base64Decode(map['public_key'] as String),
+      privateKey: base64Decode(map['private_key'] as String),
+      signature: base64Decode(map['signature'] as String),
+      timestamp: DateTime.parse(map['timestamp'] as String),
+    );
+  }
   /// Creates a signed prekey.
   const SignedPrekey({
     required this.keyId,
@@ -65,31 +76,16 @@ class SignedPrekey {
   /// Whether this prekey should be rotated.
   ///
   /// Prekeys are typically rotated after 7 days.
-  bool shouldRotate({Duration maxAge = const Duration(days: 7)}) {
-    return DateTime.now().difference(timestamp) > maxAge;
-  }
+  bool shouldRotate({Duration maxAge = const Duration(days: 7)}) => DateTime.now().difference(timestamp) > maxAge;
 
   /// Converts to a map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'key_id': keyId,
       'public_key': base64Encode(publicKey),
       'private_key': base64Encode(privateKey),
       'signature': base64Encode(signature),
       'timestamp': timestamp.toIso8601String(),
     };
-  }
-
-  /// Creates from a deserialized map.
-  factory SignedPrekey.fromMap(Map<String, dynamic> map) {
-    return SignedPrekey(
-      keyId: map['key_id'] as int,
-      publicKey: base64Decode(map['public_key'] as String),
-      privateKey: base64Decode(map['private_key'] as String),
-      signature: base64Decode(map['signature'] as String),
-      timestamp: DateTime.parse(map['timestamp'] as String),
-    );
-  }
 
   /// Extracts only public components for sharing.
   SignedPrekeyPublic get publicPart => SignedPrekeyPublic(
@@ -101,6 +97,15 @@ class SignedPrekey {
 
 /// Public components of a signed prekey.
 class SignedPrekeyPublic {
+
+  /// Creates from a server response map.
+  factory SignedPrekeyPublic.fromMap(Map<String, dynamic> map) {
+    return SignedPrekeyPublic(
+      keyId: map['key_id'] as int,
+      publicKey: base64Decode(map['public_key'] as String),
+      signature: base64Decode(map['signature'] as String),
+    );
+  }
   /// Creates a public signed prekey.
   const SignedPrekeyPublic({
     required this.keyId,
@@ -118,20 +123,9 @@ class SignedPrekeyPublic {
   final Uint8List signature;
 
   /// Converts to a map for server upload.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'key_id': keyId,
       'public_key': base64Encode(publicKey),
       'signature': base64Encode(signature),
     };
-  }
-
-  /// Creates from a server response map.
-  factory SignedPrekeyPublic.fromMap(Map<String, dynamic> map) {
-    return SignedPrekeyPublic(
-      keyId: map['key_id'] as int,
-      publicKey: base64Decode(map['public_key'] as String),
-      signature: base64Decode(map['signature'] as String),
-    );
-  }
 }

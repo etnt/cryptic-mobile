@@ -25,8 +25,7 @@ class LoadingOverlay extends StatelessWidget {
   final Widget? child;
 
   @override
-  Widget build(BuildContext context) {
-    return Stack(
+  Widget build(BuildContext context) => Stack(
       children: [
         if (child != null) child!,
         if (isLoading)
@@ -57,14 +56,12 @@ class LoadingOverlay extends StatelessWidget {
           ),
       ],
     );
-  }
 }
 
 /// Extension to easily show loading overlay.
 extension LoadingOverlayExtension on BuildContext {
   /// Show a loading overlay dialog.
-  Future<void> showLoadingOverlay({String? message}) {
-    return showDialog(
+  Future<void> showLoadingOverlay({String? message}) => showDialog(
       context: this,
       barrierDismissible: false,
       builder: (context) => PopScope(
@@ -92,5 +89,4 @@ extension LoadingOverlayExtension on BuildContext {
         ),
       ),
     );
-  }
 }

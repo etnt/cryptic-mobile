@@ -77,8 +77,7 @@ class Conversation {
     bool? isMuted,
     bool? isArchived,
     DateTime? createdAt,
-  }) {
-    return Conversation(
+  }) => Conversation(
       id: id ?? this.id,
       peerUsername: peerUsername ?? this.peerUsername,
       peerDisplayName: peerDisplayName ?? this.peerDisplayName,
@@ -91,7 +90,6 @@ class Conversation {
       isArchived: isArchived ?? this.isArchived,
       createdAt: createdAt ?? this.createdAt,
     );
-  }
 
   @override
   bool operator ==(Object other) =>

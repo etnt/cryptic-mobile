@@ -31,16 +31,16 @@ class InvalidKeyException extends CryptoException {
 class SignatureVerificationException extends CryptoException {
   /// Creates a new signature verification exception.
   const SignatureVerificationException([
-    String message = 'Signature verification failed',
-  ]) : super(message);
+    super.message = 'Signature verification failed',
+  ]);
 }
 
 /// Exception thrown when message decryption fails.
 class DecryptionException extends CryptoException {
   /// Creates a new decryption exception.
   const DecryptionException([
-    String message = 'Failed to decrypt message',
-  ]) : super(message);
+    super.message = 'Failed to decrypt message',
+  ]);
 }
 
 /// Exception thrown when storage operations fail.
@@ -53,8 +53,8 @@ class StorageException extends CrypticException {
 class StorageLockedExcpetion extends StorageException {
   /// Creates a new storage locked exception.
   const StorageLockedExcpetion([
-    String message = 'Secure storage is locked',
-  ]) : super(message);
+    super.message = 'Secure storage is locked',
+  ]);
 }
 
 /// Exception thrown when a required key is not found.
@@ -74,8 +74,8 @@ class NetworkException extends CrypticException {
 class ConnectionException extends NetworkException {
   /// Creates a new connection exception.
   const ConnectionException([
-    String message = 'Failed to connect to server',
-  ]) : super(message);
+    super.message = 'Failed to connect to server',
+  ]);
 }
 
 /// Exception thrown when server returns an error.
@@ -104,6 +104,6 @@ class NoSessionException extends ProtocolException {
 class MessageOrderException extends ProtocolException {
   /// Creates a new message order exception.
   const MessageOrderException([
-    String message = 'Message order violation detected',
-  ]) : super(message);
+    super.message = 'Message order violation detected',
+  ]);
 }

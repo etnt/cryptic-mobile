@@ -66,13 +66,11 @@ class AuthStatus {
     String? username,
     String? error,
     bool clearError = false,
-  }) {
-    return AuthStatus(
+  }) => AuthStatus(
       state: state ?? this.state,
       username: username ?? this.username,
       error: clearError ? null : (error ?? this.error),
     );
-  }
 }
 
 /// Notifier for authentication state.
@@ -204,7 +202,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 
   /// Check if user needs initial setup.
   Future<void> checkAuthState() async {
-    final hasCerts = await _authService.hasCertificates();
+    final hasCerts = await _authService.hasStoredCertificates();
     if (!hasCerts) {
       state = state.copyWith(
         state: AuthState.needsSetup,
@@ -223,9 +221,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 }
 
 /// Provider for authentication state.
-final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>((ref) {
-  return AuthNotifier();
-});
+final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>((ref) => AuthNotifier());
 
 /// Provider for the authenticated engine.
 ///

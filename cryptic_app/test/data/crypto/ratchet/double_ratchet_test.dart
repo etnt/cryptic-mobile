@@ -199,7 +199,7 @@ void main() {
         final sharedSecret = Uint8List(32)..fillRange(0, 32, 0x42);
         final keyPair = await x25519.generateKeyPair();
 
-        var state = await ratchet.initSender(
+        final state = await ratchet.initSender(
           rootKey: sharedSecret,
           dhKeyPair: (keyPair.publicKey, keyPair.privateKey),
         );
@@ -278,7 +278,7 @@ void main() {
         final sharedSecret = Uint8List(32)..fillRange(0, 32, 0x42);
         final keyPair = await x25519.generateKeyPair();
 
-        var state = await ratchet.initSender(
+        final state = await ratchet.initSender(
           rootKey: sharedSecret,
           dhKeyPair: (keyPair.publicKey, keyPair.privateKey),
         );
@@ -304,7 +304,7 @@ void main() {
         );
 
         final bobKeyPair = await x25519.generateKeyPair();
-        var bobState = await ratchet.initReceiver(
+        final bobState = await ratchet.initReceiver(
           rootKey: sharedSecret,
           dhKeyPair: (bobKeyPair.publicKey, bobKeyPair.privateKey),
         );
@@ -335,7 +335,7 @@ void main() {
         );
 
         final bobKeyPair = await x25519.generateKeyPair();
-        var bobState = await ratchet.initReceiver(
+        final bobState = await ratchet.initReceiver(
           rootKey: sharedSecret,
           dhKeyPair: (bobKeyPair.publicKey, bobKeyPair.privateKey),
         );

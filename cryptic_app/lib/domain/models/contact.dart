@@ -71,8 +71,7 @@ class Contact {
     bool? isVerified,
     bool? isTrusted,
     DateTime? addedAt,
-  }) {
-    return Contact(
+  }) => Contact(
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       status: status ?? this.status,
@@ -82,7 +81,6 @@ class Contact {
       isTrusted: isTrusted ?? this.isTrusted,
       addedAt: addedAt ?? this.addedAt,
     );
-  }
 
   @override
   bool operator ==(Object other) =>

@@ -73,7 +73,7 @@ void main() {
           caCertificate: Uint8List.fromList([1]),
         );
 
-        expect(() => noHost.getWebSocketUrl(), throwsStateError);
+        expect(noHost.getWebSocketUrl, throwsStateError);
       });
 
       test('should throw if port not configured', () {
@@ -84,7 +84,7 @@ void main() {
           serverHost: 'localhost',
         );
 
-        expect(() => noPort.getWebSocketUrl(), throwsStateError);
+        expect(noPort.getWebSocketUrl, throwsStateError);
       });
     });
 

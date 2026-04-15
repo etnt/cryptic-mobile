@@ -11,7 +11,7 @@ import 'package:cryptic_app/core/utils/logger.dart';
 void main() {
   group('AppLogger', () {
     setUp(() {
-      AppLogger.init(level: LogLevel.debug, enableConsole: false);
+      AppLogger.init(enableConsole: false);
     });
 
     test('should initialize with provided log level', () {

@@ -67,7 +67,6 @@ class DoubleRatchet {
       recvMessageNumber: 0,
       prevRecvChainLength: 0,
       dhSelf: dhKeyPair,
-      dhRemote: null, // Set when first message received
       dhRatchetStep: 0,
       sendingChainActive: true,
       receivingChainActive: true, // Ready for Bob's replies
@@ -96,7 +95,6 @@ class DoubleRatchet {
       recvMessageNumber: 0,
       prevRecvChainLength: 0,
       dhSelf: dhKeyPair,
-      dhRemote: null, // Set from X3DH message
       dhRatchetStep: 0,
       sendingChainActive: false, // Activated on first send
       receivingChainActive: true,
@@ -300,12 +298,10 @@ class DoubleRatchet {
   Future<(Uint8List, Uint8List)> _advanceReceivingChain(
     Uint8List chainKey,
     int messageNumber,
-  ) async {
-    return _kdf.deriveMessageKey(
+  ) async => _kdf.deriveMessageKey(
       chainKey: chainKey,
       messageNumber: messageNumber,
     );
-  }
 
   /// Derives encryption key from message key.
   /// 
@@ -398,9 +394,7 @@ class DoubleRatchet {
     );
   }
   
-  String _bytesToHex(Uint8List bytes) {
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-  }
+  String _bytesToHex(Uint8List bytes) => bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   /// Performs DH ratchet step on send.
   Future<RatchetState> _performDhRatchetOnSend(RatchetState state) async {

@@ -143,7 +143,7 @@ class WebSocketClient {
       _setState(ConnectionState.connected);
     } catch (e, stackTrace) {
       AppLogger.error('WebSocket connection failed', 
-          tag: 'WebSocket', error: e, stackTrace: stackTrace);
+          tag: 'WebSocket', error: e, stackTrace: stackTrace,);
       _setState(ConnectionState.error, e);
       rethrow;
     }

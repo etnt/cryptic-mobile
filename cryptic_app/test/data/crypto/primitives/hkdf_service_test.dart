@@ -168,7 +168,6 @@ void main() {
 
         final secret1 = await hkdf.deriveX3dhSecret(
           dhOutputs: [dh1, dh2, dh3],
-          info: 'X3DH',
         );
 
         final secret2 = await hkdf.deriveX3dhSecret(
@@ -279,9 +278,9 @@ void main() {
           final mkStr = messageKey.join(',');
 
           expect(seenChainKeys.contains(ckStr), false,
-              reason: 'Chain key repeated at iteration $i');
+              reason: 'Chain key repeated at iteration $i',);
           expect(seenMessageKeys.contains(mkStr), false,
-              reason: 'Message key repeated at iteration $i');
+              reason: 'Message key repeated at iteration $i',);
 
           seenChainKeys.add(ckStr);
           seenMessageKeys.add(mkStr);

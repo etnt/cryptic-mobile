@@ -75,7 +75,7 @@ class ConnectUseCase implements UseCase<ConnectParams, ConnectResult> {
       // Return success
       return UseCaseSuccess(ConnectResult(
         status: _engine.state.connectionStatus,
-      ));
+      ),);
     } catch (e) {
       return UseCaseError('Failed to connect', e);
     }

@@ -24,13 +24,12 @@ void main() {
       recvMessageNumber: 0,
       prevRecvChainLength: 0,
       dhSelf: (Uint8List(32), Uint8List(32)),
-      dhRemote: null,
       dhRatchetStep: 0,
       skippedKeys: {},
       sendingChainActive: false,
       receivingChainActive: false,
       createdAt: DateTime.now(),
-    ));
+    ),);
   });
 
   late MockSessionRepository mockSessionRepository;
@@ -46,8 +45,7 @@ void main() {
     );
   });
 
-  RatchetState createMockState() {
-    return RatchetState(
+  RatchetState createMockState() => RatchetState(
       rootKey: Uint8List(32),
       sendChainKey: Uint8List(32),
       sendMessageNumber: 0,
@@ -62,7 +60,6 @@ void main() {
       receivingChainActive: false,
       createdAt: DateTime.now(),
     );
-  }
 
   group('SessionManager initialization', () {
     test('should start with no sessions', () {

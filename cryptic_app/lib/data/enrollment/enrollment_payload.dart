@@ -21,33 +21,11 @@ import '../../core/errors/app_exceptions.dart';
 ///   "v": 2,
 ///   "salt": "<32 hex chars>",
 ///   "iv": "<32 hex chars>",
-///   "ciphertext": "<base64>",
+///   "ct": "<base64>",
 ///   "hmac": "<64 hex chars>"
 /// }
 /// ```
 class EnrollmentEnvelope {
-  const EnrollmentEnvelope({
-    required this.version,
-    required this.salt,
-    required this.iv,
-    required this.ciphertext,
-    required this.hmac,
-  });
-
-  /// Payload format version.
-  final int version;
-
-  /// Argon2id salt (16 bytes from hex).
-  final Uint8List salt;
-
-  /// AES-256-CBC initialization vector (16 bytes from hex).
-  final Uint8List iv;
-
-  /// Encrypted payload (raw bytes from base64).
-  final Uint8List ciphertext;
-
-  /// HMAC-SHA256 over the base64-encoded ciphertext string (32 bytes from hex).
-  final Uint8List hmac;
 
   /// Parse from QR code JSON string.
   factory EnrollmentEnvelope.fromQrData(String qrData) {
@@ -70,7 +48,7 @@ class EnrollmentEnvelope {
 
     final saltHex = map['salt'] as String?;
     final ivHex = map['iv'] as String?;
-    final ciphertextB64 = map['ciphertext'] as String?;
+    final ciphertextB64 = map['ct'] as String?;
     final hmacHex = map['hmac'] as String?;
 
     if (saltHex == null ||
@@ -82,18 +60,45 @@ class EnrollmentEnvelope {
 
     return EnrollmentEnvelope(
       version: version,
-      salt: _hexDecode(saltHex),
+      saltHex: saltHex,
       iv: _hexDecode(ivHex),
       ciphertext: base64.decode(ciphertextB64),
+      ciphertextBase64: ciphertextB64,
       hmac: _hexDecode(hmacHex),
     );
   }
+  const EnrollmentEnvelope({
+    required this.version,
+    required this.saltHex,
+    required this.iv,
+    required this.ciphertext,
+    required this.ciphertextBase64,
+    required this.hmac,
+  });
 
-  /// Get the base64 ciphertext string for HMAC verification.
+  /// Payload format version.
+  final int version;
+
+  /// Argon2id salt as the original hex string.
   ///
-  /// We need the original base64 string (not the decoded bytes) because
-  /// the HMAC is computed over the base64 representation.
-  String get ciphertextBase64 => base64.encode(ciphertext);
+  /// The CLI `argon2` tool uses the hex string directly as ASCII bytes
+  /// for the salt, so we must preserve the original string form.
+  final String saltHex;
+
+  /// AES-256-CBC initialization vector (16 bytes from hex).
+  final Uint8List iv;
+
+  /// Encrypted payload (raw bytes from base64).
+  final Uint8List ciphertext;
+
+  /// Original base64-encoded ciphertext string from the QR envelope.
+  ///
+  /// The HMAC is computed over this exact string, so we preserve it
+  /// rather than re-encoding from decoded bytes.
+  final String ciphertextBase64;
+
+  /// HMAC-SHA256 over the base64-encoded ciphertext string (32 bytes from hex).
+  final Uint8List hmac;
 
   static Uint8List _hexDecode(String hex) {
     if (hex.length.isOdd) {
@@ -111,6 +116,92 @@ class EnrollmentEnvelope {
 ///
 /// Contains all information the mobile client needs to enroll.
 class EnrollmentPayload {
+
+  /// Parse from decrypted JSON.
+  factory EnrollmentPayload.fromJson(String json) {
+    try {
+      final map = jsonDecode(json) as Map<String, dynamic>;
+      return EnrollmentPayload.fromMap(map);
+    } on FormatException catch (e) {
+      throw EnrollmentException('Invalid enrollment payload: $e');
+    }
+  }
+
+  /// Parse from decoded JSON map.
+  ///
+  /// The server's `cryptic-onboard create-mobile-enrollment` produces:
+  /// ```json
+  /// {
+  ///   "username": "alice",
+  ///   "server_host": "localhost",
+  ///   "server_port": 8443,
+  ///   "ca_fingerprint": "<64 hex>",
+  ///   "enrollment_sec": "<base64 of 64-byte Ed25519 secret>",
+  ///   "expires_at": <unix seconds>
+  /// }
+  /// ```
+  factory EnrollmentPayload.fromMap(Map<String, dynamic> map) {
+    // Username
+    final username = map['username'] as String?;
+    if (username == null || username.isEmpty) {
+      throw const EnrollmentException('Missing username in payload');
+    }
+
+    // Server config (top-level keys from the onboard tool)
+    final host = map['server_host'] as String?;
+    final port = map['server_port'] as int? ?? 8443;
+    if (host == null || host.isEmpty) {
+      throw const EnrollmentException('Missing server_host in payload');
+    }
+
+    // Enrollment Ed25519 keys.
+    // The onboard tool stores the DER-encoded private key in enrollment_sec
+    // and the raw 32-byte public key in enrollment_pub. We extract the
+    // 32-byte seed from the DER and combine with the public key to form the
+    // 64-byte NaCl-style secret key expected by the Ed25519 signing code.
+    final secB64 = map['enrollment_sec'] as String?;
+    final pubB64 = map['enrollment_pub'] as String?;
+    if (secB64 == null || pubB64 == null) {
+      throw const EnrollmentException(
+        'Missing enrollment_sec or enrollment_pub in payload',
+      );
+    }
+    final secDer = base64.decode(secB64);
+    final pubRaw = base64.decode(pubB64);
+    if (pubRaw.length != 32) {
+      throw EnrollmentException(
+        'Invalid enrollment public key size: ${pubRaw.length} (expected 32)',
+      );
+    }
+    // The 32-byte seed is the last 32 bytes of the PKCS#8 DER encoding.
+    final seed = secDer.sublist(secDer.length - 32);
+    final enrollmentKey = Uint8List(64)
+      ..setRange(0, 32, seed)
+      ..setRange(32, 64, pubRaw);
+
+    // CA fingerprint
+    final caFp = map['ca_fingerprint'] as String?;
+    if (caFp == null || caFp.length != 64) {
+      throw const EnrollmentException(
+        'Missing or invalid ca_fingerprint in payload',
+      );
+    }
+
+    // Expiry
+    final expiresAtUnix = map['expires_at'] as int?;
+    if (expiresAtUnix == null) {
+      throw const EnrollmentException('Missing expires_at in payload');
+    }
+
+    return EnrollmentPayload(
+      username: username,
+      serverHost: host,
+      serverPort: port,
+      enrollmentSecretKey: Uint8List.fromList(enrollmentKey),
+      caFingerprint: caFp,
+      expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
+    );
+  }
   const EnrollmentPayload({
     required this.username,
     required this.serverHost,
@@ -143,79 +234,6 @@ class EnrollmentPayload {
 
   /// Extract the 32-byte Ed25519 public key from the secret key.
   Uint8List get enrollmentPublicKey => enrollmentSecretKey.sublist(32, 64);
-
-  /// Parse from decrypted JSON.
-  factory EnrollmentPayload.fromJson(String json) {
-    try {
-      final map = jsonDecode(json) as Map<String, dynamic>;
-      return EnrollmentPayload.fromMap(map);
-    } on FormatException catch (e) {
-      throw EnrollmentException('Invalid enrollment payload: $e');
-    }
-  }
-
-  /// Parse from decoded JSON map.
-  ///
-  /// Supports both compact keys (v2) and verbose keys (v1 GPG fallback).
-  factory EnrollmentPayload.fromMap(Map<String, dynamic> map) {
-    // Username
-    final username =
-        map['u'] as String? ?? map['username'] as String?;
-    if (username == null || username.isEmpty) {
-      throw const EnrollmentException('Missing username in payload');
-    }
-
-    // Server config
-    final server = map['s'] as Map<String, dynamic>? ??
-        map['server'] as Map<String, dynamic>?;
-    if (server == null) {
-      throw const EnrollmentException('Missing server config in payload');
-    }
-    final host =
-        server['h'] as String? ?? server['host'] as String?;
-    final port =
-        server['p'] as int? ?? server['port'] as int? ?? 8443;
-    if (host == null || host.isEmpty) {
-      throw const EnrollmentException('Missing server host in payload');
-    }
-
-    // Enrollment key
-    final ekB64 = map['ek'] as String?;
-    if (ekB64 == null) {
-      throw const EnrollmentException(
-        'Missing enrollment key (ek) in payload',
-      );
-    }
-    final enrollmentKey = base64.decode(ekB64);
-    if (enrollmentKey.length != 64) {
-      throw EnrollmentException(
-        'Invalid enrollment key size: ${enrollmentKey.length} (expected 64)',
-      );
-    }
-
-    // CA fingerprint
-    final caFp = map['cf'] as String?;
-    if (caFp == null || caFp.length != 64) {
-      throw const EnrollmentException(
-        'Missing or invalid CA fingerprint (cf) in payload',
-      );
-    }
-
-    // Expiry
-    final expiresAtUnix = map['x'] as int? ?? map['expires_at'] as int?;
-    if (expiresAtUnix == null) {
-      throw const EnrollmentException('Missing expiry (x) in payload');
-    }
-
-    return EnrollmentPayload(
-      username: username,
-      serverHost: host,
-      serverPort: port,
-      enrollmentSecretKey: Uint8List.fromList(enrollmentKey),
-      caFingerprint: caFp,
-      expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
-    );
-  }
 
   /// Securely erase the enrollment key from memory.
   void eraseKey() {

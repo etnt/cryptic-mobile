@@ -64,13 +64,11 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
       home: _buildCurrentScreen(),
     );
   }
 
-  Widget _buildCurrentScreen() {
-    return switch (_currentScreen) {
+  Widget _buildCurrentScreen() => switch (_currentScreen) {
       AppScreen.splash => SplashScreen(
           onInitialized: (needsSetup) {
             setState(() {
@@ -80,11 +78,14 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
           },
         ),
       AppScreen.enrollment => EnrollmentFlowScreen(
-          onComplete: () {
+          onComplete: () async {
             ref.read(enrollmentProvider.notifier).reset();
-            setState(() {
-              _currentScreen = AppScreen.login;
-            });
+            await ref.read(authProvider.notifier).checkAuthState();
+            if (mounted) {
+              setState(() {
+                _currentScreen = AppScreen.login;
+              });
+            }
           },
         ),
       AppScreen.login => LoginScreen(
@@ -96,5 +97,4 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
         ),
       AppScreen.home => const UsersScreen(),
     };
-  }
 }

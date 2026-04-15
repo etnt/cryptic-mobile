@@ -32,20 +32,20 @@ void main() {
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<WelcomeMessage>());
-      expect((message as WelcomeMessage).message, 'Connected to Cryptic Server');
+      expect((message! as WelcomeMessage).message, 'Connected to Cryptic Server');
     });
 
     test('should parse success message', () {
       final json = {
         'type': 'success',
         'operation': 'upload_identity_keys',
-        'message': 'Keys uploaded successfully'
+        'message': 'Keys uploaded successfully',
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<SuccessMessage>());
-      final success = message as SuccessMessage;
+      final success = message! as SuccessMessage;
       expect(success.operation, 'upload_identity_keys');
       expect(success.message, 'Keys uploaded successfully');
     });
@@ -53,13 +53,13 @@ void main() {
     test('should parse users message', () {
       final json = {
         'type': 'users',
-        'users': ['alice', 'bob', 'charlie']
+        'users': ['alice', 'bob', 'charlie'],
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<UsersMessage>());
-      final users = message as UsersMessage;
+      final users = message! as UsersMessage;
       expect(users.users, ['alice', 'bob', 'charlie']);
     });
 
@@ -72,18 +72,18 @@ void main() {
         'signed_prekey': {
           'key_id': 1,
           'public_key': base64Encode(utf8.encode('prekey')),
-          'signature': base64Encode(utf8.encode('signature'))
+          'signature': base64Encode(utf8.encode('signature')),
         },
         'one_time_prekey': {
           'key_id': 5,
-          'public_key': base64Encode(utf8.encode('otpk'))
-        }
+          'public_key': base64Encode(utf8.encode('otpk')),
+        },
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<KeyBundleMessage>());
-      final bundle = message as KeyBundleMessage;
+      final bundle = message! as KeyBundleMessage;
       expect(bundle.username, 'bob');
       expect(bundle.signedPrekey.keyId, 1);
       expect(bundle.oneTimePrekey?.keyId, 5);
@@ -98,14 +98,14 @@ void main() {
         'signed_prekey': {
           'key_id': 1,
           'public_key': 'pk',
-          'signature': 'sig'
-        }
+          'signature': 'sig',
+        },
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<KeyBundleMessage>());
-      final bundle = message as KeyBundleMessage;
+      final bundle = message! as KeyBundleMessage;
       expect(bundle.oneTimePrekey, isNull);
     });
 
@@ -114,13 +114,13 @@ void main() {
         'type': 'message_sent',
         'message_id': 'uuid-123',
         'to_user': 'bob',
-        'timestamp': 1699999999
+        'timestamp': 1699999999,
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<MessageSentMessage>());
-      final sent = message as MessageSentMessage;
+      final sent = message! as MessageSentMessage;
       expect(sent.messageId, 'uuid-123');
       expect(sent.toUser, 'bob');
       expect(sent.timestamp, 1699999999);
@@ -130,13 +130,13 @@ void main() {
       final json = {
         'type': 'error',
         'message': 'User not found',
-        'success': false
+        'success': false,
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<ErrorMessage>());
-      final error = message as ErrorMessage;
+      final error = message! as ErrorMessage;
       expect(error.message, 'User not found');
       expect(error.success, false);
     });
@@ -145,13 +145,13 @@ void main() {
       final json = {
         'type': 'user_status',
         'username': 'alice',
-        'online': true
+        'online': true,
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<UserStatusMessage>());
-      final status = message as UserStatusMessage;
+      final status = message! as UserStatusMessage;
       expect(status.username, 'alice');
       expect(status.isOnline, true);
     });
@@ -159,13 +159,13 @@ void main() {
     test('should parse pending messages delivered', () {
       final json = {
         'type': 'pending_messages_delivered',
-        'count': 5
+        'count': 5,
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<PendingMessagesDeliveredMessage>());
-      expect((message as PendingMessagesDeliveredMessage).count, 5);
+      expect((message! as PendingMessagesDeliveredMessage).count, 5);
     });
 
     test('should return UnknownServerMessage for unknown type', () {
@@ -174,7 +174,7 @@ void main() {
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<UnknownServerMessage>());
-      final unknown = message as UnknownServerMessage;
+      final unknown = message! as UnknownServerMessage;
       expect(unknown.typeString, 'future_feature');
       expect(unknown.rawJson['data'], 'value');
     });
@@ -224,13 +224,13 @@ void main() {
         'identity_key': base64Encode(utf8.encode('ik')),
         'ephemeral_key': base64Encode(utf8.encode('ek')),
         'used_one_time_prekey_id': 3,
-        'ciphertext': base64Encode(utf8.encode('ct'))
+        'ciphertext': base64Encode(utf8.encode('ct')),
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<IncomingMessage>());
-      final incoming = message as IncomingMessage;
+      final incoming = message! as IncomingMessage;
       expect(incoming.isX3dh, true);
       expect(incoming.isRatchet, false);
       expect(incoming.fromUser, 'alice');
@@ -246,13 +246,13 @@ void main() {
         'dh_public': base64Encode(utf8.encode('dh')),
         'previous_chain_length': 5,
         'message_number': 3,
-        'ciphertext': base64Encode(utf8.encode('ct'))
+        'ciphertext': base64Encode(utf8.encode('ct')),
       };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<IncomingMessage>());
-      final incoming = message as IncomingMessage;
+      final incoming = message! as IncomingMessage;
       expect(incoming.isX3dh, false);
       expect(incoming.isRatchet, true);
     });
@@ -266,7 +266,7 @@ void main() {
         'identity_key': base64Encode(utf8.encode('identity')),
         'ephemeral_key': base64Encode(utf8.encode('ephemeral')),
         'used_one_time_prekey_id': 7,
-        'ciphertext': base64Encode(utf8.encode('cipher'))
+        'ciphertext': base64Encode(utf8.encode('cipher')),
       };
 
       final x3dh = IncomingX3dhMessage.fromRawData(data);
@@ -285,7 +285,7 @@ void main() {
         'to_user': 'bob',
         'identity_key': base64Encode([1, 2, 3]),
         'ephemeral_key': base64Encode([4, 5, 6]),
-        'ciphertext': base64Encode([7, 8, 9])
+        'ciphertext': base64Encode([7, 8, 9]),
       };
 
       final x3dh = IncomingX3dhMessage.fromRawData(data);
@@ -302,7 +302,7 @@ void main() {
         'dh_public': base64Encode(utf8.encode('dh_key')),
         'previous_chain_length': 10,
         'message_number': 5,
-        'ciphertext': base64Encode(utf8.encode('encrypted'))
+        'ciphertext': base64Encode(utf8.encode('encrypted')),
       };
 
       final ratchet = IncomingRatchetMessage.fromRawData(data);
@@ -344,11 +344,11 @@ void main() {
         'signed_prekey': {
           'key_id': 1,
           'public_key': 'pk',
-          'signature': 'sig'
-        }
+          'signature': 'sig',
+        },
       };
 
-      final message = ServerMessage.fromJson(json) as KeyBundleMessage;
+      final message = ServerMessage.fromJson(json)! as KeyBundleMessage;
 
       expect(message.identitySignKeyBytes, signKey);
       expect(message.identityDhKeyBytes, dhKey);
@@ -363,7 +363,7 @@ void main() {
       final prekey = SignedPrekey.fromJson({
         'key_id': 42,
         'public_key': base64Encode(pk),
-        'signature': base64Encode(sig)
+        'signature': base64Encode(sig),
       });
 
       expect(prekey.keyId, 42);
@@ -377,10 +377,10 @@ void main() {
       final json = {
         'type': 'user_status',
         'username': 'alice',
-        'status': 'online'
+        'status': 'online',
       };
 
-      final message = ServerMessage.fromJson(json) as UserStatusMessage;
+      final message = ServerMessage.fromJson(json)! as UserStatusMessage;
 
       expect(message.isOnline, true);
     });
@@ -389,10 +389,10 @@ void main() {
       final json = {
         'type': 'user_status',
         'username': 'alice',
-        'status': 'offline'
+        'status': 'offline',
       };
 
-      final message = ServerMessage.fromJson(json) as UserStatusMessage;
+      final message = ServerMessage.fromJson(json)! as UserStatusMessage;
 
       expect(message.isOnline, false);
     });

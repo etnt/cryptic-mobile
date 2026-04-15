@@ -126,7 +126,7 @@ class MtlsConfig {
   /// - Client certificate and key for authentication
   /// - CA certificate for server validation
   SecurityContext createSecurityContext() {
-    final context = SecurityContext(withTrustedRoots: false);
+    final context = SecurityContext();
 
     // Set CA certificate to validate server
     context.setTrustedCertificatesBytes(caCertificate);
@@ -178,15 +178,13 @@ class MtlsConfig {
       caCertificate.isNotEmpty;
 
   @override
-  String toString() {
-    return 'MtlsConfig('
+  String toString() => 'MtlsConfig('
         'host: $serverHost, '
         'port: $serverPort, '
         'certSize: ${clientCertificate.length}, '
         'keySize: ${clientPrivateKey.length}, '
         'caSize: ${caCertificate.length}'
         ')';
-  }
 }
 
 /// Exception thrown when mTLS configuration fails.

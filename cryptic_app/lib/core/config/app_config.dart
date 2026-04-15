@@ -19,7 +19,53 @@ enum Environment {
 ///
 /// Provides environment-specific settings for server URLs,
 /// logging, and other runtime configuration.
-class AppConfig {
+enum AppConfig {
+  /// Development configuration (localhost).
+  /// 
+  /// Note: Uses '10.0.2.2' which is the Android emulator's alias for the host
+  /// machine's localhost. For iOS Simulator, 'localhost' also works, but
+  /// '10.0.2.2' is automatically resolved on both platforms.
+  development._(
+    environment: Environment.development,
+    serverHost: '10.0.2.2',
+    serverPort: 8443,
+    useTls: true,
+    logLevel: LogLevel.debug,
+    enableConsoleLogging: true,
+    connectionTimeoutSeconds: 10,
+    reconnectDelaySeconds: 2,
+    maxReconnectAttempts: 10,
+    oneTimePrekeysToMaintain: 10,
+  ),
+
+  /// Staging configuration.
+  staging._(
+    environment: Environment.staging,
+    serverHost: 'staging.cryptic.example.com',
+    serverPort: 443,
+    useTls: true,
+    logLevel: LogLevel.info,
+    enableConsoleLogging: true,
+    connectionTimeoutSeconds: 15,
+    reconnectDelaySeconds: 3,
+    maxReconnectAttempts: 5,
+    oneTimePrekeysToMaintain: 20,
+  ),
+
+  /// Production configuration.
+  production._(
+    environment: Environment.production,
+    serverHost: 'cryptic.example.com',
+    serverPort: 443,
+    useTls: true,
+    logLevel: LogLevel.warning,
+    enableConsoleLogging: false,
+    connectionTimeoutSeconds: 20,
+    reconnectDelaySeconds: 5,
+    maxReconnectAttempts: 3,
+    oneTimePrekeysToMaintain: 50,
+  );
+
   /// Creates a new configuration instance.
   const AppConfig._({
     required this.environment,
@@ -33,52 +79,6 @@ class AppConfig {
     required this.maxReconnectAttempts,
     required this.oneTimePrekeysToMaintain,
   });
-
-  /// Development configuration (localhost).
-  /// 
-  /// Note: Uses '10.0.2.2' which is the Android emulator's alias for the host
-  /// machine's localhost. For iOS Simulator, 'localhost' also works, but
-  /// '10.0.2.2' is automatically resolved on both platforms.
-  static const AppConfig development = AppConfig._(
-    environment: Environment.development,
-    serverHost: '10.0.2.2',
-    serverPort: 8443,
-    useTls: true,
-    logLevel: LogLevel.debug,
-    enableConsoleLogging: true,
-    connectionTimeoutSeconds: 10,
-    reconnectDelaySeconds: 2,
-    maxReconnectAttempts: 10,
-    oneTimePrekeysToMaintain: 10,
-  );
-
-  /// Staging configuration.
-  static const AppConfig staging = AppConfig._(
-    environment: Environment.staging,
-    serverHost: 'staging.cryptic.example.com',
-    serverPort: 443,
-    useTls: true,
-    logLevel: LogLevel.info,
-    enableConsoleLogging: true,
-    connectionTimeoutSeconds: 15,
-    reconnectDelaySeconds: 3,
-    maxReconnectAttempts: 5,
-    oneTimePrekeysToMaintain: 20,
-  );
-
-  /// Production configuration.
-  static const AppConfig production = AppConfig._(
-    environment: Environment.production,
-    serverHost: 'cryptic.example.com',
-    serverPort: 443,
-    useTls: true,
-    logLevel: LogLevel.warning,
-    enableConsoleLogging: false,
-    connectionTimeoutSeconds: 20,
-    reconnectDelaySeconds: 5,
-    maxReconnectAttempts: 3,
-    oneTimePrekeysToMaintain: 50,
-  );
 
   /// Current active configuration.
   ///

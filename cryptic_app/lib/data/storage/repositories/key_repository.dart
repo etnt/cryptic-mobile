@@ -31,14 +31,10 @@ class KeyRepository {
   }
 
   /// Loads identity key pair.
-  Future<IdentityKeyPair?> loadIdentityKeys() async {
-    return await _keyStorage.loadIdentityKeyPair();
-  }
+  Future<IdentityKeyPair?> loadIdentityKeys() async => await _keyStorage.loadIdentityKeyPair();
 
   /// Checks if identity keys exist.
-  Future<bool> hasIdentityKeys() async {
-    return await _keyStorage.hasIdentityKeys();
-  }
+  Future<bool> hasIdentityKeys() async => await _keyStorage.hasIdentityKeys();
 
   /// Deletes identity keys.
   Future<void> deleteIdentityKeys() async {
@@ -55,9 +51,7 @@ class KeyRepository {
   }
 
   /// Loads signed prekey.
-  Future<SignedPrekey?> loadSignedPrekey() async {
-    return await _keyStorage.loadSignedPrekey();
-  }
+  Future<SignedPrekey?> loadSignedPrekey() async => await _keyStorage.loadSignedPrekey();
 
   /// Deletes signed prekey.
   Future<void> deleteSignedPrekey() async {
@@ -74,9 +68,7 @@ class KeyRepository {
   }
 
   /// Loads all one-time prekeys.
-  Future<List<OneTimePrekey>> loadOneTimePrekeys() async {
-    return await _keyStorage.loadOneTimePrekeys();
-  }
+  Future<List<OneTimePrekey>> loadOneTimePrekeys() async => await _keyStorage.loadOneTimePrekeys();
 
   /// Adds new one-time prekeys.
   Future<void> addOneTimePrekeys(List<OneTimePrekey> prekeys) async {
@@ -89,9 +81,7 @@ class KeyRepository {
   }
 
   /// Gets a one-time prekey by ID.
-  Future<OneTimePrekey?> getOneTimePrekey(int keyId) async {
-    return await _keyStorage.getOneTimePrekey(keyId);
-  }
+  Future<OneTimePrekey?> getOneTimePrekey(int keyId) async => await _keyStorage.getOneTimePrekey(keyId);
 
   /// Gets the count of remaining one-time prekeys.
   Future<int> getOneTimePrekeyCount() async {
@@ -114,9 +104,7 @@ class KeyRepository {
   }
 
   /// Loads the full key bundle.
-  Future<KeyBundle?> loadKeyBundle() async {
-    return await _keyStorage.loadKeyBundle();
-  }
+  Future<KeyBundle?> loadKeyBundle() async => await _keyStorage.loadKeyBundle();
 
   /// Deletes the key bundle.
   Future<void> deleteKeyBundle() async {
@@ -167,9 +155,7 @@ class KeyRepository {
   }
 
   /// Loads the username.
-  Future<String?> loadUsername() async {
-    return await _keyStorage.loadUsername();
-  }
+  Future<String?> loadUsername() async => await _keyStorage.loadUsername();
 
   /// Saves server info.
   Future<void> saveServerInfo({
@@ -180,18 +166,14 @@ class KeyRepository {
   }
 
   /// Loads server info.
-  Future<({String host, int port})?> loadServerInfo() async {
-    return await _keyStorage.loadServerInfo();
-  }
+  Future<({String host, int port})?> loadServerInfo() async => await _keyStorage.loadServerInfo();
 
   // ─────────────────────────────────────────────────────────────────────────
   // Data Management
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Checks if storage is initialized with keys.
-  Future<bool> isInitialized() async {
-    return await _keyStorage.isInitialized();
-  }
+  Future<bool> isInitialized() async => await _keyStorage.isInitialized();
 
   /// Deletes all stored keys and metadata.
   Future<void> deleteAllData() async {

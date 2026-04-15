@@ -8,7 +8,7 @@ import 'package:cryptic_app/domain/models/contact.dart';
 
 void main() {
   group('ChatMessage', () {
-    final timestamp = DateTime(2025, 11, 30, 12, 0);
+    final timestamp = DateTime(2025, 11, 30, 12);
 
     test('should create message with required fields', () {
       final message = ChatMessage(
@@ -70,7 +70,6 @@ void main() {
         content: 'test',
         timestamp: timestamp,
         direction: MessageDirection.outgoing,
-        status: MessageStatus.sent,
       );
 
       expect(failed.isFailed, isTrue);
@@ -105,7 +104,6 @@ void main() {
         content: 'test',
         timestamp: timestamp,
         direction: MessageDirection.outgoing,
-        status: MessageStatus.sent,
       );
 
       expect(pending.isPending, isTrue);
@@ -187,7 +185,6 @@ void main() {
       const noUnread = Conversation(
         id: 'conv-1',
         peerUsername: 'bob',
-        unreadCount: 0,
       );
 
       const hasUnread = Conversation(
@@ -204,7 +201,6 @@ void main() {
       const original = Conversation(
         id: 'conv-1',
         peerUsername: 'bob',
-        unreadCount: 0,
       );
 
       final updated = original.copyWith(unreadCount: 3);
@@ -268,7 +264,6 @@ void main() {
 
       const unknown = Contact(
         username: 'charlie',
-        status: ContactStatus.unknown,
       );
 
       expect(online.isOnline, isTrue);

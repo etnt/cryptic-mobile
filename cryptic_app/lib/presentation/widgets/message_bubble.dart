@@ -127,8 +127,7 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status, Color color) {
-    return switch (status) {
+  Widget _buildStatusIcon(MessageStatus status, Color color) => switch (status) {
       MessageStatus.pending => Icon(
           Icons.access_time,
           size: 14,
@@ -160,7 +159,6 @@ class MessageBubble extends StatelessWidget {
           color: AppColors.error,
         ),
     };
-  }
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();

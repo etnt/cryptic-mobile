@@ -47,7 +47,7 @@ void main() {
         expect(queue.length, 5);
 
         // First message should be 'user1' not 'user0'
-        final first = queue.dequeue() as GetKeyBundleMessage;
+        final first = queue.dequeue()! as GetKeyBundleMessage;
         expect(first.username, 'user1');
       });
     });
@@ -62,9 +62,9 @@ void main() {
         queue.enqueue(GetKeyBundleMessage(username: 'second'));
         queue.enqueue(GetKeyBundleMessage(username: 'third'));
 
-        final first = queue.dequeue() as GetKeyBundleMessage;
-        final second = queue.dequeue() as GetKeyBundleMessage;
-        final third = queue.dequeue() as GetKeyBundleMessage;
+        final first = queue.dequeue()! as GetKeyBundleMessage;
+        final second = queue.dequeue()! as GetKeyBundleMessage;
+        final third = queue.dequeue()! as GetKeyBundleMessage;
 
         expect(first.username, 'first');
         expect(second.username, 'second');
@@ -102,7 +102,7 @@ void main() {
         queue.enqueue(GetKeyBundleMessage(username: 'first'));
         queue.enqueue(GetKeyBundleMessage(username: 'second'));
 
-        final peeked = queue.peek() as GetKeyBundleMessage;
+        final peeked = queue.peek()! as GetKeyBundleMessage;
 
         expect(peeked.username, 'first');
         expect(queue.length, 2); // Not removed
@@ -139,7 +139,7 @@ void main() {
         shortQueue.enqueue(GetKeyBundleMessage(username: 'new'));
 
         // Old message should be expired
-        final message = shortQueue.dequeue() as GetKeyBundleMessage;
+        final message = shortQueue.dequeue()! as GetKeyBundleMessage;
         expect(message.username, 'new');
       });
     });
@@ -220,7 +220,6 @@ void main() {
     test('should enqueue with different priorities', () {
       queue.enqueue(
         GetKeyBundleMessage(username: 'normal'),
-        priority: MessagePriority.normal,
       );
       queue.enqueue(
         GetKeyBundleMessage(username: 'high'),
@@ -247,7 +246,6 @@ void main() {
       );
       queue.enqueue(
         GetKeyBundleMessage(username: 'normal'),
-        priority: MessagePriority.normal,
       );
 
       final messages = queue.dequeueAll();
@@ -263,7 +261,7 @@ void main() {
 
     test('should clear all queues', () {
       queue.enqueue(ListUsersMessage(), priority: MessagePriority.high);
-      queue.enqueue(ListUsersMessage(), priority: MessagePriority.normal);
+      queue.enqueue(ListUsersMessage());
       queue.enqueue(ListUsersMessage(), priority: MessagePriority.low);
 
       queue.clear();

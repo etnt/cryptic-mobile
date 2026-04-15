@@ -52,17 +52,13 @@ class UseCaseSuccess<T> extends UseCaseResult<T> {
   final T value;
 
   @override
-  UseCaseResult<R> map<R>(R Function(T value) mapper) {
-    return UseCaseSuccess(mapper(value));
-  }
+  UseCaseResult<R> map<R>(R Function(T value) mapper) => UseCaseSuccess(mapper(value));
 
   @override
   R fold<R>({
     required R Function(T value) onSuccess,
     required R Function(String error, Object? exception) onError,
-  }) {
-    return onSuccess(value);
-  }
+  }) => onSuccess(value);
 
   @override
   bool operator ==(Object other) =>
@@ -90,17 +86,13 @@ class UseCaseError<T> extends UseCaseResult<T> {
   final Object? exception;
 
   @override
-  UseCaseResult<R> map<R>(R Function(T value) mapper) {
-    return UseCaseError(message, exception);
-  }
+  UseCaseResult<R> map<R>(R Function(T value) mapper) => UseCaseError(message, exception);
 
   @override
   R fold<R>({
     required R Function(T value) onSuccess,
     required R Function(String error, Object? exception) onError,
-  }) {
-    return onError(message, exception);
-  }
+  }) => onError(message, exception);
 
   @override
   bool operator ==(Object other) =>

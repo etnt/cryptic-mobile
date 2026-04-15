@@ -20,43 +20,6 @@ import 'signed_prekey.dart';
 /// - Signed prekey (medium-term, rotated weekly)
 /// - One-time prekey (optional, used once then deleted)
 class KeyBundle {
-  /// Creates a key bundle.
-  const KeyBundle({
-    required this.username,
-    required this.identitySignKey,
-    required this.identityDhKey,
-    required this.signedPrekey,
-    this.oneTimePrekey,
-  });
-
-  /// Username of the key bundle owner.
-  final String username;
-
-  /// Ed25519 public key for identity verification.
-  final Uint8List identitySignKey;
-
-  /// X25519 public key for identity DH.
-  final Uint8List identityDhKey;
-
-  /// Signed prekey with signature.
-  final SignedPrekeyPublic signedPrekey;
-
-  /// Optional one-time prekey (may be null if exhausted).
-  final OneTimePrekeyPublic? oneTimePrekey;
-
-  /// Whether this bundle includes a one-time prekey.
-  bool get hasOneTimePrekey => oneTimePrekey != null;
-
-  /// Converts to a map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
-      'username': username,
-      'identity_sign_key': base64Encode(identitySignKey),
-      'identity_dh_key': base64Encode(identityDhKey),
-      'signed_prekey': signedPrekey.toMap(),
-      if (oneTimePrekey != null) 'one_time_prekey': oneTimePrekey!.toMap(),
-    };
-  }
 
   /// Creates from a server response map.
   ///
@@ -86,6 +49,41 @@ class KeyBundle {
       oneTimePrekey: otpk,
     );
   }
+  /// Creates a key bundle.
+  const KeyBundle({
+    required this.username,
+    required this.identitySignKey,
+    required this.identityDhKey,
+    required this.signedPrekey,
+    this.oneTimePrekey,
+  });
+
+  /// Username of the key bundle owner.
+  final String username;
+
+  /// Ed25519 public key for identity verification.
+  final Uint8List identitySignKey;
+
+  /// X25519 public key for identity DH.
+  final Uint8List identityDhKey;
+
+  /// Signed prekey with signature.
+  final SignedPrekeyPublic signedPrekey;
+
+  /// Optional one-time prekey (may be null if exhausted).
+  final OneTimePrekeyPublic? oneTimePrekey;
+
+  /// Whether this bundle includes a one-time prekey.
+  bool get hasOneTimePrekey => oneTimePrekey != null;
+
+  /// Converts to a map for serialization.
+  Map<String, dynamic> toMap() => {
+      'username': username,
+      'identity_sign_key': base64Encode(identitySignKey),
+      'identity_dh_key': base64Encode(identityDhKey),
+      'signed_prekey': signedPrekey.toMap(),
+      if (oneTimePrekey != null) 'one_time_prekey': oneTimePrekey!.toMap(),
+    };
 }
 
 /// User's own complete key material.
@@ -93,57 +91,6 @@ class KeyBundle {
 /// Contains both public and private components of all keys.
 /// This is stored encrypted locally, never shared.
 class OwnKeyBundle {
-  /// Creates an own key bundle.
-  const OwnKeyBundle({
-    required this.identity,
-    required this.signedPrekey,
-    required this.oneTimePrekeys,
-  });
-
-  /// Long-term identity key pair.
-  final IdentityKeyPair identity;
-
-  /// Current signed prekey.
-  final SignedPrekey signedPrekey;
-
-  /// Pool of unused one-time prekeys.
-  final Map<int, OneTimePrekey> oneTimePrekeys;
-
-  /// Creates a key bundle for upload to server.
-  KeyBundle toPublicBundle(String username) {
-    return KeyBundle(
-      username: username,
-      identitySignKey: identity.signPublicKey,
-      identityDhKey: identity.dhPublicKey,
-      signedPrekey: signedPrekey.publicPart,
-      oneTimePrekey: null, // One-time prekeys uploaded separately
-    );
-  }
-
-  /// Gets a one-time prekey by ID and removes it from the pool.
-  ///
-  /// Returns null if the key ID is not found.
-  OneTimePrekey? consumeOneTimePrekey(int keyId) {
-    return oneTimePrekeys.remove(keyId);
-  }
-
-  /// How many one-time prekeys remain in the pool.
-  int get remainingOneTimePrekeys => oneTimePrekeys.length;
-
-  /// Whether we need to upload more one-time prekeys.
-  bool get needsMoreOneTimePrekeys =>
-      remainingOneTimePrekeys < OneTimePrekeyBatch.minimumPoolSize;
-
-  /// Converts to a map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
-      'identity': identity.toMap(),
-      'signed_prekey': signedPrekey.toMap(),
-      'one_time_prekeys': oneTimePrekeys.map(
-        (id, pk) => MapEntry(id.toString(), pk.toMap()),
-      ),
-    };
-  }
 
   /// Creates from a deserialized map.
   factory OwnKeyBundle.fromMap(Map<String, dynamic> map) {
@@ -165,4 +112,49 @@ class OwnKeyBundle {
       oneTimePrekeys: oneTimePrekeys,
     );
   }
+  /// Creates an own key bundle.
+  const OwnKeyBundle({
+    required this.identity,
+    required this.signedPrekey,
+    required this.oneTimePrekeys,
+  });
+
+  /// Long-term identity key pair.
+  final IdentityKeyPair identity;
+
+  /// Current signed prekey.
+  final SignedPrekey signedPrekey;
+
+  /// Pool of unused one-time prekeys.
+  final Map<int, OneTimePrekey> oneTimePrekeys;
+
+  /// Creates a key bundle for upload to server.
+  KeyBundle toPublicBundle(String username) => KeyBundle(
+      username: username,
+      identitySignKey: identity.signPublicKey,
+      identityDhKey: identity.dhPublicKey,
+      signedPrekey: signedPrekey.publicPart,
+      oneTimePrekey: null, // One-time prekeys uploaded separately
+    );
+
+  /// Gets a one-time prekey by ID and removes it from the pool.
+  ///
+  /// Returns null if the key ID is not found.
+  OneTimePrekey? consumeOneTimePrekey(int keyId) => oneTimePrekeys.remove(keyId);
+
+  /// How many one-time prekeys remain in the pool.
+  int get remainingOneTimePrekeys => oneTimePrekeys.length;
+
+  /// Whether we need to upload more one-time prekeys.
+  bool get needsMoreOneTimePrekeys =>
+      remainingOneTimePrekeys < OneTimePrekeyBatch.minimumPoolSize;
+
+  /// Converts to a map for serialization.
+  Map<String, dynamic> toMap() => {
+      'identity': identity.toMap(),
+      'signed_prekey': signedPrekey.toMap(),
+      'one_time_prekeys': oneTimePrekeys.map(
+        (id, pk) => MapEntry(id.toString(), pk.toMap()),
+      ),
+    };
 }

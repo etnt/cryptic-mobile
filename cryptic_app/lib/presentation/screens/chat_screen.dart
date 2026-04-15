@@ -137,7 +137,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(widget.peerId),
             if (hasSession)

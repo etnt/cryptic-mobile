@@ -129,7 +129,7 @@ class MessageProcessor {
   }
 
   Future<ProcessingResult> _handleOnlineUsers(
-      OnlineUsersResponseMessage message) async {
+      OnlineUsersResponseMessage message,) async {
     print('[MessageProcessor] Handling online_users: ${message.users}');
     final event = UsersListReceived(message.users);
     _eventController.add(event);

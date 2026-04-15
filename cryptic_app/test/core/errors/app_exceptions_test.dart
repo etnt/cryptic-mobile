@@ -3,9 +3,8 @@
 // Unit tests for custom exceptions
 //
 
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:cryptic_app/core/errors/app_exceptions.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CryptoException', () {

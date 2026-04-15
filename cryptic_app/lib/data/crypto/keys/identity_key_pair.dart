@@ -18,6 +18,16 @@ import '../../../core/errors/app_exceptions.dart';
 /// The Ed25519 public key is the canonical "identity" and is signed
 /// to prove ownership of the X25519 DH key.
 class IdentityKeyPair {
+
+  /// Creates from a deserialized map.
+  factory IdentityKeyPair.fromMap(Map<String, dynamic> map) {
+    return IdentityKeyPair(
+      signPublicKey: base64Decode(map['sign_public_key'] as String),
+      signPrivateKey: base64Decode(map['sign_private_key'] as String),
+      dhPublicKey: base64Decode(map['dh_public_key'] as String),
+      dhPrivateKey: base64Decode(map['dh_private_key'] as String),
+    );
+  }
   /// Creates an identity key pair.
   const IdentityKeyPair({
     required this.signPublicKey,
@@ -63,24 +73,12 @@ class IdentityKeyPair {
   }
 
   /// Converts to a map for serialization.
-  Map<String, String> toMap() {
-    return {
+  Map<String, String> toMap() => {
       'sign_public_key': base64Encode(signPublicKey),
       'sign_private_key': base64Encode(signPrivateKey),
       'dh_public_key': base64Encode(dhPublicKey),
       'dh_private_key': base64Encode(dhPrivateKey),
     };
-  }
-
-  /// Creates from a deserialized map.
-  factory IdentityKeyPair.fromMap(Map<String, dynamic> map) {
-    return IdentityKeyPair(
-      signPublicKey: base64Decode(map['sign_public_key'] as String),
-      signPrivateKey: base64Decode(map['sign_private_key'] as String),
-      dhPublicKey: base64Decode(map['dh_public_key'] as String),
-      dhPrivateKey: base64Decode(map['dh_private_key'] as String),
-    );
-  }
 
   /// Extracts only public keys for sharing.
   IdentityPublicKeys get publicKeys => IdentityPublicKeys(
@@ -91,6 +89,14 @@ class IdentityKeyPair {
 
 /// Public identity keys for sharing with other users.
 class IdentityPublicKeys {
+
+  /// Creates from a deserialized map.
+  factory IdentityPublicKeys.fromMap(Map<String, dynamic> map) {
+    return IdentityPublicKeys(
+      signPublicKey: base64Decode(map['identity_sign_public'] as String),
+      dhPublicKey: base64Decode(map['identity_dh_public'] as String),
+    );
+  }
   /// Creates identity public keys.
   const IdentityPublicKeys({
     required this.signPublicKey,
@@ -104,20 +110,10 @@ class IdentityPublicKeys {
   final Uint8List dhPublicKey;
 
   /// Converts to a map for serialization.
-  Map<String, String> toMap() {
-    return {
+  Map<String, String> toMap() => {
       'identity_sign_public': base64Encode(signPublicKey),
       'identity_dh_public': base64Encode(dhPublicKey),
     };
-  }
-
-  /// Creates from a deserialized map.
-  factory IdentityPublicKeys.fromMap(Map<String, dynamic> map) {
-    return IdentityPublicKeys(
-      signPublicKey: base64Decode(map['identity_sign_public'] as String),
-      dhPublicKey: base64Decode(map['identity_dh_public'] as String),
-    );
-  }
 
   @override
   bool operator ==(Object other) {

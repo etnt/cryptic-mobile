@@ -55,7 +55,6 @@ class ServerConnectionConfig {
   static const localhost = ServerConnectionConfig(
     host: 'localhost',
     port: 8443,
-    useBundledCerts: true,
   );
 
   /// Server hostname.
@@ -105,10 +104,16 @@ class AuthenticationService {
     }
   }
 
-  /// Check if identity keys exist for a user.
-  Future<bool> hasIdentityKeys() async {
-    return await _keyRepository.hasIdentityKeys();
+  /// Check if enrollment-issued certificates exist in secure storage.
+  ///
+  /// Unlike [hasCertificates], this ignores bundled dev assets and only
+  /// returns true when the user has completed the enrollment flow.
+  Future<bool> hasStoredCertificates() async {
+    return _certificateStorage.hasCertificates();
   }
+
+  /// Check if identity keys exist for a user.
+  Future<bool> hasIdentityKeys() async => await _keyRepository.hasIdentityKeys();
 
   /// Authenticate and connect to the server.
   ///
@@ -191,7 +196,7 @@ class AuthenticationService {
 
     // Fall back to bundled certificates
     if (config.useBundledCerts) {
-      return await _loadBundledCertificates(config);
+      return _loadBundledCertificates(config);
     }
 
     return null;

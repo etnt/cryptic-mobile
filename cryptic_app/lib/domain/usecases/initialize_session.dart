@@ -87,7 +87,7 @@ class InitializeSessionUseCase
         return UseCaseSuccess(SessionInitResult(
           peerUsername: params.peerUsername,
           isNewSession: false,
-        ));
+        ),);
       }
 
       // Request key bundle to trigger X3DH
@@ -98,7 +98,7 @@ class InitializeSessionUseCase
       return UseCaseSuccess(SessionInitResult(
         peerUsername: params.peerUsername,
         isNewSession: true,
-      ));
+      ),);
     } catch (e) {
       return UseCaseError('Failed to initialize session', e);
     }

@@ -36,8 +36,7 @@ class EnrollmentProgressScreen extends ConsumerWidget {
     BuildContext context,
     ThemeData theme,
     EnrollmentStage? stage,
-  ) {
-    return Scaffold(
+  ) => Scaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -66,10 +65,9 @@ class EnrollmentProgressScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
 
   Widget _buildStepList(ThemeData theme, EnrollmentStage? currentStage) {
-    final stages = EnrollmentStage.values;
+    const stages = EnrollmentStage.values;
     final currentIndex =
         currentStage != null ? stages.indexOf(currentStage) : -1;
 
@@ -120,8 +118,7 @@ class EnrollmentProgressScreen extends ConsumerWidget {
     BuildContext context,
     ThemeData theme,
     EnrollmentResult result,
-  ) {
-    return Scaffold(
+  ) => Scaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -165,15 +162,13 @@ class EnrollmentProgressScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
 
   Widget _buildFailure(
     BuildContext context,
     ThemeData theme,
     WidgetRef ref,
     String error,
-  ) {
-    return Scaffold(
+  ) => Scaffold(
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -213,10 +208,8 @@ class EnrollmentProgressScreen extends ConsumerWidget {
         ),
       ),
     );
-  }
 
-  String _stageLabel(EnrollmentStage? stage) {
-    return switch (stage) {
+  String _stageLabel(EnrollmentStage? stage) => switch (stage) {
       EnrollmentStage.parsingQr => 'Parsing QR code...',
       EnrollmentStage.decrypting => 'Decrypting enrollment data...',
       EnrollmentStage.verifyingCa => 'Verifying CA certificate...',
@@ -227,5 +220,4 @@ class EnrollmentProgressScreen extends ConsumerWidget {
       EnrollmentStage.complete => 'Complete!',
       null => 'Preparing...',
     };
-  }
 }

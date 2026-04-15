@@ -4,10 +4,9 @@
 
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:cryptic_app/core/errors/app_exceptions.dart';
 import 'package:cryptic_app/data/crypto/primitives/x25519_service.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late X25519Service x25519;

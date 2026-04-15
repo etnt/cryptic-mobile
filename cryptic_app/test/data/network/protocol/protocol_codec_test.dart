@@ -43,7 +43,7 @@ void main() {
         final message = ProtocolCodec.decode(json);
 
         expect(message, isA<WelcomeMessage>());
-        expect((message as WelcomeMessage).message, 'Hello');
+        expect((message! as WelcomeMessage).message, 'Hello');
       });
 
       test('should return null for invalid JSON', () {
@@ -70,7 +70,7 @@ void main() {
         final message = ProtocolCodec.decodeMap(map);
 
         expect(message, isA<UsersMessage>());
-        expect((message as UsersMessage).users, ['alice', 'bob']);
+        expect((message! as UsersMessage).users, ['alice', 'bob']);
       });
     });
 

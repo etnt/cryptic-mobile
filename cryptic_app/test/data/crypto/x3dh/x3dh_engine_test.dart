@@ -4,11 +4,9 @@
 
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
-
-import 'package:cryptic_app/data/crypto/keys/key_bundle.dart';
 import 'package:cryptic_app/data/crypto/keys/key_generator.dart';
 import 'package:cryptic_app/data/crypto/x3dh/x3dh_engine.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   late X3dhEngine x3dh;

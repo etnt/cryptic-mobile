@@ -13,6 +13,16 @@ import '../../../core/constants/crypto_constants.dart';
 
 /// A skipped message key entry for out-of-order message handling.
 class SkippedKeyEntry {
+
+  /// Creates from a map.
+  factory SkippedKeyEntry.fromMap(Map<String, dynamic> map) {
+    return SkippedKeyEntry(
+      messageKey: base64Decode(map['message_key'] as String),
+      timestamp:
+          DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
+      dhPublic: base64Decode(map['dh_public'] as String),
+    );
+  }
   /// Creates a skipped key entry.
   const SkippedKeyEntry({
     required this.messageKey,
@@ -30,27 +40,21 @@ class SkippedKeyEntry {
   final Uint8List dhPublic;
 
   /// Converts to a map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'message_key': base64Encode(messageKey),
       'timestamp': timestamp.millisecondsSinceEpoch,
       'dh_public': base64Encode(dhPublic),
     };
-  }
-
-  /// Creates from a map.
-  factory SkippedKeyEntry.fromMap(Map<String, dynamic> map) {
-    return SkippedKeyEntry(
-      messageKey: base64Decode(map['message_key'] as String),
-      timestamp:
-          DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
-      dhPublic: base64Decode(map['dh_public'] as String),
-    );
-  }
 }
 
 /// Key for the skipped keys map: (dhStep, messageNumber).
 class SkippedKeyId {
+
+  /// Creates from a string key.
+  factory SkippedKeyId.fromKey(String key) {
+    final parts = key.split(':');
+    return SkippedKeyId(int.parse(parts[0]), int.parse(parts[1]));
+  }
   /// Creates a skipped key identifier.
   const SkippedKeyId(this.dhStep, this.messageNumber);
 
@@ -73,12 +77,6 @@ class SkippedKeyId {
 
   /// Converts to a string key for map serialization.
   String toKey() => '$dhStep:$messageNumber';
-
-  /// Creates from a string key.
-  factory SkippedKeyId.fromKey(String key) {
-    final parts = key.split(':');
-    return SkippedKeyId(int.parse(parts[0]), int.parse(parts[1]));
-  }
 }
 
 /// Complete Double Ratchet state.
@@ -90,6 +88,47 @@ class SkippedKeyId {
 /// - DH ratchet keys
 /// - Skipped message key cache
 class RatchetState {
+
+  /// Creates from a map.
+  factory RatchetState.fromMap(Map<String, dynamic> map) {
+    final skippedKeysMap = map['skipped_keys'] as Map<String, dynamic>? ?? {};
+    final skippedKeys = <SkippedKeyId, SkippedKeyEntry>{};
+    for (final entry in skippedKeysMap.entries) {
+      final id = SkippedKeyId.fromKey(entry.key);
+      skippedKeys[id] =
+          SkippedKeyEntry.fromMap(entry.value as Map<String, dynamic>);
+    }
+
+    return RatchetState(
+      rootKey: base64Decode(map['root_key'] as String),
+      sendChainKey: base64Decode(map['send_chain_key'] as String),
+      sendMessageNumber: map['send_message_number'] as int,
+      recvChainKey: base64Decode(map['recv_chain_key'] as String),
+      recvMessageNumber: map['recv_message_number'] as int,
+      prevRecvChainLength: map['prev_recv_chain_length'] as int,
+      dhSelf: (
+        base64Decode(map['dh_self_public'] as String),
+        base64Decode(map['dh_self_private'] as String),
+      ),
+      dhRemote: map['dh_remote'] != null
+          ? base64Decode(map['dh_remote'] as String)
+          : null,
+      dhRatchetStep: map['dh_ratchet_step'] as int,
+      skippedKeys: skippedKeys,
+      maxSkip: map['max_skip'] as int? ?? CryptoConstants.maxSkipPerStep,
+      maxCacheSize:
+          map['max_cache_size'] as int? ?? CryptoConstants.maxSkippedMessageKeys,
+      maxCacheAge: Duration(
+        milliseconds: map['max_cache_age_ms'] as int? ?? 86400000,
+      ),
+      sendingChainActive: map['sending_chain_active'] as bool,
+      receivingChainActive: map['receiving_chain_active'] as bool,
+      createdAt:
+          DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      lastUpdated:
+          DateTime.fromMillisecondsSinceEpoch(map['last_updated'] as int),
+    );
+  }
   /// Creates a ratchet state.
   RatchetState({
     required this.rootKey,
@@ -99,15 +138,11 @@ class RatchetState {
     required this.recvMessageNumber,
     required this.prevRecvChainLength,
     required this.dhSelf,
-    this.dhRemote,
-    required this.dhRatchetStep,
+    required this.dhRatchetStep, required this.sendingChainActive, required this.receivingChainActive, required this.createdAt, this.dhRemote,
     Map<SkippedKeyId, SkippedKeyEntry>? skippedKeys,
     this.maxSkip = CryptoConstants.maxSkipPerStep,
     this.maxCacheSize = CryptoConstants.maxSkippedMessageKeys,
     this.maxCacheAge = const Duration(hours: 24),
-    required this.sendingChainActive,
-    required this.receivingChainActive,
-    required this.createdAt,
     DateTime? lastUpdated,
   })  : skippedKeys = skippedKeys ?? {},
         lastUpdated = lastUpdated ?? DateTime.now();
@@ -193,8 +228,7 @@ class RatchetState {
     bool? sendingChainActive,
     bool? receivingChainActive,
     DateTime? lastUpdated,
-  }) {
-    return RatchetState(
+  }) => RatchetState(
       rootKey: rootKey ?? this.rootKey,
       sendChainKey: sendChainKey ?? this.sendChainKey,
       sendMessageNumber: sendMessageNumber ?? this.sendMessageNumber,
@@ -213,7 +247,6 @@ class RatchetState {
       createdAt: createdAt,
       lastUpdated: lastUpdated ?? DateTime.now(),
     );
-  }
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() {
@@ -244,50 +277,8 @@ class RatchetState {
     };
   }
 
-  /// Creates from a map.
-  factory RatchetState.fromMap(Map<String, dynamic> map) {
-    final skippedKeysMap = map['skipped_keys'] as Map<String, dynamic>? ?? {};
-    final skippedKeys = <SkippedKeyId, SkippedKeyEntry>{};
-    for (final entry in skippedKeysMap.entries) {
-      final id = SkippedKeyId.fromKey(entry.key);
-      skippedKeys[id] =
-          SkippedKeyEntry.fromMap(entry.value as Map<String, dynamic>);
-    }
-
-    return RatchetState(
-      rootKey: base64Decode(map['root_key'] as String),
-      sendChainKey: base64Decode(map['send_chain_key'] as String),
-      sendMessageNumber: map['send_message_number'] as int,
-      recvChainKey: base64Decode(map['recv_chain_key'] as String),
-      recvMessageNumber: map['recv_message_number'] as int,
-      prevRecvChainLength: map['prev_recv_chain_length'] as int,
-      dhSelf: (
-        base64Decode(map['dh_self_public'] as String),
-        base64Decode(map['dh_self_private'] as String),
-      ),
-      dhRemote: map['dh_remote'] != null
-          ? base64Decode(map['dh_remote'] as String)
-          : null,
-      dhRatchetStep: map['dh_ratchet_step'] as int,
-      skippedKeys: skippedKeys,
-      maxSkip: map['max_skip'] as int? ?? CryptoConstants.maxSkipPerStep,
-      maxCacheSize:
-          map['max_cache_size'] as int? ?? CryptoConstants.maxSkippedMessageKeys,
-      maxCacheAge: Duration(
-        milliseconds: map['max_cache_age_ms'] as int? ?? 86400000,
-      ),
-      sendingChainActive: map['sending_chain_active'] as bool,
-      receivingChainActive: map['receiving_chain_active'] as bool,
-      createdAt:
-          DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
-      lastUpdated:
-          DateTime.fromMillisecondsSinceEpoch(map['last_updated'] as int),
-    );
-  }
-
   /// Gets summary info (safe for logging).
-  Map<String, dynamic> getInfo() {
-    return {
+  Map<String, dynamic> getInfo() => {
       'dh_ratchet_step': dhRatchetStep,
       'send_message_number': sendMessageNumber,
       'recv_message_number': recvMessageNumber,
@@ -299,7 +290,6 @@ class RatchetState {
       'created_at': createdAt.toIso8601String(),
       'last_updated': lastUpdated.toIso8601String(),
     };
-  }
 
   /// Removes expired keys from the skipped keys cache.
   ///

@@ -3,9 +3,8 @@
 // Unit tests for crypto constants
 //
 
-import 'package:flutter_test/flutter_test.dart';
-
 import 'package:cryptic_app/core/constants/crypto_constants.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('CryptoConstants', () {

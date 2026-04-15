@@ -50,9 +50,7 @@ class SessionManager {
   List<String> get peerUsernames => _sessions.keys.toList();
 
   /// Check if a session exists for a peer.
-  bool hasSession(String peerUsername) {
-    return _sessions.containsKey(peerUsername);
-  }
+  bool hasSession(String peerUsername) => _sessions.containsKey(peerUsername);
 
   /// Get session info for a peer.
   PeerSession? getSessionInfo(String peerUsername) {
@@ -67,8 +65,7 @@ class SessionManager {
   }
 
   /// Get all session infos.
-  Map<String, PeerSession> getAllSessionInfos() {
-    return {
+  Map<String, PeerSession> getAllSessionInfos() => {
       for (final entry in _sessions.entries)
         entry.key: PeerSession(
           peerUsername: entry.key,
@@ -76,7 +73,6 @@ class SessionManager {
           messageCount: entry.value.sendMessageNumber,
         ),
     };
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Session Creation

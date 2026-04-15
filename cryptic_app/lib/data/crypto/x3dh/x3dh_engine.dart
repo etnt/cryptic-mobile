@@ -70,6 +70,16 @@ class X3dhReceiverResult {
 
 /// X3DH encrypted message blob structure.
 class X3dhMessageBlob {
+
+  /// Creates from a map (e.g., from JSON).
+  factory X3dhMessageBlob.fromMap(Map<String, dynamic> map) {
+    return X3dhMessageBlob(
+      metadata: X3dhMetadata.fromMap(map['metadata'] as Map<String, dynamic>),
+      signature: base64Decode(map['signature'] as String),
+      ciphertext: base64Decode(map['ciphertext'] as String),
+      nonce: base64Decode(map['nonce'] as String),
+    );
+  }
   /// Creates an X3DH message blob.
   const X3dhMessageBlob({
     required this.metadata,
@@ -91,28 +101,36 @@ class X3dhMessageBlob {
   final Uint8List nonce;
 
   /// Converts to a map for JSON serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'metadata': metadata.toMap(),
       'signature': base64Encode(signature),
       'ciphertext': base64Encode(ciphertext),
       'nonce': base64Encode(nonce),
     };
-  }
-
-  /// Creates from a map (e.g., from JSON).
-  factory X3dhMessageBlob.fromMap(Map<String, dynamic> map) {
-    return X3dhMessageBlob(
-      metadata: X3dhMetadata.fromMap(map['metadata'] as Map<String, dynamic>),
-      signature: base64Decode(map['signature'] as String),
-      ciphertext: base64Decode(map['ciphertext'] as String),
-      nonce: base64Decode(map['nonce'] as String),
-    );
-  }
 }
 
 /// X3DH message metadata.
 class X3dhMetadata {
+
+  /// Creates from a map.
+  factory X3dhMetadata.fromMap(Map<String, dynamic> map) {
+    return X3dhMetadata(
+      version: map['version'] as int,
+      type: map['type'] as String,
+      senderId: base64Decode(map['sender_id'] as String),
+      senderIdentityDhPublic:
+          base64Decode(map['sender_identity_dh_public'] as String),
+      senderIdentitySignPublic:
+          base64Decode(map['sender_identity_sign_public'] as String),
+      recipientId: base64Decode(map['recipient_id'] as String),
+      ephemeralPublic: base64Decode(map['ephemeral_public'] as String),
+      otpkId: map['otpk_id'] != null
+          ? base64Decode(map['otpk_id'] as String)
+          : null,
+      messageId: base64Decode(map['message_id'] as String),
+      timestamp: map['timestamp'] as int,
+    );
+  }
   /// Creates X3DH metadata.
   const X3dhMetadata({
     required this.version,
@@ -122,9 +140,7 @@ class X3dhMetadata {
     required this.senderIdentitySignPublic,
     required this.recipientId,
     required this.ephemeralPublic,
-    this.otpkId,
-    required this.messageId,
-    required this.timestamp,
+    required this.messageId, required this.timestamp, this.otpkId,
   });
 
   /// Protocol version.
@@ -158,8 +174,7 @@ class X3dhMetadata {
   final int timestamp;
 
   /// Converts to a map for serialization.
-  Map<String, dynamic> toMap() {
-    return {
+  Map<String, dynamic> toMap() => {
       'version': version,
       'type': type,
       'sender_id': base64Encode(senderId),
@@ -171,33 +186,12 @@ class X3dhMetadata {
       'message_id': base64Encode(messageId),
       'timestamp': timestamp,
     };
-  }
 
   /// Serializes metadata to bytes for signing.
   Uint8List toBytes() {
     // Use JSON encoding for consistent cross-platform serialization
     final json = jsonEncode(toMap());
     return Uint8List.fromList(utf8.encode(json));
-  }
-
-  /// Creates from a map.
-  factory X3dhMetadata.fromMap(Map<String, dynamic> map) {
-    return X3dhMetadata(
-      version: map['version'] as int,
-      type: map['type'] as String,
-      senderId: base64Decode(map['sender_id'] as String),
-      senderIdentityDhPublic:
-          base64Decode(map['sender_identity_dh_public'] as String),
-      senderIdentitySignPublic:
-          base64Decode(map['sender_identity_sign_public'] as String),
-      recipientId: base64Decode(map['recipient_id'] as String),
-      ephemeralPublic: base64Decode(map['ephemeral_public'] as String),
-      otpkId: map['otpk_id'] != null
-          ? base64Decode(map['otpk_id'] as String)
-          : null,
-      messageId: base64Decode(map['message_id'] as String),
-      timestamp: map['timestamp'] as int,
-    );
   }
 }
 

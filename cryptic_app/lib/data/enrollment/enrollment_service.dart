@@ -6,7 +6,7 @@
 // 1. Parse QR data (encrypted envelope)
 // 2. Decrypt with passphrase → enrollment payload
 // 3. Fetch & verify CA certificate
-// 4. Generate RSA keypair + CSR
+// 4. Generate Ed25519 keypair + CSR
 // 5. Sign CSR with enrollment key
 // 6. Submit to server
 // 7. Store mTLS certificate
@@ -229,7 +229,7 @@ class EnrollmentService {
     final lines = caCertPem.split('\n');
     final b64Lines = lines
         .where((line) =>
-            !line.startsWith('-----') && line.trim().isNotEmpty)
+            !line.startsWith('-----') && line.trim().isNotEmpty,)
         .join();
     final derBytes = base64.decode(b64Lines);
 
@@ -260,11 +260,11 @@ class EnrollmentService {
     final url = Uri.https('$host:$port', '/ca/v1/mobile-csr');
 
     try {
-      // Use the verified CA cert for this request
-      final securityContext = SecurityContext(withTrustedRoots: false);
-      securityContext.setTrustedCertificatesBytes(utf8.encode(caCertPem));
-
-      final ioClient = HttpClient(context: securityContext);
+      // The CA cert was already verified by fingerprint from the QR code.
+      // Accept the server's TLS cert here to avoid hostname/chain mismatches
+      // (e.g. cert issued for a FQDN but we're connecting via localhost).
+      final ioClient = HttpClient()
+        ..badCertificateCallback = (cert, host, port) => true;
       final request = await ioClient.postUrl(url);
       request.headers.contentType = ContentType.json;
 

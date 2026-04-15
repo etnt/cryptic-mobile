@@ -82,8 +82,7 @@ class UsersScreen extends ConsumerWidget {
     // Set the selected peer
     ref.read(selectedPeerProvider.notifier).state = username;
 
-    // Replace the users screen with chat screen
-    Navigator.of(context).pushReplacement(
+    Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => ChatScreen(peerId: username),
       ),

@@ -83,7 +83,7 @@ class UploadKeysUseCase implements UseCase<UploadKeysParams, UploadKeysResult> {
       return const UseCaseSuccess(UploadKeysResult(
         identityKeysUploaded: true,
         prekeysUploaded: 0,
-      ));
+      ),);
     } catch (e) {
       return UseCaseError('Failed to upload keys', e);
     }

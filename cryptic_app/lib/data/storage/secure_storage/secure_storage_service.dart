@@ -47,7 +47,7 @@ class SecureStorageService {
       accessibility: options.accessible,
     );
 
-    final androidOptions = const AndroidOptions(
+    const androidOptions = AndroidOptions(
       encryptedSharedPreferences: true,
     );
 

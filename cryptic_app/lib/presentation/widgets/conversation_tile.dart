@@ -105,8 +105,7 @@ class ConversationTile extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar(ThemeData theme) {
-    return CircleAvatar(
+  Widget _buildAvatar(ThemeData theme) => CircleAvatar(
       backgroundColor: theme.colorScheme.primaryContainer,
       child: Text(
         conversation.displayName.isNotEmpty
@@ -118,10 +117,8 @@ class ConversationTile extends StatelessWidget {
         ),
       ),
     );
-  }
 
-  Widget _buildStatusIcon(MessageStatus status, ThemeData theme) {
-    return switch (status) {
+  Widget _buildStatusIcon(MessageStatus status, ThemeData theme) => switch (status) {
       MessageStatus.pending || MessageStatus.sending => Icon(
           Icons.access_time,
           size: 16,
@@ -148,7 +145,6 @@ class ConversationTile extends StatelessWidget {
           color: theme.colorScheme.error,
         ),
     };
-  }
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();

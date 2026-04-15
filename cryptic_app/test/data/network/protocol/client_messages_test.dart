@@ -19,7 +19,7 @@ void main() {
 
     test('should parse from value', () {
       expect(ClientMessageType.fromValue('upload_identity_keys'),
-          ClientMessageType.uploadIdentityKeys);
+          ClientMessageType.uploadIdentityKeys,);
       expect(ClientMessageType.fromValue('x3dh'), ClientMessageType.x3dh);
       expect(ClientMessageType.fromValue('unknown'), isNull);
     });
@@ -148,7 +148,6 @@ void main() {
         fromUser: 'alice',
         toUser: 'bob',
         ephemeralPublic: 'ephemeral',
-        otpkId: null,
         ciphertext: 'data',
         nonce: 'nonce',
         signature: 'sig',
