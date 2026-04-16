@@ -3,24 +3,26 @@
 This document outlines the architecture for a Flutter mobile application that
 implements the Cryptic end-to-end encrypted messaging protocol.
 
-## Implementation Status (December 2025)
+## Implementation Status (April 2026)
 
-**✅ M7 Integration Complete** - Bidirectional encrypted messaging working!
+**✅ M8 Mobile Enrollment Complete** - End-to-end: QR enrollment → mTLS → encrypted chat
 
 | Component | Status | Notes |
 |-----------|--------|-------|
 | X3DH Key Agreement | ✅ Complete | Interoperates with Erlang server |
 | Double Ratchet | ✅ Complete | Blake2b KDF matching libsodium |
 | WebSocket Client | ✅ Complete | mTLS with client certificates |
-| Protocol Messages | ✅ Complete | JSON encoding/decoding |
-| Key Storage | ✅ Complete | Secure storage with passphrase |
-| Session Management | ✅ Complete | Persistent sessions |
+| Protocol Messages | ✅ Complete | JSON encoding/decoding, Erlang char-list tolerance |
+| Key Storage | ✅ Complete | flutter_secure_storage (iOS Keychain) |
+| Session Management | ✅ Complete | Persistent ratchet sessions |
 | Chat UI | ✅ Complete | Send/receive messages |
 | Users List | ✅ Complete | Online users from server |
 | Connection Status | ✅ Complete | Real-time status updates |
-| Message History | 🔄 Partial | In-memory only (DB pending) |
-| Mobile Enrollment | ✅ Complete | QR scan → Ed25519 CSR → cert |
+| Message History | 🔄 Partial | In-memory only (SQLCipher DB pending) |
+| Mobile Enrollment | ✅ Complete | QR scan → ECDSA P-256 CSR (Ed25519-signed) → mTLS cert |
+| Certificate Storage | ✅ Complete | Cert/key in iOS Keychain via flutter_secure_storage |
 | Settings Screen | 🔄 Planned | Basic structure only |
+| Certificate Renewal | 📋 Planned | No renewal flow yet |
 | Notifications | 📋 Planned | Not yet implemented |
 
 ## Overview
@@ -54,132 +56,165 @@ WebSocket communication while adapting to Flutter's reactive UI patterns.
                               ↕
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Storage Layer                             │
-│  - Secure Key Storage (flutter_secure_storage)                  │
+│  - Certificate Storage (mTLS certs via flutter_secure_storage)  │
+│  - Secure Key Storage (identity keys, prekeys, sessions)        │
 │  - Session Repository (persisted ratchet state)                 │
+│  - Encrypted Preferences (app settings)                         │
 │  - Message Database (sqflite_sqlcipher) - pending               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure (Actual Implementation)
 
-```dart
+```
 lib/
-├── main.dart                          // App entry point with Riverpod
+├── main.dart                              // App entry point with Riverpod
+│
 ├── core/
 │   ├── config/
-│   │   └── app_config.dart           // Server URLs, ports, etc.
+│   │   └── app_config.dart               // AppConfig enum (dev/staging/prod)
 │   ├── constants/
-│   │   └── crypto_constants.dart     // Crypto parameters (key sizes, etc.)
+│   │   └── crypto_constants.dart         // Crypto params (key sizes, HKDF info)
+│   ├── errors/
+│   │   └── app_exceptions.dart           // CrypticException hierarchy
+│   ├── theme/
+│   │   ├── app_colors.dart               // Color palette
+│   │   ├── app_text_styles.dart          // Typography
+│   │   ├── app_theme.dart                // Light/dark ThemeData (Material 3)
+│   │   └── theme.dart                    // Barrel export
 │   └── utils/
-│       └── logger.dart               // Logging utility
+│       └── logger.dart                   // AppLogger with redaction
 │
 ├── domain/
 │   ├── models/
-│   │   ├── message.dart              // Plaintext message model
-│   │   └── user.dart                 // User model
-│   │
-│   └── repositories/
-│       └── auth_repository.dart      // Authentication abstraction
+│   │   ├── contact.dart                  // Contact + ContactStatus
+│   │   ├── conversation.dart             // Conversation model
+│   │   ├── message.dart                  // ChatMessage + MessageStatus/Direction
+│   │   └── models.dart                   // Barrel export
+│   ├── usecases/
+│   │   ├── use_case.dart                 // UseCase/NoInputUseCase base + Result
+│   │   ├── connect.dart                  // ConnectUseCase / DisconnectUseCase
+│   │   ├── get_users.dart                // GetUsersUseCase
+│   │   ├── initialize_session.dart       // InitializeSessionUseCase
+│   │   ├── send_message.dart             // SendMessageUseCase
+│   │   ├── upload_keys.dart              // UploadKeysUseCase (stub)
+│   │   └── usecases.dart                 // Barrel export
+│   └── services/
+│       └── crypto/
+│           └── crypto_services.dart      // Pointer to data/crypto
 │
 ├── data/
 │   ├── crypto/
-│   │   ├── x3dh/
-│   │   │   ├── x3dh_engine.dart      // ✅ X3DH key agreement (Signal protocol)
-│   │   │   └── x3dh_result.dart      // X3DH operation result
-│   │   │
-│   │   ├── ratchet/
-│   │   │   ├── double_ratchet.dart   // ✅ Double Ratchet encryption
-│   │   │   ├── ratchet_message.dart  // Encrypted message format
-│   │   │   └── session_state.dart    // Ratchet session state
-│   │   │
+│   │   ├── keys/
+│   │   │   ├── identity_key_pair.dart    // IdentityKeyPair
+│   │   │   ├── key_bundle.dart           // KeyBundle (X3DH)
+│   │   │   ├── key_generator.dart        // KeyGenerator (Ed25519+X25519)
+│   │   │   ├── one_time_prekey.dart      // OneTimePrekey
+│   │   │   ├── signed_prekey.dart        // SignedPrekey
+│   │   │   └── keys.dart                 // Barrel export
 │   │   ├── primitives/
-│   │   │   ├── ed25519_service.dart  // ✅ Ed25519 signing
-│   │   │   ├── x25519_service.dart   // ✅ X25519 key exchange
-│   │   │   ├── chacha20_poly1305_service.dart // ✅ AEAD encryption
-│   │   │   ├── hkdf_service.dart     // HMAC-based KDF (for X3DH)
-│   │   │   └── kdf_service.dart      // ✅ Blake2b KDF (for Double Ratchet)
-│   │   │
-│   │   └── keys/
-│   │       ├── identity_keys.dart    // ✅ Identity key pairs
-│   │       ├── key_bundle.dart       // ✅ X3DH key bundle
-│   │       ├── one_time_prekey.dart  // ✅ One-time prekeys
-│   │       └── signed_prekey.dart    // ✅ Signed prekeys
-│   │
-│   ├── network/
-│   │   ├── websocket/
-│   │   │   └── websocket_client.dart // ✅ mTLS WebSocket client
-│   │   │
-│   │   └── protocol/
-│   │       ├── client_messages.dart  // ✅ Outgoing message types
-│   │       ├── server_messages.dart  // ✅ Incoming message types
-│   │       ├── protocol_message.dart // Message base class
-│   │       └── protocol_codec.dart   // JSON encoding/decoding
-│   │
-│   ├── enrollment/
-│   │   ├── enrollment_payload.dart   // ✅ QR envelope & payload models
-│   │   ├── enrollment_crypto.dart    // ✅ Argon2id, HMAC, AES, Ed25519
-│   │   ├── csr_generator.dart        // ✅ RSA-2048 keypair + PKCS#10 CSR
-│   │   └── enrollment_service.dart   // ✅ Full enrollment orchestrator
-│   │
-│   ├── storage/
-│   │   ├── secure_storage.dart       // ✅ Encrypted key storage
-│   │   └── session_storage.dart      // ✅ Session persistence
+│   │   │   ├── chacha20_poly1305_service.dart  // AEAD encryption
+│   │   │   ├── ed25519_service.dart            // Ed25519 signing
+│   │   │   ├── hkdf_service.dart               // HMAC-based KDF (for X3DH)
+│   │   │   ├── kdf_service.dart                // Blake2b KDF (Double Ratchet)
+│   │   │   └── x25519_service.dart             // X25519 key exchange
+│   │   ├── ratchet/
+│   │   │   ├── double_ratchet.dart       // DoubleRatchet (encrypt/decrypt)
+│   │   │   ├── ratchet_message.dart      // RatchetMessage format
+│   │   │   ├── ratchet_state.dart        // RatchetState (per-peer)
+│   │   │   └── ratchet.dart              // Barrel export
+│   │   └── x3dh/
+│   │       └── x3dh_engine.dart          // X3dhEngine (sender/receiver)
 │   │
 │   ├── engine/
-│   │   ├── cryptic_engine.dart       // ✅ Main orchestrator
-│   │   ├── engine_state.dart         // ✅ Engine state & events
-│   │   ├── session_manager.dart      // ✅ Per-peer session management
-│   │   └── message_processor.dart    // ✅ Message encryption/decryption
+│   │   ├── cryptic_engine.dart           // CrypticEngine - main orchestrator
+│   │   ├── engine_state.dart             // EngineState, EngineEvent, enums
+│   │   ├── message_processor.dart        // MessageProcessor (decode+decrypt)
+│   │   ├── session_manager.dart          // SessionManager (per-peer ratchets)
+│   │   └── engine.dart                   // Barrel export
 │   │
-│   └── services/
-│       └── key_management_service.dart // Key generation utilities
+│   ├── enrollment/
+│   │   ├── enrollment_payload.dart       // EnrollmentEnvelope + Payload (QR v1/v2)
+│   │   ├── enrollment_crypto.dart        // Argon2id, HMAC, AES-CBC, Ed25519 sign
+│   │   ├── csr_generator.dart            // ECDSA P-256 keypair + PKCS#10 CSR
+│   │   └── enrollment_service.dart       // Full enrollment orchestrator
+│   │
+│   ├── network/
+│   │   ├── protocol/
+│   │   │   ├── protocol_message.dart     // ProtocolMessage base, type enums
+│   │   │   ├── client_messages.dart      // Outgoing message types (toJson)
+│   │   │   ├── server_messages.dart      // Incoming message types (fromJson)
+│   │   │   └── protocol_codec.dart       // ProtocolCodec + extensions
+│   │   └── websocket/
+│   │       ├── websocket_client.dart     // WebSocketClient (mTLS)
+│   │       ├── mtls_config.dart          // MtlsConfig (PEM → SecurityContext)
+│   │       ├── connection_manager.dart   // ConnectionManager (reconnect, heartbeat)
+│   │       └── message_queue.dart        // MessageQueue (offline outbound)
+│   │
+│   ├── services/
+│   │   └── authentication_service.dart   // AuthenticationService (cert → engine)
+│   │
+│   └── storage/
+│       ├── storage.dart                  // Barrel export
+│       ├── secure_storage/
+│       │   ├── secure_storage_service.dart    // flutter_secure_storage wrapper
+│       │   ├── certificate_storage_service.dart // mTLS cert/key/CA storage
+│       │   ├── key_storage_service.dart       // Identity keys + session state
+│       │   └── secure_storage.dart            // Barrel export
+│       ├── repositories/
+│       │   ├── key_repository.dart            // KeyRepository facade
+│       │   ├── session_repository.dart        // SessionRepository facade
+│       │   └── repositories.dart              // Barrel export
+│       └── preferences/
+│           ├── encrypted_preferences.dart     // EncryptedPreferences (settings)
+│           └── preferences.dart               // Barrel export
 │
 ├── presentation/
+│   ├── app.dart                          // CrypticApp root (screen routing)
 │   ├── providers/
-│   │   ├── engine_provider.dart      // ✅ Engine Riverpod provider
-│   │   ├── auth_provider.dart        // ✅ Auth state provider
-│   │   └── messages_provider.dart    // Message list provider
-│   │
-│   └── screens/
-│       ├── splash_screen.dart        // ✅ App startup
-│       ├── login_screen.dart         // ✅ Username/passphrase entry
-│       ├── users_screen.dart         // ✅ Online users list
-│       ├── chat_screen.dart          // ✅ Chat conversation
-│       ├── conversations_screen.dart // Conversation list (basic)
-│       └── enrollment/
-│           ├── enrollment_flow_screen.dart    // ✅ Flow orchestrator
-│           ├── qr_scanner_screen.dart         // ✅ QR code scanning
-│           ├── passphrase_screen.dart         // ✅ Passphrase entry
-│           └── enrollment_progress_screen.dart // ✅ Progress display
-│
-├── test/
-│   ├── data/
-│   │   └── network/
-│   │       └── protocol/
-│   │           ├── client_messages_test.dart  // Protocol tests
-│   │           └── protocol_codec_test.dart   // Codec tests
-│   │
-│   └── widget_test.dart
+│   │   ├── auth_provider.dart            // AuthNotifier + AuthStatus
+│   │   ├── engine_provider.dart          // Engine Riverpod providers
+│   │   ├── enrollment_provider.dart      // EnrollmentNotifier + status
+│   │   ├── messages_provider.dart        // ConversationsNotifier
+│   │   └── providers.dart                // Barrel export
+│   ├── screens/
+│   │   ├── splash_screen.dart            // Startup + auth check
+│   │   ├── login_screen.dart             // Username/passphrase entry
+│   │   ├── users_screen.dart             // Online users list (home screen)
+│   │   ├── chat_screen.dart              // Chat conversation
+│   │   ├── conversations_screen.dart     // Conversation list (alternate)
+│   │   ├── screens.dart                  // Barrel export
+│   │   └── enrollment/
+│   │       ├── enrollment_flow_screen.dart     // Flow orchestrator
+│   │       ├── qr_scanner_screen.dart          // QR code scanning
+│   │       ├── passphrase_screen.dart          // Passphrase entry
+│   │       └── enrollment_progress_screen.dart // Progress display
+│   └── widgets/
+│       ├── connection_status_banner.dart  // Connection state indicator
+│       ├── conversation_tile.dart        // Conversation list item
+│       ├── empty_state.dart              // Empty state placeholder
+│       ├── loading_overlay.dart          // Loading overlay
+│       ├── message_bubble.dart           // Chat message bubble
+│       ├── message_input.dart            // Text input + send button
+│       ├── user_avatar.dart              // Avatar with initials
+│       └── widgets.dart                  // Barrel export
 │
 └── assets/
-    └── certificates/                  // mTLS certificates
-        ├── ca.crt                     // CA certificate
-        ├── client.crt                 // Client certificate
-        └── client.key                 // Client private key
+    └── certificates/                     // Bundled fallback certs (dev only)
+        ├── ca.crt
+        ├── client.crt
+        └── client.key
 ```
-│   │   │
-│   │   └── settings/
-│   │       ├── settings_screen.dart       // App settings
-│   │       ├── key_management_screen.dart // View/backup keys
-│   │       └── server_config_screen.dart  // Server connection settings
-│   │
-│   └── widgets/
 ## Core Components
 
-> **Note**: The code samples below are illustrative. For the actual implementation,
-> see the source files in `lib/data/`. Key differences from typical Signal implementations:
+> **Note**: The code samples below are illustrative pseudocode showing the
+> conceptual design. For the actual implementation, see the source files in
+> `lib/data/`. Key differences from the pseudocode and typical Signal implementations:
+> - `CrypticEngine` takes concrete dependencies (`KeyRepository`, `SessionRepository`,
+>   `WebSocketClient`) rather than abstract repository interfaces
 > - Uses Blake2b KDF (matching libsodium) instead of HKDF for ratchet chain keys
 > - Uses XOR mixing for root key updates instead of HKDF
+> - `AuthenticationService` (not shown below) bridges certificate loading and engine setup
 > - See [Critical Implementation Details](#critical-implementation-details) for specifics.
 
 ### 1. CrypticEngine (Port of `cryptic_engine.erl`)
@@ -953,64 +988,66 @@ class DoubleRatchet {
 
 ### State Management
 
+The app uses Riverpod providers organized across four provider files:
+
 ```dart
-// Provider for CrypticEngine
-final crypticEngineProvider = StateNotifierProvider<CrypticEngineNotifier, EngineState>((ref) {
-  return CrypticEngineNotifier();
+// auth_provider.dart — Owns the CrypticEngine lifecycle
+final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>(...);
+// AuthNotifier holds CrypticEngine?, exposes authenticate/setup/logout/checkAuthState
+// AuthStatus: { isAuthenticated, needsSetup, error }
+
+// Derived provider so other providers can access the engine
+final authenticatedEngineProvider = Provider<CrypticEngine?>((ref) {
+  final auth = ref.watch(authProvider);
+  return auth.isAuthenticated ? ref.read(authProvider.notifier).engine : null;
 });
 
-class CrypticEngineNotifier extends StateNotifier<EngineState> {
-  CrypticEngine? _engine;
-  
-  CrypticEngineNotifier() : super(EngineState.initial());
-  
-  Future<void> initialize(String username, String passphrase) async {
-    state = state.copyWith(status: EngineStatus.initializing);
-    
-    try {
-      _engine = CrypticEngine(
-        username: username,
-        crypto: CryptoRepositoryImpl(),
-        network: WebSocketClientImpl(),
-        storage: StorageRepositoryImpl(),
-      );
-      
-      await _engine!.initialize(passphrase);
-      
-      // Listen to message stream
-      _engine!.messageStream.listen((message) {
-        // Update messages state
-      });
-      
-      state = state.copyWith(
-        status: EngineStatus.ready,
-        username: username,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        status: EngineStatus.error,
-        errorMessage: e.toString(),
-      );
-    }
-  }
-  
-  Future<void> sendMessage(String toUser, String text) async {
-    await _engine?.sendMessage(toUser, text);
-  }
-}
+// engine_provider.dart — Derived providers from engine state
+final engineProvider = Provider<CrypticEngine?>((ref) =>
+    ref.watch(authenticatedEngineProvider));
 
-// Provider for messages
-final messagesProvider = StreamProvider.family<List<Message>, String>((ref, peerUsername) {
-  final storage = ref.watch(storageRepositoryProvider);
-  return storage.getMessagesStream(peerUsername);
+final engineStateProvider = StreamProvider<EngineState>((ref) {
+  final engine = ref.watch(engineProvider);
+  return engine?.stateChanges ?? Stream.value(EngineState.initial);
 });
 
-// Provider for contacts
-final contactsProvider = FutureProvider<List<String>>((ref) async {
-  final network = ref.watch(networkRepositoryProvider);
-  return await network.listUsers();
+final engineEventsProvider = StreamProvider<EngineEvent>((ref) {
+  final engine = ref.watch(engineProvider);
+  return engine?.events ?? const Stream.empty();
 });
+
+// Derived convenience providers
+final usersProvider = Provider<List<String>>(...);           // Online users (excludes self)
+final sessionsProvider = Provider<Map<String, PeerSession>>(...);
+final hasSessionProvider = Provider.family<bool, String>(...);
+final connectionStatusProvider = Provider<ConnectionStatus>(...);
+final isConnectedProvider = Provider<bool>(...);
+
+// enrollment_provider.dart — Enrollment flow state
+final enrollmentProvider = StateNotifierProvider<EnrollmentNotifier, EnrollmentStatus>(...);
+// Phases: idle → scanning → passphrase → enrolling → complete/error
+
+// messages_provider.dart — Conversation tracking
+final conversationsProvider = StateNotifierProvider<ConversationsNotifier, List<Conversation>>(...);
+final selectedPeerProvider = StateProvider<String?>(...);
 ```
+
+### Navigation Flow
+
+The app uses imperative screen routing in `CrypticApp` (a `ConsumerStatefulWidget`):
+
+```
+SplashScreen → checkAuthState()
+  ├─ needsSetup → EnrollmentFlowScreen → LoginScreen
+  └─ hasCerts   → LoginScreen
+                      ↓ authenticate()
+                   UsersScreen (home)
+                      ↓ tap user
+                   ChatScreen (Navigator.push)
+```
+
+`EnrollmentFlowScreen` internally switches between `QrScannerScreen`,
+`PassphraseScreen`, and `EnrollmentProgressScreen` based on `EnrollmentPhase`.
 
 ### Chat Screen
 
@@ -1080,17 +1117,20 @@ dependencies:
   riverpod_annotation: ^2.3.0       # Riverpod code generation annotations
   
   # Cryptography
-  pointycastle: ^3.9.0              # Ed25519, X25519, ChaCha20-Poly1305, Blake2b
-  cryptography: ^2.7.0              # Additional crypto utilities
+  pointycastle: ^3.9.0              # Ed25519, X25519, ChaCha20-Poly1305, Blake2b, ECDSA
+  cryptography: ^2.7.0              # Argon2id KDF (used by enrollment)
   
   # Network
   web_socket_channel: ^2.4.0        # WebSocket client
-  http: ^1.1.0                      # HTTP for REST endpoints
+  http: ^1.1.0                      # HTTP for enrollment REST endpoints
   
   # Storage
-  flutter_secure_storage: ^9.0.0    # Secure key storage (hardware-backed)
-  sqflite_sqlcipher: ^3.0.0         # Encrypted SQLite database
+  flutter_secure_storage: ^9.0.0    # Secure key/cert storage (iOS Keychain)
+  sqflite_sqlcipher: ^3.0.0         # Encrypted SQLite database (pending)
   path_provider: ^2.1.0             # File paths
+  
+  # Enrollment
+  mobile_scanner: ^7.2.0            # QR code scanning (Apple Vision API on iOS)
   
   # Utilities
   uuid: ^4.2.0                      # Generate message IDs
@@ -1099,6 +1139,7 @@ dependencies:
   equatable: ^2.0.5                 # Value equality for models
   freezed_annotation: ^2.4.0        # Immutable data classes
   json_annotation: ^4.8.0           # JSON serialization
+  cupertino_icons: ^1.0.6           # iOS-style icons
   
 dev_dependencies:
   flutter_test:
@@ -1112,6 +1153,10 @@ dev_dependencies:
   
   # Testing
   mockito: ^5.4.0                   # Mocking for tests
+  mocktail: ^1.0.0                  # Lightweight mocking
+  
+  # Linting
+  flutter_lints: ^3.0.0             # Lint rules
 ```
 
 ## Testing Strategy
@@ -1203,13 +1248,15 @@ void main() {
 
 ## Security Considerations
 
-1. **Key Storage**: Use `flutter_secure_storage` with hardware-backed encryption
-2. **Database Encryption**: Use `sqflite_sqlcipher` with key derived from user passphrase
-3. **Forward Secrecy**: Implement proper Double Ratchet with DH ratchet steps
-4. **Certificate Pinning**: Pin CA certificate for mTLS connections
-5. **Memory Security**: Clear sensitive data from memory after use
-6. **Code Obfuscation**: Enable ProGuard/R8 for Android release builds
-7. **Root Detection**: Detect jailbroken/rooted devices and warn users
+1. **Key Storage**: Uses `flutter_secure_storage` backed by iOS Keychain / Android Keystore
+2. **Certificate Storage**: mTLS client cert/key/CA stored in iOS Keychain
+3. **Database Encryption**: `sqflite_sqlcipher` available for message DB (not yet wired)
+4. **Forward Secrecy**: Double Ratchet with DH ratchet steps
+5. **CA Fingerprint Pinning**: Enrollment verifies CA certificate SHA-256 fingerprint from QR payload
+6. **Enrollment Security**: One-time Ed25519 key consumed on use; Argon2id-encrypted QR envelope
+7. **Memory Security**: Clear sensitive data from memory after use
+8. **Code Obfuscation**: Enable ProGuard/R8 for Android release builds
+9. **Root Detection**: Detect jailbroken/rooted devices and warn users (planned)
 
 ## Implementation Progress
 
@@ -1223,39 +1270,51 @@ void main() {
 
 2. ✅ **Phase 2**: WebSocket client with mTLS
    - Certificate-based authentication
-   - Automatic reconnection handling
    - Connection state management
+   - ConnectionManager with reconnect/heartbeat (available but engine uses raw WebSocketClient)
 
-3. ✅ **Phase 3**: Storage layer (keys, sessions)
-   - Secure key storage with passphrase encryption
-   - Session state persistence
-   - Message database (SQLCipher) - structure ready
+3. ✅ **Phase 3**: Storage layer (keys, sessions, certificates)
+   - Secure key storage via flutter_secure_storage (iOS Keychain)
+   - Session state persistence (per-peer ratchet state)
+   - Certificate storage for mTLS material
+   - Message database (SQLCipher) - dependency present, not wired
 
 4. ✅ **Phase 4**: CrypticEngine orchestration
-   - Event-driven architecture with streams
-   - Pending message queue for X3DH
-   - Session management per peer
+   - Event-driven architecture with streams (EngineEvent hierarchy)
+   - Pending message queue for X3DH key bundle retrieval
+   - Session management per peer via SessionManager
+   - MessageProcessor for inbound message routing
 
 5. ✅ **Phase 5**: UI screens (core functionality)
    - Login screen with passphrase
    - Users list with online status
    - Chat screen with message bubbles
    - Connection status indicator
+   - Enrollment flow (QR → passphrase → progress)
+
+6. ✅ **Phase 6**: Mobile enrollment (M8)
+   - QR code scanning (mobile_scanner v7 / Apple Vision API)
+   - Argon2id + AES-256-CBC payload decryption
+   - ECDSA P-256 keypair + PKCS#10 CSR generation (PointyCastle)
+   - Ed25519 CSR signature for server authentication
+   - CA certificate fetch with SHA-256 fingerprint pinning
+   - mTLS certificate storage in iOS Keychain
 
 ### Remaining Work
 
-6. 🔄 **Phase 6**: Polish and extended features
-   - Message persistence to database
+7. 🔄 **Phase 7**: Polish and extended features
+   - Message persistence to SQLCipher database
+   - Certificate renewal flow
    - Push notifications
    - Settings screen
    - Contact management
    - Key verification UI
 
-7. 📋 **Phase 7**: Testing and deployment
-   - Unit tests for crypto
+8. 📋 **Phase 8**: Testing and deployment
+   - Expand unit test coverage
    - Integration tests
    - Security audit
-   - App store deployment
+   - App store / F-Droid deployment
 
 ## Critical Implementation Details
 
@@ -2302,7 +2361,7 @@ Generate Ed25519 keypair
                                                           │
                                                      Verify CA cert
                                                           │
-                                                     Generate RSA-2048
+                                                     Generate ECDSA P-256
                                                      keypair + CSR
                                                           │
                                                      Sign CSR with Ed25519
@@ -2333,7 +2392,7 @@ Generate Ed25519 keypair
 | **Tooling** | `bin/cryptic-onboard` | `create-mobile-enrollment` command |
 | **Mobile** | `lib/data/enrollment/enrollment_service.dart` | Enrollment orchestrator |
 | **Mobile** | `lib/data/enrollment/enrollment_crypto.dart` | QR decryption + Ed25519 signing |
-| **Mobile** | `lib/data/enrollment/csr_generator.dart` | RSA keypair + PKCS#10 CSR |
+| **Mobile** | `lib/data/enrollment/csr_generator.dart` | ECDSA P-256 keypair + PKCS#10 CSR |
 | **Mobile** | `lib/presentation/screens/enrollment/` | UI screens |
 
 ## References

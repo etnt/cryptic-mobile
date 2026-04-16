@@ -10,7 +10,7 @@
 
 The Cryptic mobile app (Flutter) has working end-to-end encrypted messaging:
 X3DH key agreement, Double Ratchet, mTLS WebSocket transport, and a chat UI
-that interoperates with the Erlang server. The remaining blocker is
+that interoperates with the Cryptic server. The remaining blocker is
 **onboarding**: how a new mobile client obtains its mTLS certificate.
 
 The existing PC client flow relies on GPG:
