@@ -326,6 +326,14 @@ class CrypticEngine {
   /// Get list of peers with active sessions.
   List<String> get sessionPeers => _sessionManager.peerUsernames;
 
+  /// Get diagnostic info for a single peer session.
+  Map<String, dynamic>? getSessionDiagnostics(String peerUsername) =>
+      _sessionManager.getSessionDiagnostics(peerUsername);
+
+  /// Get diagnostics for all sessions.
+  Map<String, Map<String, dynamic>> getAllSessionDiagnostics() =>
+      _sessionManager.getAllSessionDiagnostics();
+
   // ─────────────────────────────────────────────────────────────────────────
   // Internal Setup
   // ─────────────────────────────────────────────────────────────────────────

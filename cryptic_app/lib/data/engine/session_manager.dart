@@ -269,6 +269,34 @@ class SessionManager {
     return state?.dhSelf.$1;
   }
 
+  /// Get diagnostic info for a single peer session.
+  ///
+  /// Returns null if no session exists. Exposes ratchet counters
+  /// and timestamps without leaking key material.
+  Map<String, dynamic>? getSessionDiagnostics(String peerUsername) {
+    final state = _sessions[peerUsername];
+    if (state == null) return null;
+
+    return {
+      'peer': peerUsername,
+      'dh_ratchet_step': state.dhRatchetStep,
+      'send_message_number': state.sendMessageNumber,
+      'recv_message_number': state.recvMessageNumber,
+      'sending_chain_active': state.sendingChainActive,
+      'receiving_chain_active': state.receivingChainActive,
+      'skipped_keys_count': state.skippedKeys.length,
+      'created_at': state.createdAt.toIso8601String(),
+      'last_updated': state.lastUpdated.toIso8601String(),
+    };
+  }
+
+  /// Get diagnostics for all sessions.
+  Map<String, Map<String, dynamic>> getAllSessionDiagnostics() => {
+      for (final peer in _sessions.keys)
+        if (getSessionDiagnostics(peer) case final diag?)
+          peer: diag,
+    };
+
   // ─────────────────────────────────────────────────────────────────────────
   // Private Helpers
   // ─────────────────────────────────────────────────────────────────────────

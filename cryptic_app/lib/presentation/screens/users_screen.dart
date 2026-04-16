@@ -11,6 +11,7 @@ import '../providers/messages_provider.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
+import 'diagnostics_screen.dart';
 
 /// Screen showing available users to chat with.
 class UsersScreen extends ConsumerWidget {
@@ -26,6 +27,15 @@ class UsersScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Users'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'Diagnostics',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const DiagnosticsScreen(),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
