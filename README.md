@@ -71,23 +71,83 @@ cd cryptic_app
 # Install dependencies
 flutter pub get
 
+# List available devices
+flutter devices
+
 # Run on iOS simulator
 flutter run -d <simulator-id> --no-hot
 
-# Or list available devices first
-flutter devices
+# Run on Android emulator (see below for setup)
+flutter run -d emulator-5554
 ```
 
-### First-time enrollment (iOS Simulator)
+### QR Code to Clipboard (for simulators/emulators)
 
-Since the iOS simulator has no camera, use the clipboard paste workflow:
+Simulators and emulators have no camera, so extract the QR data to your
+macOS clipboard and paste it in the app. Requires `zbarimg` (`brew install zbar`):
 
 ```bash
-# Extract QR data to clipboard (macOS)
 zbarimg --raw -q path/to/enrollment.png | tr -d '\n' | pbcopy
-
-# Then in the app: tap "Paste from Clipboard" → enter passphrase → Enroll
 ```
+
+Then in the app: tap **"Paste from Clipboard"** → enter the passphrase → **Enroll**.
+
+### Running on iOS Simulator
+
+```bash
+# List iOS simulators
+xcrun simctl list devices available
+
+# Run
+cd cryptic_app
+flutter run -d <simulator-id> --no-hot
+```
+
+### Running on Android Emulator
+
+1. **Create an emulator** (one-time, via Android Studio or command line):
+
+```bash
+# List available system images
+~/Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager --list | grep system-images
+
+# Create an AVD (example with API 35)
+~/Library/Android/sdk/cmdline-tools/latest/bin/avdmanager create avd \
+  -n cryptic_test -k "system-images;android-35;google_apis;arm64-v8a"
+```
+
+2. **Launch the emulator**:
+
+```bash
+~/Library/Android/sdk/emulator/emulator -avd cryptic_test &
+```
+
+3. **Wait for it to boot**, then verify:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb devices
+# Should show: emulator-5554  device
+```
+
+4. **Build, install, and launch the app**:
+
+```bash
+cd cryptic_app
+
+# Option A: flutter run (builds + installs + attaches debugger)
+flutter run -d emulator-5554
+
+# Option B: manual build + install (useful when flutter run hangs)
+flutter build apk --debug
+~/Library/Android/sdk/platform-tools/adb install -r build/app/outputs/flutter-apk/app-debug.apk
+~/Library/Android/sdk/platform-tools/adb shell am start -n com.example.cryptic_app/.MainActivity
+```
+
+5. **Enroll** using the clipboard paste workflow described above.
+
+> **Note:** The app automatically rewrites `localhost`/`127.0.0.1` to
+> `10.0.2.2` on Android, since the emulator's `localhost` refers to the
+> emulator itself, not the host machine.
 
 ## Development Commands
 

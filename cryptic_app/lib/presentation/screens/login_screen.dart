@@ -3,9 +3,12 @@
 /// Handles user authentication with username, passphrase, and server config.
 library;
 
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/storage/secure_storage/certificate_storage_service.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/loading_overlay.dart';
 
@@ -33,6 +36,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassphrase = true;
   bool _isNewUser = false;
   bool _showServerConfig = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStoredConfig();
+  }
+
+  Future<void> _loadStoredConfig() async {
+    try {
+      final certStorage = CertificateStorageService();
+      final metadata = await certStorage.loadMetadata();
+      if (metadata != null && mounted) {
+        var host = metadata.serverHost;
+        // Android emulator: rewrite localhost to host-reachable IP
+        if (Platform.isAndroid &&
+            (host == 'localhost' || host == '127.0.0.1')) {
+          host = '10.0.2.2';
+        }
+        setState(() {
+          _usernameController.text = metadata.username;
+          _serverHostController.text = host;
+          _serverPortController.text = metadata.serverPort.toString();
+        });
+      }
+    } catch (_) {
+      // Ignore — use defaults
+    }
+  }
 
   @override
   void dispose() {
