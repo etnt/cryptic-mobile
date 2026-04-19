@@ -8,6 +8,7 @@ A Flutter-based end-to-end encrypted messaging client for the Cryptic secure mes
 - **mTLS authentication** with client certificates
 - **Forward secrecy** with one-time prekeys
 - **Secure key storage** using platform-native secure storage (iOS Keychain / Android Keystore)
+- **Passphrase-encrypted keys** — all private key material is encrypted at rest with AES-256-CBC using an Argon2id-derived key from the user's passphrase, adding defence-in-depth on top of the platform keychain
 - **Encrypted local database** using SQLCipher
 - **QR-based mobile enrollment** — scan a QR code + passphrase to onboard (no GPG needed on device)
 
@@ -80,8 +81,10 @@ Certificates can be obtained in two ways:
 **Option A — QR Enrollment (recommended for mobile):**
 
 An admin creates an enrollment package with `cryptic-onboard create-mobile-enrollment`.
-On first launch the app presents a QR scanner → passphrase screen → automatic
-certificate generation and installation. No manual file copying needed.
+On first launch the app presents a QR scanner → admin passphrase → automatic
+certificate generation → **set your own passphrase** → login. The admin
+passphrase is ephemeral (used once to decrypt the QR envelope); the personal
+passphrase you choose protects all stored key material going forward.
 
 **Option B — Manual certificate placement:**
 
@@ -132,10 +135,25 @@ lib/
 │   ├── engine/     # CrypticEngine orchestrator
 │   ├── enrollment/ # QR enrollment (payload, crypto, CSR, service)
 │   ├── network/    # WebSocket client, protocol codec
+│   ├── services/   # Authentication, passphrase encryption
 │   └── storage/    # Secure storage, SQLCipher database
 ├── domain/         # Entities, repositories, use cases
 └── presentation/   # Screens, widgets, Riverpod providers
 ```
+
+### Passphrase-Based Key Encryption
+
+All sensitive stored data (identity keys, signed prekeys, one-time prekeys,
+session states, and the client TLS private key) is encrypted at rest using
+the user's personal passphrase:
+
+1. **Key derivation** — Argon2id (64 MiB memory, 3 iterations, 4 parallelism) derives a 32-byte AES key from the passphrase + a per-value random salt.
+2. **Encryption** — AES-256-CBC with PKCS7 padding and a random IV per value.
+3. **Verification** — A verifier (encrypted magic string) is stored so the passphrase can be validated on login without exposing key material.
+4. **Transparent I/O** — `EncryptedSecureStorage` wraps the platform secure storage, encrypting on write and decrypting on read for designated sensitive keys.
+
+This adds defence-in-depth: even if the platform keychain is exported or
+backed up, the key material cannot be read without the user's passphrase.
 
 ## Troubleshooting
 

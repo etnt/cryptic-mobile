@@ -11,6 +11,7 @@ import '../../providers/enrollment_provider.dart';
 import 'enrollment_progress_screen.dart';
 import 'passphrase_screen.dart';
 import 'qr_scanner_screen.dart';
+import 'set_passphrase_screen.dart';
 
 /// Top-level enrollment flow screen.
 ///
@@ -28,7 +29,10 @@ class EnrollmentFlowScreen extends ConsumerWidget {
     return switch (status.phase) {
       EnrollmentPhase.scanQr => const QrScannerScreen(),
       EnrollmentPhase.enterPassphrase => const PassphraseScreen(),
-      EnrollmentPhase.processing ||
+      EnrollmentPhase.processing =>
+        EnrollmentProgressScreen(onComplete: onComplete),
+      EnrollmentPhase.setPassphrase =>
+        SetPassphraseScreen(onComplete: onComplete ?? () {}),
       EnrollmentPhase.completed ||
       EnrollmentPhase.failed =>
         EnrollmentProgressScreen(onComplete: onComplete),

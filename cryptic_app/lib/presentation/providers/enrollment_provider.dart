@@ -5,6 +5,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/enrollment/enrollment_service.dart';
+import '../../data/services/passphrase_encryption_service.dart';
+import '../../data/storage/secure_storage/certificate_storage_service.dart';
+import '../../data/storage/secure_storage/key_storage_service.dart';
+import '../../data/storage/secure_storage/secure_storage_service.dart';
 
 /// Enrollment flow state.
 enum EnrollmentPhase {
@@ -17,7 +21,10 @@ enum EnrollmentPhase {
   /// Processing enrollment.
   processing,
 
-  /// Enrollment completed successfully.
+  /// Enrollment completed — prompt user to set their own passphrase.
+  setPassphrase,
+
+  /// Passphrase set and keys encrypted — fully done.
   completed,
 
   /// Enrollment failed.
@@ -113,7 +120,7 @@ class EnrollmentNotifier extends StateNotifier<EnrollmentStatus> {
       );
 
       state = state.copyWith(
-        phase: EnrollmentPhase.completed,
+        phase: EnrollmentPhase.setPassphrase,
         result: result,
       );
       return true;
@@ -134,6 +141,33 @@ class EnrollmentNotifier extends StateNotifier<EnrollmentStatus> {
   /// Go back from passphrase entry to QR scanning.
   void backToScan() {
     state = EnrollmentStatus.initial;
+  }
+
+  /// Encrypt all stored key material with the user's chosen passphrase.
+  ///
+  /// Called from [SetPassphraseScreen] after the user picks a passphrase.
+  /// Each sensitive storage entry is read, encrypted, and written back.
+  Future<void> encryptStoredKeys(String passphrase) async {
+    final enc = PassphraseEncryptionService();
+    final storage = SecureStorageService();
+
+    // Keys to encrypt in-place.
+    const sensitiveKeys = [
+      KeyStorageKeys.identityKeys,
+      KeyStorageKeys.signedPrekey,
+      KeyStorageKeys.oneTimePrekeys,
+      KeyStorageKeys.keyBundle,
+      CertStorageKeys.clientKey,
+    ];
+
+    for (final key in sensitiveKeys) {
+      final plaintext = await storage.read(key: key);
+      if (plaintext == null) continue;
+      final envelope = await enc.encrypt(plaintext, passphrase);
+      await storage.write(key: key, value: envelope.toJson());
+    }
+
+    state = state.copyWith(phase: EnrollmentPhase.completed);
   }
 }
 

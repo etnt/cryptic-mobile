@@ -18,6 +18,7 @@ Ratchet protocols for secure communication.
 | Online Users List | ✅ Working |
 | Session Persistence | ✅ Working |
 | Mobile Enrollment (QR + Ed25519) | ✅ Working |
+| Passphrase-Encrypted Key Storage | ✅ Working |
 | Certificate Renewal | 🔄 Pending (Phase 4) |
 | Message History (DB) | 🔄 Pending |
 
@@ -26,9 +27,15 @@ Ratchet protocols for secure communication.
 New devices are onboarded via QR code scanning — no GPG required on mobile.
 An admin generates an enrollment package with the `cryptic-onboard` tool, which
 produces an encrypted QR code. The mobile app scans it (or pastes from
-clipboard on simulators), decrypts with a passphrase, and uses the embedded
-Ed25519 key to sign an ECDSA P-256 certificate signing request. The server
-issues an mTLS client certificate and the app connects immediately.
+clipboard on simulators), decrypts with the admin-provided passphrase, and uses
+the embedded Ed25519 key to sign an ECDSA P-256 certificate signing request.
+The server issues an mTLS client certificate.
+
+After enrollment the user is prompted to **set a personal passphrase**. This
+passphrase (different from the one-time admin passphrase) encrypts all stored
+private key material (identity keys, prekeys, session states, TLS private key)
+using Argon2id + AES-256-CBC. On every subsequent login the passphrase is
+required to decrypt the keys before connecting.
 
 See [Mobile Enrollment Plan](docs/MOBILE-ENROLLMENT-PLAN.md) for the full
 design, protocol details, and known issues.
@@ -51,8 +58,10 @@ cd cryptic
 
 1. Open the Cryptic app (first launch → enrollment screen)
 2. Scan the QR code
-3. Enter the passphrase
-4. The app generates keys, requests a certificate, and connects
+3. Enter the admin-provided passphrase
+4. The app generates keys, requests a certificate, and stores it
+5. Choose a **personal passphrase** — this encrypts all key material at rest
+6. Log in with your personal passphrase to connect
 
 ## Prerequisites
 
@@ -187,7 +196,7 @@ cryptic_app/
 │   │   ├── engine/         # CrypticEngine, session management
 │   │   ├── enrollment/     # QR enrollment (CSR, crypto, service)
 │   │   ├── network/        # WebSocket, protocol codec, mTLS
-│   │   ├── services/       # Authentication service
+│   │   ├── services/       # Authentication, passphrase encryption
 │   │   └── storage/        # Secure storage, key/session repos
 │   ├── domain/             # Models, use cases
 │   └── presentation/       # UI (screens, widgets, providers)

@@ -13,8 +13,9 @@ or a mobile phone UI.
 5. [WebSocket Protocol](#websocket-protocol)
 6. [Cryptographic Engine](#cryptographic-engine)
 7. [Storage Systems](#storage-systems)
-8. [Building a New UI Client](#building-a-new-ui-client)
-9. [Reference Implementation](#reference-implementation)
+8. [Flutter Mobile App Architecture](#flutter-mobile-app-architecture)
+9. [Building a New UI Client](#building-a-new-ui-client)
+10. [Reference Implementation](#reference-implementation)
 
 ---
 
@@ -637,6 +638,273 @@ cryptic_chat_storage:get_messages_from_yesterday(Username, ServerInfo, Passphras
 
 ---
 
+## Flutter Mobile App Architecture
+
+The Flutter mobile app (`cryptic_app/`) is a full client implementation that
+mirrors the Erlang client's cryptographic protocols while using Flutter's
+reactive UI patterns and Riverpod for state management.
+
+### High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Presentation Layer (Flutter)                  │
+│  Screens: Splash, Login, Enrollment, Users, Chat                │
+│  State: Riverpod providers (AuthNotifier, EnrollmentNotifier,   │
+│         ConversationsNotifier, EngineProvider)                   │
+└──────────────────────────┬──────────────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────────────┐
+│                     Services / Engine Layer                      │
+│  CrypticEngine  — orchestrates crypto + network + sessions      │
+│  AuthenticationService — cert loading, passphrase verification,  │
+│                          engine construction                     │
+│  EnrollmentService — QR → decrypt → CSR → cert → store          │
+│  PassphraseEncryptionService — Argon2id + AES-256-CBC           │
+└──────────┬─────────────────────┬────────────────────────────────┘
+           │                     │
+┌──────────┴──────────┐ ┌───────┴──────────────────────────────┐
+│    Crypto Layer     │ │         Network Layer                │
+│  X3DH (x3dh_engine) │ │  WebSocketClient (mTLS)              │
+│  Double Ratchet     │ │  ConnectionManager (reconnect)       │
+│  Ed25519, X25519    │ │  MessageQueue (offline outbound)     │
+│  Blake2b KDF        │ │  ProtocolCodec (JSON ↔ messages)     │
+│  ChaCha20-Poly1305  │ │                                      │
+└──────────┬──────────┘ └───────┬──────────────────────────────┘
+           │                     │
+┌──────────┴─────────────────────┴────────────────────────────────┐
+│                       Storage Layer                             │
+│  SecureStorageService — flutter_secure_storage wrapper           │
+│  EncryptedSecureStorage — passphrase-encrypted overlay           │
+│  KeyStorageService — identity keys, prekeys, sessions (JSON)    │
+│  CertificateStorageService — mTLS certs/key (PEM)               │
+│  KeyRepository / SessionRepository — clean facades              │
+│  EncryptedPreferences — app settings                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Project Structure
+
+```
+cryptic_app/lib/
+├── main.dart                                 # Entry point (Riverpod root)
+├── core/
+│   ├── config/app_config.dart                # Dev/staging/prod config
+│   ├── constants/crypto_constants.dart       # Key sizes, HKDF info strings
+│   ├── errors/app_exceptions.dart            # CrypticException hierarchy
+│   ├── theme/                                # Material 3 theming
+│   └── utils/logger.dart                     # Redacting logger
+│
+├── data/
+│   ├── crypto/
+│   │   ├── keys/                             # IdentityKeyPair, KeyBundle,
+│   │   │                                     # SignedPrekey, OneTimePrekey
+│   │   ├── primitives/                       # Ed25519, X25519, HKDF,
+│   │   │                                     # Blake2b KDF, ChaCha20-Poly1305
+│   │   ├── ratchet/                          # DoubleRatchet, RatchetState
+│   │   └── x3dh/x3dh_engine.dart            # X3DH sender/receiver
+│   │
+│   ├── engine/
+│   │   ├── cryptic_engine.dart               # Main orchestrator
+│   │   ├── engine_state.dart                 # EngineState, events, enums
+│   │   ├── message_processor.dart            # Decode + decrypt incoming
+│   │   └── session_manager.dart              # Per-peer ratchet sessions
+│   │
+│   ├── enrollment/
+│   │   ├── enrollment_payload.dart           # QR envelope + payload parsing
+│   │   ├── enrollment_crypto.dart            # Argon2id, HMAC, AES-CBC, Ed25519
+│   │   ├── csr_generator.dart                # ECDSA P-256 keypair + PKCS#10 CSR
+│   │   └── enrollment_service.dart           # 7-stage enrollment orchestrator
+│   │
+│   ├── network/
+│   │   ├── protocol/                         # ProtocolCodec, client/server msgs
+│   │   └── websocket/                        # WebSocketClient, MtlsConfig,
+│   │                                         # ConnectionManager, MessageQueue
+│   │
+│   ├── services/
+│   │   ├── authentication_service.dart       # Cert loading → engine setup
+│   │   └── passphrase_encryption_service.dart # Argon2id + AES-256-CBC
+│   │
+│   └── storage/
+│       ├── secure_storage/
+│       │   ├── secure_storage_service.dart         # flutter_secure_storage
+│       │   ├── encrypted_secure_storage.dart       # Passphrase-encrypted overlay
+│       │   ├── key_storage_service.dart            # Keys + sessions (JSON)
+│       │   └── certificate_storage_service.dart    # mTLS certs (PEM)
+│       ├── repositories/
+│       │   ├── key_repository.dart                 # Key CRUD facade
+│       │   └── session_repository.dart             # Session CRUD facade
+│       └── preferences/
+│           └── encrypted_preferences.dart          # App settings
+│
+├── domain/
+│   ├── models/                               # Contact, Conversation, Message
+│   └── usecases/                             # Connect, Send, GetUsers, etc.
+│
+└── presentation/
+    ├── app.dart                              # Root widget (screen routing)
+    ├── providers/
+    │   ├── auth_provider.dart                # AuthNotifier (login state)
+    │   ├── enrollment_provider.dart          # EnrollmentNotifier (QR flow)
+    │   ├── engine_provider.dart              # Engine Riverpod providers
+    │   └── messages_provider.dart            # ConversationsNotifier
+    ├── screens/
+    │   ├── splash_screen.dart                # Startup + auth check
+    │   ├── login_screen.dart                 # Username/passphrase/server
+    │   ├── users_screen.dart                 # Online users (home)
+    │   ├── chat_screen.dart                  # Chat conversation
+    │   └── enrollment/
+    │       ├── enrollment_flow_screen.dart    # Flow orchestrator
+    │       ├── qr_scanner_screen.dart         # QR scanning / clipboard paste
+    │       ├── passphrase_screen.dart          # Admin passphrase entry
+    │       ├── enrollment_progress_screen.dart # Step progress + result
+    │       └── set_passphrase_screen.dart      # User's own passphrase
+    └── widgets/                              # Reusable UI components
+```
+
+### Enrollment Flow
+
+Mobile enrollment uses QR codes instead of GPG keys. The admin creates an
+encrypted enrollment package; the mobile app decrypts it and obtains an
+mTLS client certificate.
+
+```
+Admin (cryptic-onboard)              Mobile App              Cryptic Server
+─────────────────────               ──────────              ──────────────
+1. create-mobile-enrollment
+   → generates Ed25519 keypair
+   → encrypts with Argon2id+AES
+   → produces QR code
+   → registers enrollment on server
+                                    2. Scan QR code
+                                    3. Enter admin passphrase
+                                    4. Argon2id derive key
+                                       → decrypt envelope
+                                       → extract Ed25519 key,
+                                         server URL, CA cert
+                                    5. Generate ECDSA P-256 keypair
+                                       → build PKCS#10 CSR
+                                       → sign CSR with Ed25519 key
+                                    6. Submit CSR ─────────────────→ Verify Ed25519
+                                                                     signature
+                                                                     Issue X.509 cert
+                                       ←───────── signed cert ──────
+                                    7. Store cert + key + CA
+                                       in flutter_secure_storage
+                                    8. Set personal passphrase
+                                       → encrypt all stored keys
+                                    9. Login screen → connect
+```
+
+### Passphrase-Based Key Encryption
+
+After enrollment, the user sets a **personal passphrase** (distinct from
+the one-time admin enrollment passphrase). All sensitive stored data is
+encrypted at rest:
+
+| What is encrypted | Storage key |
+|---|---|
+| Identity key pair (Ed25519 + X25519) | `cryptic_identity_keys` |
+| Signed prekey | `cryptic_signed_prekey` |
+| One-time prekeys | `cryptic_one_time_prekeys` |
+| Full key bundle | `cryptic_key_bundle` |
+| Client TLS private key (PEM) | `cryptic_cert_client_key` |
+| Session states (per peer) | `cryptic_session_<peer>` |
+
+**Encryption scheme:**
+- **Key derivation**: Argon2id — 64 MiB memory, 3 iterations, 4 parallelism, 32-byte output
+- **Cipher**: AES-256-CBC with PKCS7 padding
+- **Per-value randomness**: Fresh 16-byte salt + 16-byte IV for each encrypted value
+- **Verification**: A verifier (encrypted magic string) is stored at `cryptic_passphrase_verifier` so the passphrase can be checked on login without exposing key material
+
+**How it works at runtime:**
+
+```
+┌────────────────┐    passphrase    ┌──────────────────────┐
+│  Login Screen  │ ───────────────→ │ AuthenticationService │
+└────────────────┘                  └──────────┬───────────┘
+                                               │
+                                    1. Verify passphrase
+                                       (decrypt verifier)
+                                               │
+                                    2. Create EncryptedSecureStorage
+                                       (wraps SecureStorageService)
+                                               │
+                                    3. Inject into KeyStorageService
+                                       + CertificateStorageService
+                                               │
+                                    4. All subsequent reads/writes
+                                       transparently encrypt/decrypt
+                                       sensitive keys
+                                               │
+                                    5. Build engine + connect
+```
+
+`EncryptedSecureStorage` extends `SecureStorageService` and overrides
+`read()` / `write()`. It checks whether a storage key is "sensitive"
+(matches a known prefix list) and if so, encrypts the value on write and
+decrypts on read. Non-sensitive keys pass through unmodified. Legacy
+plaintext values (from before passphrase setup) are detected by a
+`FormatException` on JSON parse and returned as-is for backward
+compatibility.
+
+### State Management (Riverpod)
+
+The app uses Riverpod `StateNotifier` providers for reactive state:
+
+| Provider | Notifier | State | Purpose |
+|---|---|---|---|
+| `authProvider` | `AuthNotifier` | `AuthStatus` | Login/logout, holds `CrypticEngine` |
+| `enrollmentProvider` | `EnrollmentNotifier` | `EnrollmentStatus` | QR scan → passphrase → processing → set passphrase → done |
+| `engineProvider` | (derived) | `CrypticEngine?` | Exposes engine from auth |
+| `messagesProvider` | `ConversationsNotifier` | `Map<String, List<ChatMessage>>` | Per-peer message lists |
+
+**Enrollment phases** (in order):
+`scanQr` → `enterPassphrase` → `processing` → `setPassphrase` → `completed` / `failed`
+
+### Key Crypto Differences from Erlang Client
+
+| Aspect | Erlang Client | Flutter Client |
+|---|---|---|
+| KDF for ratchet chain keys | libsodium HMAC-SHA-512/256 | Blake2b (via `cryptography` package) |
+| Root key update | HKDF | XOR mixing |
+| AEAD cipher | ChaCha20-Poly1305 (libsodium) | ChaCha20-Poly1305 (`pointycastle`) |
+| Key storage encryption | ChaCha20-Poly1305 + passphrase | AES-256-CBC + Argon2id passphrase |
+| Secure storage backend | File-based (`~/.cryptic/`) | Platform keychain (iOS Keychain / Android Keystore) |
+| mTLS key type | RSA or ECDSA | ECDSA P-256 (via enrollment CSR) |
+
+### Dependencies
+
+Key packages (see `pubspec.yaml` for versions):
+
+| Package | Purpose |
+|---|---|
+| `flutter_riverpod` | State management |
+| `pointycastle` | AES-CBC, PKCS7, SHA-256, HMAC, ECDSA |
+| `cryptography` | Argon2id, Ed25519, X25519, ChaCha20-Poly1305, Blake2b |
+| `flutter_secure_storage` | iOS Keychain / Android Keystore |
+| `sqflite_sqlcipher` | Encrypted SQLite (message history — pending) |
+| `web_socket_channel` | WebSocket transport |
+| `mobile_scanner` | Camera QR scanning |
+| `http` | HTTP client (enrollment CSR submission) |
+
+### Common Modification Points
+
+When working on the mobile app, here are the files most likely to need changes:
+
+| Task | Primary files |
+|---|---|
+| Add a new screen | `presentation/screens/`, `presentation/app.dart` |
+| Change enrollment flow | `enrollment_provider.dart`, `enrollment_flow_screen.dart`, `enrollment_service.dart` |
+| Change login/auth | `auth_provider.dart`, `authentication_service.dart`, `login_screen.dart` |
+| Change what gets encrypted | `encrypted_secure_storage.dart` (sensitive key list) |
+| Change crypto parameters | `passphrase_encryption_service.dart`, `enrollment_crypto.dart` |
+| Add protocol messages | `client_messages.dart`, `server_messages.dart`, `protocol_codec.dart` |
+| Change key storage format | `key_storage_service.dart`, `identity_key_pair.dart` |
+| Change WebSocket behavior | `websocket_client.dart`, `connection_manager.dart` |
+
+---
+
 ## Building a New UI Client
 
 ### Step-by-Step Guide for Rust/Ratatui TUI
@@ -1071,8 +1339,10 @@ When starting your Rust TUI project, ask your AI assistant:
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: November 2025  
+**Document Version**: 1.1  
+**Last Updated**: April 2026  
 **Author**: Generated for Cryptic Project
 
-This document should provide your AI assistant with everything needed to understand and integrate with the Cryptic event bus architecture. Good luck with your Rust TUI! 🚀
+This document should provide your AI assistant with everything needed to
+understand and integrate with the Cryptic system — both the Erlang server
+event bus architecture and the Flutter mobile app. 🚀

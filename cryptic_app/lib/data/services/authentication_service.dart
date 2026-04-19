@@ -14,6 +14,9 @@ import '../network/websocket/websocket_client.dart';
 import '../storage/repositories/key_repository.dart';
 import '../storage/repositories/session_repository.dart';
 import '../storage/secure_storage/certificate_storage_service.dart';
+import '../storage/secure_storage/encrypted_secure_storage.dart';
+import '../storage/secure_storage/key_storage_service.dart';
+import 'passphrase_encryption_service.dart';
 
 /// Result of authentication attempt.
 class AuthenticationResult {
@@ -118,7 +121,7 @@ class AuthenticationService {
   /// Authenticate and connect to the server.
   ///
   /// [username] - The username to authenticate as.
-  /// [passphrase] - The passphrase (for future key encryption).
+  /// [passphrase] - The passphrase for decrypting stored keys.
   /// [serverConfig] - Server connection configuration.
   Future<AuthenticationResult> authenticate({
     required String username,
@@ -126,8 +129,42 @@ class AuthenticationService {
     required ServerConnectionConfig serverConfig,
   }) async {
     try {
+      // If a passphrase has been set (post-enrollment), verify it and
+      // create encrypted-aware storage so all reads/writes are
+      // transparently encrypted.
+      final encService = PassphraseEncryptionService();
+      final passphraseSet = await encService.isPassphraseSet();
+
+      KeyRepository keyRepository;
+      SessionRepository sessionRepository;
+      CertificateStorageService certificateStorage;
+
+      if (passphraseSet) {
+        final ok = await encService.verifyPassphrase(passphrase);
+        if (!ok) {
+          return AuthenticationResult.failure('Wrong passphrase');
+        }
+
+        // Build storage layer that decrypts sensitive keys on read
+        // and re-encrypts on write.
+        final encStorage = EncryptedSecureStorage(passphrase: passphrase);
+        final keyStorageSvc = KeyStorageService(secureStorage: encStorage);
+        certificateStorage = CertificateStorageService(secureStorage: encStorage);
+        keyRepository = KeyRepository(keyStorage: keyStorageSvc);
+        sessionRepository = SessionRepository(keyStorage: keyStorageSvc);
+      } else {
+        // No passphrase encryption — use plain storage (pre-enrollment
+        // or development path).
+        keyRepository = _keyRepository;
+        sessionRepository = _sessionRepository;
+        certificateStorage = _certificateStorage;
+      }
+
       // Load mTLS configuration
-      final mtlsConfig = await _loadMtlsConfig(serverConfig);
+      final mtlsConfig = await _loadMtlsConfig(
+        serverConfig,
+        certificateStorage: certificateStorage,
+      );
       if (mtlsConfig == null) {
         return AuthenticationResult.failure(
           'No certificates available. Please import certificates first.',
@@ -144,8 +181,8 @@ class AuthenticationService {
           host: serverConfig.host,
           port: serverConfig.port,
         ),
-        keyRepository: _keyRepository,
-        sessionRepository: _sessionRepository,
+        keyRepository: keyRepository,
+        sessionRepository: sessionRepository,
         webSocketClient: webSocketClient,
       );
 
@@ -182,10 +219,15 @@ class AuthenticationService {
   }
 
   /// Load mTLS configuration from available sources.
-  Future<MtlsConfig?> _loadMtlsConfig(ServerConnectionConfig config) async {
+  Future<MtlsConfig?> _loadMtlsConfig(
+    ServerConnectionConfig config, {
+    CertificateStorageService? certificateStorage,
+  }) async {
+    final certStorage = certificateStorage ?? _certificateStorage;
+
     // Try loading from secure storage first
     final storedConfig = await MtlsConfig.fromStorage(
-      certificateStorage: _certificateStorage,
+      certificateStorage: certStorage,
       serverHost: config.host,
       serverPort: config.port,
     );
