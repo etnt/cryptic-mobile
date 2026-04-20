@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_provider.dart';
 import '../providers/engine_provider.dart';
 import '../providers/messages_provider.dart';
 import '../widgets/empty_state.dart';
@@ -43,6 +44,11 @@ class UsersScreen extends ConsumerWidget {
               print('[UsersScreen] Refresh pressed, engine=$engine, isConnected=${engine?.isConnected}');
               engine?.requestUserList();
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () => ref.read(authProvider.notifier).logout(),
           ),
         ],
       ),
