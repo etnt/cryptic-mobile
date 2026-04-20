@@ -4,4 +4,5 @@
 //
 
 export 'key_repository.dart';
+export 'message_repository.dart';
 export 'session_repository.dart';

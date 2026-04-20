@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/engine/engine_state.dart';
 import '../../domain/models/message.dart';
+import '../providers/auth_provider.dart';
 import '../providers/engine_provider.dart';
 import '../providers/messages_provider.dart';
 import '../widgets/connection_status_banner.dart';
@@ -35,9 +36,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final List<ChatMessage> _messages = [];
 
   @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    final repo = ref.read(messageRepositoryProvider);
+    if (repo == null) return;
+
+    final history = await repo.getMessages(widget.peerId);
+    if (mounted && history.isNotEmpty) {
+      setState(() {
+        _messages.insertAll(0, history);
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    }
+
+    // Mark conversation as read now that we're viewing it
+    await repo.markAsRead(widget.peerId);
+    ref.read(conversationsProvider.notifier).markAsRead(widget.peerId);
   }
 
   void _addIncomingMessage(MessageReceived event) {
@@ -54,6 +78,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() {
       _messages.add(message);
     });
+
+    // Persist to database
+    ref.read(messageRepositoryProvider)?.saveIncomingMessage(message);
 
     // Update conversation for last message display
     ref.read(conversationsProvider.notifier).addMessage(widget.peerId, message);
@@ -88,6 +115,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() {
       _messages.add(message);
     });
+
+    // Persist to database
+    ref.read(messageRepositoryProvider)?.saveMessage(message);
 
     // Add to conversation (for last message display)
     ref.read(conversationsProvider.notifier).addMessage(widget.peerId, message);
@@ -318,6 +348,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ref
                   .read(conversationsProvider.notifier)
                   .deleteConversation(widget.peerId);
+              ref
+                  .read(messageRepositoryProvider)
+                  ?.deleteConversation(widget.peerId);
               Navigator.pop(context); // Close dialog
               Navigator.pop(context); // Return to conversations
             },

@@ -5,6 +5,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/storage/repositories/message_repository.dart';
 import '../../domain/models/conversation.dart';
 import '../../domain/models/message.dart';
 
@@ -76,10 +77,10 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
     state = [];
   }
 
-  /// Load conversations from storage.
-  Future<void> loadConversations() async {
-    // TODO: Load from storage
-    state = [];
+  /// Load conversations from the message database.
+  Future<void> loadConversations(MessageRepository repo) async {
+    final conversations = await repo.loadConversations();
+    state = conversations;
   }
 }
 

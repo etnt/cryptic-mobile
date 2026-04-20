@@ -10,6 +10,7 @@ import '../core/theme/app_theme.dart';
 import '../core/utils/logger.dart';
 import 'providers/auth_provider.dart';
 import 'providers/enrollment_provider.dart';
+import 'providers/messages_provider.dart';
 import 'screens/conversations_screen.dart';
 import 'screens/enrollment/enrollment_flow_screen.dart';
 import 'screens/login_screen.dart';
@@ -49,10 +50,16 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
     // Listen to auth state changes
     ref.listen<AuthStatus>(authProvider, (previous, next) {
       if (next.isAuthenticated && _currentScreen != AppScreen.home) {
+        // Load persisted conversations from the message database
+        final repo = ref.read(messageRepositoryProvider);
+        if (repo != null) {
+          ref.read(conversationsProvider.notifier).loadConversations(repo);
+        }
         setState(() {
           _currentScreen = AppScreen.home;
         });
       } else if (!next.isAuthenticated && _currentScreen == AppScreen.home) {
+        ref.read(conversationsProvider.notifier).clear();
         setState(() {
           _currentScreen = AppScreen.login;
         });

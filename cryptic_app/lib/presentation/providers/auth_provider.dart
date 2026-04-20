@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/engine/cryptic_engine.dart';
 import '../../data/services/authentication_service.dart';
+import '../../data/storage/message_database.dart';
+import '../../data/storage/repositories/message_repository.dart';
 
 /// Authentication state.
 enum AuthState {
@@ -89,6 +91,12 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
   /// Get the current engine.
   CrypticEngine? get engine => _engine;
 
+  /// The message database (opened on auth, closed on logout).
+  final MessageDatabase _messageDb = MessageDatabase();
+
+  /// Get the message database.
+  MessageDatabase get messageDatabase => _messageDb;
+
   /// Server configuration for connection.
   ServerConnectionConfig _serverConfig = ServerConnectionConfig.localhost;
 
@@ -123,6 +131,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 
       if (result.success && result.engine != null) {
         _engine = result.engine;
+        await _messageDb.open(passphrase: passphrase, username: username);
         state = AuthStatus(
           state: AuthState.authenticated,
           username: username,
@@ -170,6 +179,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 
       if (result.success && result.engine != null) {
         _engine = result.engine;
+        await _messageDb.open(passphrase: passphrase, username: username);
         state = AuthStatus(
           state: AuthState.authenticated,
           username: username,
@@ -197,6 +207,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
       await _engine!.dispose();
       _engine = null;
     }
+    await _messageDb.close();
     state = AuthStatus.initial;
   }
 
@@ -246,4 +257,18 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
 final currentUsernameProvider = Provider<String?>((ref) {
   final auth = ref.watch(authProvider);
   return auth.username;
+});
+
+/// Provider for the message database.
+final messageDatabaseProvider = Provider<MessageDatabase?>((ref) {
+  final authStatus = ref.watch(authProvider);
+  if (!authStatus.isAuthenticated) return null;
+  return ref.watch(authProvider.notifier).messageDatabase;
+});
+
+/// Provider for the message repository.
+final messageRepositoryProvider = Provider<MessageRepository?>((ref) {
+  final db = ref.watch(messageDatabaseProvider);
+  if (db == null || !db.isOpen) return null;
+  return MessageRepository(database: db);
 });
