@@ -66,7 +66,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _addIncomingMessage(MessageReceived event) {
     final message = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       conversationId: widget.peerId,
       senderId: event.fromUser,
       content: event.plaintext,
@@ -79,11 +79,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _messages.add(message);
     });
 
-    // Persist to database
-    ref.read(messageRepositoryProvider)?.saveIncomingMessage(message);
-
-    // Update conversation for last message display
-    ref.read(conversationsProvider.notifier).addMessage(widget.peerId, message);
+    // Persistence and conversation updates are handled globally by
+    // the listener in app.dart, so we only update the local UI here.
 
     // Scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());

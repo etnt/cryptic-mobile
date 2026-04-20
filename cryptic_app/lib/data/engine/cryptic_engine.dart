@@ -188,6 +188,9 @@ class CrypticEngine {
       // Upload identity keys after connecting
       await _uploadIdentityKeys();
 
+      // Request pending messages that arrived while offline
+      _webSocketClient.send(protocol.RequestPendingMessagesMessage());
+
       // Request user list
       await requestUserList();
     } catch (e) {
@@ -216,7 +219,7 @@ class CrypticEngine {
     await _connectionSubscription?.cancel();
 
     _messageProcessor.dispose();
-    _sessionManager.dispose();
+    await _sessionManager.dispose();
 
     await _webSocketClient.disconnect();
 
@@ -245,20 +248,19 @@ class CrypticEngine {
     }
 
     if (_sessionManager.hasSession(toUser)) {
-      print('[Engine] sendMessage: Have session, sending ratchet message');
+      final diag = _sessionManager.getSessionDiagnostics(toUser);
+      print('[Engine] sendMessage: Have session for $toUser $diag');
       // Have session - encrypt and send with Double Ratchet
       await _sendRatchetMessage(toUser, plaintext);
     } else {
-      print('[Engine] sendMessage: No session, initiating X3DH');
+      print('[Engine] sendMessage: No session for $toUser '
+          '(loaded peers: ${_sessionManager.peerUsernames}), initiating X3DH');
       // No session - need to initiate X3DH
       await _initiateX3dh(toUser, plaintext);
     }
   }
 
   /// Request the list of online users.
-  ///
-  /// Uses `online_users` command (available to all users).
-  /// For admin-only `list_users`, use [requestAllUsers].
   Future<void> requestUserList() async {
     print('[Engine] requestUserList called, isConnected=$isConnected');
     if (!isConnected) {
@@ -361,6 +363,15 @@ class CrypticEngine {
     if (event is UsersListReceived) {
       print('[Engine] Updating state with users: ${event.users}');
       _updateState(_state.copyWith(users: event.users));
+    } else if (event is UserStatusChanged) {
+      print('[Engine] User status: ${event.username} online=${event.isOnline}');
+      final users = List<String>.from(_state.users);
+      if (event.isOnline && !users.contains(event.username)) {
+        users.add(event.username);
+      } else if (!event.isOnline) {
+        users.remove(event.username);
+      }
+      _updateState(_state.copyWith(users: users));
     }
   }
 

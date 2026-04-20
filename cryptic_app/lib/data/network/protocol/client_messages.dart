@@ -405,3 +405,18 @@ class SendMessageRequest extends ProtocolMessage {
         'plaintext': plaintext,
       };
 }
+
+/// Request delivery of pending (offline) messages from the server.
+///
+/// The server queues messages for offline users. After connecting and
+/// initializing the engine, the client must explicitly request them.
+class RequestPendingMessagesMessage extends ProtocolMessage {
+  /// Creates a request pending messages message.
+  RequestPendingMessagesMessage();
+
+  @override
+  String get type => ClientMessageType.requestPendingMessages.value;
+
+  @override
+  Map<String, dynamic> toJson() => {'type': type};
+}

@@ -10,6 +10,7 @@ import '../../data/engine/engine_state.dart';
 import '../../data/storage/repositories/key_repository.dart';
 import '../../data/storage/repositories/session_repository.dart';
 import 'auth_provider.dart';
+import 'messages_provider.dart';
 
 /// Provider for the key repository.
 ///
@@ -89,17 +90,44 @@ final engineStatusProvider = Provider<EngineStatus>((ref) {
   return state.status;
 });
 
-/// Provider for the list of registered users (excluding current user).
+/// Provider for the list of users to display.
+///
+/// Merges online users from the server with known peers from
+/// active sessions and conversation history, so offline contacts
+/// you've chatted with remain visible.
 final usersProvider = Provider<List<String>>((ref) {
   // Watch the stream-based state provider to get reactive updates
   final asyncState = ref.watch(engineStateProvider);
-  final allUsers = asyncState.valueOrNull?.users ?? [];
+  final onlineUsers = asyncState.valueOrNull?.users ?? [];
   
   // Filter out the current user - can't chat with yourself
   final currentUsername = ref.watch(usernameProvider);
-  if (currentUsername == null) return allUsers;
-  
-  return allUsers.where((user) => user != currentUsername).toList();
+
+  // Merge: online users + peers with active sessions + conversation history
+  final sessions = ref.watch(sessionsProvider);
+  final conversations = ref.watch(conversationsProvider);
+
+  final allPeers = <String>{
+    ...onlineUsers,
+    ...sessions.keys,
+    ...conversations.map((c) => c.peerUsername),
+  };
+
+  if (currentUsername != null) {
+    allPeers.remove(currentUsername);
+  }
+
+  // Sort: online users first, then alphabetical
+  final onlineSet = onlineUsers.toSet();
+  final sorted = allPeers.toList()
+    ..sort((a, b) {
+      final aOnline = onlineSet.contains(a);
+      final bOnline = onlineSet.contains(b);
+      if (aOnline != bOnline) return aOnline ? -1 : 1;
+      return a.compareTo(b);
+    });
+
+  return sorted;
 });
 
 /// Provider for active sessions.

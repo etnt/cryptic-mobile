@@ -41,7 +41,13 @@ class SessionManager {
   }
 
   /// Dispose the session manager.
-  void dispose() {
+  ///
+  /// Saves all in-memory sessions to storage before clearing.
+  Future<void> dispose() async {
+    // Persist any in-memory session state before clearing.
+    for (final entry in _sessions.entries) {
+      await _saveSession(entry.key, entry.value);
+    }
     _sessions.clear();
     _currentUsername = null;
   }
@@ -176,13 +182,26 @@ class SessionManager {
     }
 
     final peers = await _sessionRepository.listPeers();
+    print('[SessionManager] loadAllSessions: found ${peers.length} peers: $peers');
 
     for (final peer in peers) {
-      final state = await _sessionRepository.loadSession(peerUsername: peer);
-      if (state != null) {
-        _sessions[peer] = state;
+      try {
+        final state = await _sessionRepository.loadSession(peerUsername: peer);
+        if (state != null) {
+          _sessions[peer] = state;
+          print('[SessionManager] Loaded session for $peer '
+              '(send#=${state.sendMessageNumber}, recv#=${state.recvMessageNumber}, '
+              'dhStep=${state.dhRatchetStep})');
+        } else {
+          print('[SessionManager] Session for $peer was null');
+        }
+      } catch (e) {
+        print('[SessionManager] Failed to load session for $peer: $e');
       }
     }
+
+    print('[SessionManager] loadAllSessions complete: '
+        '${_sessions.length} sessions loaded');
   }
 
   // ─────────────────────────────────────────────────────────────────────────

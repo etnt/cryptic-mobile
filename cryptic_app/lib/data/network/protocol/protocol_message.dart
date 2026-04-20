@@ -42,7 +42,10 @@ enum ClientMessageType {
   onlineUsers('online_users'),
 
   /// Send a message (higher-level, engine encrypts).
-  sendMessage('send_message');
+  sendMessage('send_message'),
+
+  /// Request delivery of pending (offline) messages.
+  requestPendingMessages('request_pending_messages');
 
   const ClientMessageType(this.value);
 

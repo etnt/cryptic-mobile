@@ -8,10 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/utils/logger.dart';
+import '../data/engine/engine_state.dart';
+import '../domain/models/message.dart';
 import 'providers/auth_provider.dart';
+import 'providers/engine_provider.dart';
 import 'providers/enrollment_provider.dart';
 import 'providers/messages_provider.dart';
-import 'screens/conversations_screen.dart';
 import 'screens/enrollment/enrollment_flow_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
@@ -46,6 +48,33 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
   @override
   Widget build(BuildContext context) {
     AppLogger.debug('Building CrypticApp', tag: 'App');
+
+    // Globally persist incoming messages regardless of which screen is open.
+    // Without this, messages arriving while the ChatScreen is not mounted
+    // (e.g. pending messages delivered on connect) would be lost.
+    ref.listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
+      next.whenData((event) {
+        if (event is MessageReceived) {
+          final repo = ref.read(messageRepositoryProvider);
+          if (repo != null) {
+            final msg = ChatMessage(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              conversationId: event.fromUser,
+              senderId: event.fromUser,
+              content: event.plaintext,
+              timestamp: event.timestamp,
+              direction: MessageDirection.incoming,
+              status: MessageStatus.delivered,
+            );
+            repo.saveIncomingMessage(msg);
+            ref.read(conversationsProvider.notifier).addMessage(
+              event.fromUser,
+              msg,
+            );
+          }
+        }
+      });
+    });
 
     // Listen to auth state changes
     ref.listen<AuthStatus>(authProvider, (previous, next) {
