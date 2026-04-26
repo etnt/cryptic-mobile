@@ -117,6 +117,7 @@ class MessageProcessor {
       ProcessingSuccess();
 
   Future<ProcessingResult> _handleError(ErrorMessage message) async {
+    print('[MessageProcessor] ERROR from server: ${message.message}');
     final event = EngineError(message.message);
     _eventController.add(event);
     return ProcessingSuccess(event: event);
@@ -148,6 +149,7 @@ class MessageProcessor {
   Future<ProcessingResult> _handleMessageSent(
     MessageSentMessage message,
   ) async {
+    print('[MessageProcessor] message_sent received: messageId=${message.messageId}, toUser=${message.toUser}');
     final event = MessageSent(
       messageId: message.messageId,
       toUser: message.toUser,

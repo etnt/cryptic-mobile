@@ -6,6 +6,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import '../../core/utils/logger.dart';
@@ -106,6 +107,20 @@ class CrypticEngine {
   // Pending messages waiting for X3DH completion
   final Map<String, List<String>> _pendingMessages = {};
 
+  // Reconnection state
+  bool _intentionalDisconnect = false;
+  Timer? _reconnectTimer;
+  Timer? _keepaliveTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 10;
+  static const Duration _initialReconnectDelay = Duration(seconds: 1);
+  static const Duration _maxReconnectDelay = Duration(seconds: 60);
+  static const Duration _keepaliveInterval = Duration(seconds: 30);
+
+  // Message processing serialization – ensures only one message is
+  // processed at a time so Double Ratchet state stays consistent.
+  Future<void> _messageProcessingChain = Future.value();
+
   // Stream subscriptions
   StreamSubscription<ServerMessage>? _messageSubscription;
   StreamSubscription<WebSocketEvent>? _connectionSubscription;
@@ -177,6 +192,9 @@ class CrypticEngine {
       throw StateError('CrypticEngine not initialized');
     }
 
+    _intentionalDisconnect = false;
+    _reconnectAttempts = 0;
+
     _updateState(_state.copyWith(
       connectionStatus: ConnectionStatus.connecting,
     ),);
@@ -193,6 +211,9 @@ class CrypticEngine {
 
       // Request user list
       await requestUserList();
+
+      // Start keepalive to prevent server idle timeout
+      _startKeepalive();
     } catch (e) {
       _updateState(_state.withError('Connection failed: $e'));
       _emitEvent(EngineError('Connection failed: $e'));
@@ -202,6 +223,9 @@ class CrypticEngine {
 
   /// Disconnect from the server.
   Future<void> disconnect() async {
+    _intentionalDisconnect = true;
+    _reconnectTimer?.cancel();
+    _keepaliveTimer?.cancel();
     await _webSocketClient.disconnect();
     _updateState(_state.copyWith(
       connectionStatus: ConnectionStatus.disconnected,
@@ -214,6 +238,9 @@ class CrypticEngine {
     if (_isDisposed) return;
 
     _isDisposed = true;
+    _intentionalDisconnect = true;
+    _reconnectTimer?.cancel();
+    _keepaliveTimer?.cancel();
 
     await _messageSubscription?.cancel();
     await _connectionSubscription?.cancel();
@@ -341,9 +368,10 @@ class CrypticEngine {
   // ─────────────────────────────────────────────────────────────────────────
 
   void _setupInternalListeners() {
-    // Listen to WebSocket messages
+    // Listen to WebSocket messages – serialized so Double Ratchet state
+    // is never accessed concurrently by two messages.
     _messageSubscription = _webSocketClient.messages.listen(
-      _handleServerMessage,
+      _enqueueServerMessage,
       onError: _handleWebSocketError,
     );
 
@@ -388,12 +416,87 @@ class CrypticEngine {
       AppLogger.info('Engine: Connection status changed to $status', tag: 'Engine');
       _updateState(_state.copyWith(connectionStatus: status));
       _emitEvent(ConnectionStatusChanged(status));
+
+      // Auto-reconnect on unexpected disconnect
+      if (status == ConnectionStatus.disconnected &&
+          !_intentionalDisconnect &&
+          !_isDisposed &&
+          _isInitialized) {
+        _keepaliveTimer?.cancel();
+        _scheduleReconnect();
+      }
+
+      // Reset reconnect counter on successful connection
+      if (status == ConnectionStatus.connected) {
+        _reconnectAttempts = 0;
+      }
     }
+  }
+
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      print('[Engine] Max reconnect attempts ($_maxReconnectAttempts) reached, giving up');
+      _emitEvent(EngineError('Connection lost after $_maxReconnectAttempts reconnect attempts'));
+      return;
+    }
+
+    _reconnectAttempts++;
+    final delay = _calculateBackoff();
+    print('[Engine] Scheduling reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () async {
+      if (_isDisposed || _intentionalDisconnect) return;
+      print('[Engine] Attempting reconnect #$_reconnectAttempts');
+      try {
+        await connect();
+      } catch (e) {
+        print('[Engine] Reconnect attempt $_reconnectAttempts failed: $e');
+        // _handleWebSocketEvent will trigger another _scheduleReconnect
+      }
+    });
+  }
+
+  Duration _calculateBackoff() {
+    final baseMs = _initialReconnectDelay.inMilliseconds;
+    final multiplier = pow(2, _reconnectAttempts - 1);
+    final delayMs = (baseMs * multiplier).round();
+    final maxMs = _maxReconnectDelay.inMilliseconds;
+    // Add ±10% jitter
+    final jitter = (delayMs * 0.1 * (Random().nextDouble() * 2 - 1)).round();
+    return Duration(milliseconds: min(delayMs + jitter, maxMs));
+  }
+
+  void _startKeepalive() {
+    _keepaliveTimer?.cancel();
+    _keepaliveTimer = Timer.periodic(_keepaliveInterval, (_) {
+      if (isConnected) {
+        try {
+          _webSocketClient.sendRaw('{"type":"ping"}');
+        } catch (_) {
+          // Connection error will be handled by _onDone/_onError
+        }
+      }
+    });
   }
 
   void _handleWebSocketError(Object error) {
     _updateState(_state.withError(error.toString()));
     _emitEvent(EngineError(error.toString()));
+  }
+
+  /// Enqueue a server message for serial processing.
+  ///
+  /// Each message is chained onto [_messageProcessingChain] so that
+  /// the previous handler completes before the next one starts.
+  void _enqueueServerMessage(ServerMessage message) {
+    _messageProcessingChain = _messageProcessingChain.then((_) async {
+      try {
+        await _handleServerMessage(message);
+      } catch (e, st) {
+        print('[Engine] Error processing server message: $e\n$st');
+      }
+    });
   }
 
   Future<void> _handleServerMessage(ServerMessage message) async {
@@ -634,6 +737,9 @@ class CrypticEngine {
   // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _sendRatchetMessage(String toUser, String plaintext) async {
+    final diag = _sessionManager.getSessionDiagnostics(toUser);
+    print('[Engine] _sendRatchetMessage: toUser=$toUser, from=$_username, sessionDiag=$diag');
+    
     // Encrypt with Double Ratchet
     final ratchetMsg = await _sessionManager.encryptMessage(
       peerUsername: toUser,
@@ -654,7 +760,7 @@ class CrypticEngine {
       nonce: ratchetMsg.nonce,
     );
 
-    print('[Engine] _sendRatchetMessage: Sending to $toUser');
+    print('[Engine] _sendRatchetMessage: Sending ratchet to $toUser (dhStep=${ratchetMsg.dhStep}, msgNum=${ratchetMsg.messageNumber}, from=$_username)');
     _webSocketClient.send(message);
 
     // Update session state

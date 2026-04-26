@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/engine/engine_state.dart';
+import '../../data/services/notification_service.dart';
 import '../../domain/models/message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/engine_provider.dart';
@@ -38,11 +39,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationService.instance.activeChatPeer = widget.peerId;
     _loadHistory();
   }
 
   @override
   void dispose() {
+    NotificationService.instance.activeChatPeer = null;
     _scrollController.dispose();
     super.dispose();
   }
@@ -124,8 +127,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     // Send via engine
     final engine = ref.read(engineProvider);
-    print('[ChatScreen] Sending message to ${widget.peerId}: $text');
-    await engine?.sendMessage(widget.peerId, text);
+    if (engine == null) {
+      print('[ChatScreen] ERROR: engine is null! Cannot send message.');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Send failed: engine not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    print('[ChatScreen] Sending message to ${widget.peerId}: $text (engine.isConnected=${engine.isConnected})');
+    try {
+      await engine.sendMessage(widget.peerId, text);
+      print('[ChatScreen] Message sent successfully');
+    } catch (e, stack) {
+      print('[ChatScreen] ERROR sending message: $e');
+      print('[ChatScreen] Stack: $stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Send failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Future<void> _resetSession() async {

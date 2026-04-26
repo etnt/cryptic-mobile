@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
+import '../data/services/notification_service.dart';
 import '../domain/models/message.dart';
 import 'providers/auth_provider.dart';
 import 'providers/engine_provider.dart';
@@ -70,6 +71,12 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
             ref.read(conversationsProvider.notifier).addMessage(
               event.fromUser,
               msg,
+            );
+
+            // Show local notification (suppressed if that chat is open)
+            NotificationService.instance.showMessageNotification(
+              fromUser: event.fromUser,
+              messageBody: event.plaintext,
             );
           }
         }

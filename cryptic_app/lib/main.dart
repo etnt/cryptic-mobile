@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_config.dart';
 import 'core/utils/logger.dart';
+import 'data/services/notification_service.dart';
 import 'presentation/app.dart';
 
 /// Application entry point.
@@ -31,6 +32,9 @@ Future<void> main() async {
   // TODO(M2): Initialize secure storage
   // TODO(M3): Initialize database
   // TODO(M5): Load cached sessions
+
+  // Initialize local notifications
+  await NotificationService.instance.initialize();
 
   runApp(
     // ProviderScope enables Riverpod throughout the app

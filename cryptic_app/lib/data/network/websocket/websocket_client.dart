@@ -222,8 +222,10 @@ class WebSocketClient {
   }
 
   void _onDone() {
-    print('[WebSocket] _onDone called - connection closed');
-    AppLogger.warning('WebSocket connection closed (_onDone called)', tag: 'WebSocket');
+    final closeCode = _socket?.closeCode;
+    final closeReason = _socket?.closeReason;
+    print('[WebSocket] _onDone called - connection closed (code=$closeCode, reason=$closeReason)');
+    AppLogger.warning('WebSocket connection closed (_onDone called, code=$closeCode, reason=$closeReason)', tag: 'WebSocket');
     _socket = null;
     _socketSubscription = null;
     if (_state != ConnectionState.disconnected) {

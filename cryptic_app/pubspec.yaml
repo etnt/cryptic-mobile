@@ -38,6 +38,9 @@ dependencies:
   # Enrollment
   mobile_scanner: ^7.2.0
 
+  # Notifications
+  flutter_local_notifications: ^18.0.0
+
   # UI
   cupertino_icons: ^1.0.6
 
