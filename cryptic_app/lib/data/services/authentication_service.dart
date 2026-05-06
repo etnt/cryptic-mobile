@@ -192,7 +192,7 @@ class AuthenticationService {
 
       return AuthenticationResult.success(engine);
     } catch (e) {
-      return AuthenticationResult.failure(e.toString());
+      return AuthenticationResult.failure(_friendlyError(e));
     }
   }
 
@@ -308,5 +308,71 @@ class AuthenticationService {
       serverHost: serverHost,
       serverPort: serverPort,
     );
+  }
+
+  /// Map raw error to a user-friendly message.
+  static String _friendlyError(Object e) {
+    final raw = e.toString();
+
+    // TLS/certificate errors
+    if (raw.contains('UNKNOWN_CA') || raw.contains('UNKOWN_CA')) {
+      return 'Server does not trust your certificate.\n'
+          'Please re-enroll against this server.';
+    }
+    if (raw.contains('CERTIFICATE_EXPIRED') ||
+        raw.contains('certificate_expired')) {
+      return 'Your client certificate has expired.\n'
+          'Please re-enroll to obtain a new certificate.';
+    }
+    if (raw.contains('CERTIFICATE_REVOKED') ||
+        raw.contains('certificate_revoked')) {
+      return 'Your certificate has been revoked.\n'
+          'Contact your administrator.';
+    }
+    if (raw.contains('HANDSHAKE_FAILURE') ||
+        raw.contains('handshake_failure')) {
+      return 'TLS handshake failed.\n'
+          'The server may not support your TLS configuration.';
+    }
+    if (raw.contains('CERTIFICATE_UNKNOWN')) {
+      return 'Server rejected your certificate.\n'
+          'Please re-enroll against this server.';
+    }
+    if (raw.contains('BAD_CERTIFICATE')) {
+      return 'Invalid client certificate.\n'
+          'Please re-enroll to obtain a new certificate.';
+    }
+
+    // Network errors
+    if (raw.contains('SocketException') ||
+        raw.contains('Connection refused')) {
+      return 'Cannot reach the server.\n'
+          'Check the host and port, and your network connection.';
+    }
+    if (raw.contains('Connection timed out') ||
+        raw.contains('timed out')) {
+      return 'Connection timed out.\n'
+          'Check your network connection and server address.';
+    }
+    if (raw.contains('No route to host') ||
+        raw.contains('Network is unreachable')) {
+      return 'Server is unreachable.\n'
+          'Check your network connection.';
+    }
+
+    // DNS errors
+    if (raw.contains('Failed host lookup') ||
+        raw.contains('getaddrinfo')) {
+      return 'Cannot resolve server hostname.\n'
+          'Check the server address.';
+    }
+
+    // Passphrase / storage
+    if (raw.contains('Wrong passphrase')) {
+      return 'Wrong passphrase';
+    }
+
+    // Default: return the raw error
+    return raw;
   }
 }

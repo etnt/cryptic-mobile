@@ -45,6 +45,7 @@ class CrypticApp extends ConsumerStatefulWidget {
 
 class _CrypticAppState extends ConsumerState<CrypticApp> {
   AppScreen _currentScreen = AppScreen.splash;
+  int _loginKey = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -126,15 +127,22 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
             await ref.read(authProvider.notifier).checkAuthState();
             if (mounted) {
               setState(() {
+                _loginKey++;
                 _currentScreen = AppScreen.login;
               });
             }
           },
         ),
       AppScreen.login => LoginScreen(
+          key: ValueKey(_loginKey),
           onLoginSuccess: () {
             setState(() {
               _currentScreen = AppScreen.home;
+            });
+          },
+          onReenroll: () {
+            setState(() {
+              _currentScreen = AppScreen.enrollment;
             });
           },
         ),

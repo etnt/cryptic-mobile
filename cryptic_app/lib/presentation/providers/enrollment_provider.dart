@@ -95,7 +95,13 @@ class EnrollmentNotifier extends StateNotifier<EnrollmentStatus> {
   }
 
   /// Execute enrollment with the scanned QR data and passphrase.
-  Future<bool> enroll(String passphrase) async {
+  ///
+  /// [serverHost] and [serverPort] override the values from the QR payload.
+  Future<bool> enroll(
+    String passphrase, {
+    String? serverHost,
+    int? serverPort,
+  }) async {
     final qrData = state.qrData;
     if (qrData == null) {
       state = state.copyWith(
@@ -114,6 +120,8 @@ class EnrollmentNotifier extends StateNotifier<EnrollmentStatus> {
       final result = await _enrollmentService.enroll(
         qrData: qrData,
         passphrase: passphrase,
+        serverHostOverride: serverHost,
+        serverPortOverride: serverPort,
         onProgress: (stage) {
           state = state.copyWith(stage: stage);
         },

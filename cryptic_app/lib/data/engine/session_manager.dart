@@ -197,6 +197,12 @@ class SessionManager {
         }
       } catch (e) {
         print('[SessionManager] Failed to load session for $peer: $e');
+        print('[SessionManager] Removing corrupted session for $peer');
+        try {
+          await _sessionRepository.deleteSession(peerUsername: peer);
+        } catch (deleteError) {
+          print('[SessionManager] Could not delete session for $peer: $deleteError');
+        }
       }
     }
 

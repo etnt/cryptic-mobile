@@ -90,7 +90,41 @@ class SkippedKeyId {
 class RatchetState {
 
   /// Creates from a map.
+  ///
+  /// Throws [FormatException] if required fields are missing or null.
   factory RatchetState.fromMap(Map<String, dynamic> map) {
+    // Validate required String fields before casting
+    const requiredStringKeys = [
+      'root_key',
+      'send_chain_key',
+      'recv_chain_key',
+      'dh_self_public',
+      'dh_self_private',
+    ];
+    for (final key in requiredStringKeys) {
+      if (map[key] == null) {
+        throw FormatException(
+          'Missing required field "$key" in session data',
+        );
+      }
+    }
+
+    const requiredIntKeys = [
+      'send_message_number',
+      'recv_message_number',
+      'prev_recv_chain_length',
+      'dh_ratchet_step',
+      'created_at',
+      'last_updated',
+    ];
+    for (final key in requiredIntKeys) {
+      if (map[key] == null) {
+        throw FormatException(
+          'Missing required field "$key" in session data',
+        );
+      }
+    }
+
     final skippedKeysMap = map['skipped_keys'] as Map<String, dynamic>? ?? {};
     final skippedKeys = <SkippedKeyId, SkippedKeyEntry>{};
     for (final entry in skippedKeysMap.entries) {
@@ -121,8 +155,8 @@ class RatchetState {
       maxCacheAge: Duration(
         milliseconds: map['max_cache_age_ms'] as int? ?? 86400000,
       ),
-      sendingChainActive: map['sending_chain_active'] as bool,
-      receivingChainActive: map['receiving_chain_active'] as bool,
+      sendingChainActive: map['sending_chain_active'] as bool? ?? false,
+      receivingChainActive: map['receiving_chain_active'] as bool? ?? false,
       createdAt:
           DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       lastUpdated:

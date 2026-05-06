@@ -9,7 +9,6 @@
 // - Expiration timestamp
 
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import '../../core/errors/app_exceptions.dart';
@@ -149,16 +148,13 @@ class EnrollmentPayload {
     }
 
     // Server config (top-level keys from the onboard tool).
-    // On Android emulator, localhost/127.0.0.1 refers to the emulator's
-    // own loopback. Rewrite to 10.0.2.2 which routes to the host machine.
-    var host = map['server_host'] as String?;
+    // Server host/port from QR payload. These may be overridden by the user
+    // in the enrollment UI (e.g. when the admin used localhost but the mobile
+    // device needs a public hostname to reach the server).
+    final host = map['server_host'] as String?;
     final port = map['server_port'] as int? ?? 8443;
     if (host == null || host.isEmpty) {
       throw const EnrollmentException('Missing server_host in payload');
-    }
-    if (Platform.isAndroid &&
-        (host == 'localhost' || host == '127.0.0.1')) {
-      host = '10.0.2.2';
     }
 
     // Enrollment Ed25519 keys.

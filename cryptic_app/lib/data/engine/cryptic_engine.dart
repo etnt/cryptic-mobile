@@ -472,7 +472,9 @@ class CrypticEngine {
     _keepaliveTimer = Timer.periodic(_keepaliveInterval, (_) {
       if (isConnected) {
         try {
-          _webSocketClient.sendRaw('{"type":"ping"}');
+          // Use online_users as keepalive — server recognizes it and
+          // it keeps the connection alive without a dedicated ping command.
+          _webSocketClient.sendRaw('{"type":"online_users"}');
         } catch (_) {
           // Connection error will be handled by _onDone/_onError
         }

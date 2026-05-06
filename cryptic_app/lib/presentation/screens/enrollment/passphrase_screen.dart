@@ -19,17 +19,27 @@ class PassphraseScreen extends ConsumerStatefulWidget {
 class _PassphraseScreenState extends ConsumerState<PassphraseScreen> {
   final _formKey = GlobalKey<FormState>();
   final _controller = TextEditingController();
+  final _serverHostController = TextEditingController();
+  final _serverPortController = TextEditingController(text: '8443');
   bool _obscure = true;
 
   @override
   void dispose() {
     _controller.dispose();
+    _serverHostController.dispose();
+    _serverPortController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    await ref.read(enrollmentProvider.notifier).enroll(_controller.text);
+    final host = _serverHostController.text.trim();
+    final port = int.tryParse(_serverPortController.text.trim());
+    await ref.read(enrollmentProvider.notifier).enroll(
+          _controller.text,
+          serverHost: host.isEmpty ? null : host,
+          serverPort: port,
+        );
   }
 
   @override
@@ -103,6 +113,61 @@ class _PassphraseScreenState extends ConsumerState<PassphraseScreen> {
                       return null;
                     },
                     onFieldSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Server Address',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Enter the public address of your Cryptic server.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: _serverHostController,
+                          decoration: const InputDecoration(
+                            labelText: 'Host',
+                            prefixIcon: Icon(Icons.dns),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 1,
+                        child: TextFormField(
+                          controller: _serverPortController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Port',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Required';
+                            }
+                            if (int.tryParse(value.trim()) == null) {
+                              return 'Invalid';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   if (status.error != null) ...[
                     const SizedBox(height: 16),

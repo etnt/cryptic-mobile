@@ -61,7 +61,20 @@ xcrun simctl boot "iPhone 17 Pro"
 open -a Simulator
 ```
 
-### 3. Run the App
+### 3. Android Emulator Setup
+
+```bash
+# List available AVDs
+~/Library/Android/sdk/emulator/emulator -list-avds
+
+# Start the emulator
+~/Library/Android/sdk/emulator/emulator -avd <avd_name> &
+
+# Wait for it to boot, then verify
+flutter devices
+```
+
+### 4. Run the App
 
 ```bash
 # List available devices
@@ -74,7 +87,7 @@ flutter run -d <device-id>
 flutter run -d A2A02E78-F63D-4000-A309-18B0A4FF3351
 ```
 
-### 4. Certificate Setup
+### 5. Certificate Setup
 
 Certificates can be obtained in two ways:
 

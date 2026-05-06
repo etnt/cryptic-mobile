@@ -90,12 +90,16 @@ class EnrollmentService {
   ///
   /// [qrData] - Raw string scanned from the QR code.
   /// [passphrase] - Passphrase provided by the admin out-of-band.
+  /// [serverHostOverride] - If set, use this host instead of the one in the QR.
+  /// [serverPortOverride] - If set, use this port instead of the one in the QR.
   /// [onProgress] - Optional callback for UI progress updates.
   ///
   /// Throws [EnrollmentException] on failure.
   Future<EnrollmentResult> enroll({
     required String qrData,
     required String passphrase,
+    String? serverHostOverride,
+    int? serverPortOverride,
     EnrollmentProgressCallback? onProgress,
   }) async {
     // Step 1: Parse QR envelope
@@ -115,11 +119,15 @@ class EnrollmentService {
     }
 
     try {
+      // Use overrides if provided, otherwise fall back to QR payload values.
+      final host = serverHostOverride ?? payload.serverHost;
+      final port = serverPortOverride ?? payload.serverPort;
+
       // Step 3: Fetch & verify CA certificate
       onProgress?.call(EnrollmentStage.verifyingCa);
       final caCertPem = await _fetchAndVerifyCaCert(
-        host: payload.serverHost,
-        port: payload.serverPort,
+        host: host,
+        port: port,
         expectedFingerprint: payload.caFingerprint,
       );
 
@@ -140,8 +148,8 @@ class EnrollmentService {
       // Step 6: Submit CSR to server
       onProgress?.call(EnrollmentStage.submittingCsr);
       final serverResponse = await _submitCsr(
-        host: payload.serverHost,
-        port: payload.serverPort,
+        host: host,
+        port: port,
         csrPem: csrResult.csrPem,
         enrollmentFp: enrollmentFp,
         signatureB64: base64.encode(signature),
@@ -160,8 +168,8 @@ class EnrollmentService {
         caCertPem: caCertPem,
         metadata: CertificateMetadata(
           username: payload.username,
-          serverHost: payload.serverHost,
-          serverPort: payload.serverPort,
+          serverHost: host,
+          serverPort: port,
           importedAt: DateTime.now(),
           expiresAt:
               DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
@@ -173,8 +181,8 @@ class EnrollmentService {
 
       return EnrollmentResult(
         username: payload.username,
-        serverHost: payload.serverHost,
-        serverPort: payload.serverPort,
+        serverHost: host,
+        serverPort: port,
         certSerial: serial,
         expiresAt:
             DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),

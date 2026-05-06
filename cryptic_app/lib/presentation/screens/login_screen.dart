@@ -3,14 +3,16 @@
 /// Handles user authentication with username, passphrase, and server config.
 library;
 
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/storage/secure_storage/certificate_storage_service.dart';
+import '../../data/storage/secure_storage/secure_storage_service.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/loading_overlay.dart';
+
+/// Storage key for user-chosen server configuration.
+const _kServerConfigKey = 'cryptic_user_server_config';
 
 /// Login screen for user authentication.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -18,10 +20,14 @@ class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
     super.key,
     this.onLoginSuccess,
+    this.onReenroll,
   });
 
   /// Callback when login succeeds.
   final VoidCallback? onLoginSuccess;
+
+  /// Callback when user wants to re-enroll.
+  final VoidCallback? onReenroll;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -36,6 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassphrase = true;
   bool _isNewUser = false;
   bool _showServerConfig = false;
+  bool _isLoadingConfig = true;
 
   @override
   void initState() {
@@ -45,23 +52,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _loadStoredConfig() async {
     try {
-      final certStorage = CertificateStorageService();
-      final metadata = await certStorage.loadMetadata();
-      if (metadata != null && mounted) {
-        var host = metadata.serverHost;
-        // Android emulator: rewrite localhost to host-reachable IP
-        if (Platform.isAndroid &&
-            (host == 'localhost' || host == '127.0.0.1')) {
-          host = '10.0.2.2';
-        }
-        setState(() {
+      final storage = SecureStorageService();
+
+      // 1. Load user's previously chosen server config (saved on successful login)
+      final savedConfig = await storage.readJson(key: _kServerConfigKey);
+      if (savedConfig != null && mounted) {
+        _usernameController.text = savedConfig['username'] as String? ?? '';
+        _serverHostController.text = savedConfig['host'] as String? ?? 'localhost';
+        _serverPortController.text =
+            (savedConfig['port'] as int? ?? 8443).toString();
+        _showServerConfig = true;
+      } else {
+        // 2. Fall back to enrollment metadata for first login after enrollment
+        final certStorage = CertificateStorageService();
+        final metadata = await certStorage.loadMetadata();
+        if (metadata != null && mounted) {
           _usernameController.text = metadata.username;
-          _serverHostController.text = host;
-          _serverPortController.text = metadata.serverPort.toString();
-        });
+          // Don't use the enrollment host — it may be an internal address.
+          // Only use it if it looks like a real hostname (not localhost/10.0.2.2).
+          final host = metadata.serverHost;
+          if (host != 'localhost' &&
+              host != '127.0.0.1' &&
+              host != '10.0.2.2') {
+            _serverHostController.text = host;
+            _serverPortController.text = metadata.serverPort.toString();
+          }
+          _showServerConfig = true;
+        }
       }
     } catch (_) {
       // Ignore — use defaults
+    }
+    if (mounted) {
+      setState(() {
+        _isLoadingConfig = false;
+      });
     }
   }
 
@@ -78,24 +103,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authNotifier = ref.read(authProvider.notifier);
+    final username = _usernameController.text.trim();
     final serverHost = _serverHostController.text.trim();
     final serverPort = int.tryParse(_serverPortController.text.trim()) ?? 8443;
-    
+
+    debugPrint('[LoginScreen] Connecting to $serverHost:$serverPort');
+
     final success = _isNewUser
         ? await authNotifier.setup(
-            username: _usernameController.text.trim(),
+            username: username,
             passphrase: _passphraseController.text,
             serverHost: serverHost,
             serverPort: serverPort,
           )
         : await authNotifier.authenticate(
-            username: _usernameController.text.trim(),
+            username: username,
             passphrase: _passphraseController.text,
             serverHost: serverHost,
             serverPort: serverPort,
           );
 
     if (success && mounted) {
+      // Persist the user's server choice for next login
+      try {
+        final storage = SecureStorageService();
+        await storage.writeJson(key: _kServerConfigKey, value: {
+          'username': username,
+          'host': serverHost,
+          'port': serverPort,
+        });
+      } catch (_) {
+        // Non-critical, ignore
+      }
       widget.onLoginSuccess?.call();
     }
   }
@@ -106,7 +145,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
 
     return Scaffold(
-      body: LoadingOverlay(
+      body: _isLoadingConfig
+          ? const Center(child: CircularProgressIndicator())
+          : LoadingOverlay(
         isLoading: authState.isAuthenticating,
         message: _isNewUser ? 'Connecting & setting up...' : 'Connecting...',
         child: SafeArea(
@@ -210,8 +251,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a passphrase';
                         }
-                        if (_isNewUser && value.length < 8) {
-                          return 'Passphrase must be at least 8 characters';
+                        if (_isNewUser && value.length < 6) {
+                          return 'Passphrase must be at least 6 characters';
                         }
                         return null;
                       },
@@ -342,6 +383,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : 'New user? Create account',
                       ),
                     ),
+                    const SizedBox(height: 8),
+
+                    // Re-enroll
+                    if (widget.onReenroll != null)
+                      TextButton.icon(
+                        onPressed: widget.onReenroll,
+                        icon: const Icon(Icons.qr_code, size: 18),
+                        label: const Text('Re-enroll with QR code'),
+                      ),
                   ],
                 ),
               ),

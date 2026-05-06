@@ -148,8 +148,8 @@ class _SetPassphraseScreenState extends ConsumerState<SetPassphraseScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter a passphrase';
                       }
-                      if (value.length < 8) {
-                        return 'Passphrase must be at least 8 characters';
+                      if (value.length < 6) {
+                        return 'Passphrase must be at least 6 characters';
                       }
                       return null;
                     },

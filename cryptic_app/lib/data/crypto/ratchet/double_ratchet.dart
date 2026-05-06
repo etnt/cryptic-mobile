@@ -53,11 +53,14 @@ class DoubleRatchet {
     required Uint8List rootKey,
     required (Uint8List, Uint8List) dhKeyPair,
   }) async {
+    print('[DoubleRatchet] initSender: rootKey(sessionKey)=${_bytesToHex(rootKey)}');
     // Derive initial sending chain from root key
     final sendChainKey = await _deriveChainKey(rootKey, 'init');
+    print('[DoubleRatchet] initSender: sendChainKey(init)=${_bytesToHex(sendChainKey)}');
 
     // Derive initial receiving chain (for Bob's replies)
     final recvChainKey = await _deriveChainKey(rootKey, 'resp');
+    print('[DoubleRatchet] initSender: recvChainKey(resp)=${_bytesToHex(recvChainKey)}');
 
     return RatchetState(
       rootKey: rootKey,
@@ -133,11 +136,19 @@ class DoubleRatchet {
     // Derive encryption key from message key
     final encKey = await _deriveEncryptionKey(messageKey);
 
+    print('[DR-DEBUG] encryptMessage: msgNum=${currentState.sendMessageNumber}');
+    print('[DR-DEBUG] sendChainKey=${_bytesToHex(currentState.sendChainKey)}');
+    print('[DR-DEBUG] messageKey=${_bytesToHex(messageKey)}');
+    print('[DR-DEBUG] encKey=${_bytesToHex(encKey)}');
+
     // Encrypt with ChaCha20-Poly1305
     final encrypted = await _chacha.encrypt(
       plaintext: plaintext,
       key: encKey,
     );
+
+    print('[DR-DEBUG] nonce(${encrypted.nonce.length} bytes)=${_bytesToHex(encrypted.nonce)}');
+    print('[DR-DEBUG] ciphertextWithTag(${encrypted.ciphertextWithTag.length} bytes)=${_bytesToHex(encrypted.ciphertextWithTag)}');
 
     // Build message (ciphertext includes tag appended)
     final message = RatchetMessage(

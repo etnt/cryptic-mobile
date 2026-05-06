@@ -128,7 +128,11 @@ flutter run -d <simulator-id> --no-hot
 2. **Launch the emulator**:
 
 ```bash
+# Basic launch
 ~/Library/Android/sdk/emulator/emulator -avd cryptic_test &
+
+# Launch with custom DNS (needed if the emulator can't resolve external hostnames)
+~/Library/Android/sdk/emulator/emulator -avd cryptic_test -dns-server 8.8.8.8 &
 ```
 
 3. **Wait for it to boot**, then verify:
@@ -171,6 +175,9 @@ flutter run -d ios          # iOS Simulator
 flutter run -d android      # Android Emulator (must be running)
 flutter run -d chrome       # Web browser
 
+# Run with filtered log output (useful for debugging)
+flutter run -d emulator-5554 2>&1 | grep "I/flutter"
+
 # Code quality
 flutter analyze             # Static analysis
 dart format .               # Format code
@@ -184,6 +191,39 @@ flutter build apk           # Android APK
 flutter build ios           # iOS (requires signing)
 flutter build web           # Web app
 ```
+
+### Emulator Management
+
+```bash
+# List AVDs
+~/Library/Android/sdk/emulator/emulator -list-avds
+
+# Start emulator with custom DNS (fixes external hostname resolution)
+~/Library/Android/sdk/emulator/emulator -avd <avd_name> -dns-server 8.8.8.8 &
+
+# Stop a running emulator
+~/Library/Android/sdk/platform-tools/adb emu kill
+
+# Check emulator connectivity
+~/Library/Android/sdk/platform-tools/adb devices
+```
+
+### Troubleshooting Connection Issues
+
+If the app fails to connect to the server:
+
+1. **DNS resolution failure** (`Failed host lookup`):
+   - Restart the emulator with `-dns-server 8.8.8.8`
+   - Or use the server IP address directly in the login screen
+
+2. **Connection refused**:
+   - Verify port forwarding (external port → server port 8443)
+   - Test from host: `nc -zv <hostname> <port>`
+   - Test TLS: `openssl s_client -connect <hostname>:<port>`
+
+3. **TLS/certificate errors**:
+   - Re-enroll to get a fresh certificate
+   - Ensure the CA cert stored on the device matches the server's CA
 
 ## Project Structure
 
