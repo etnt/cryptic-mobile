@@ -158,9 +158,14 @@ class EnrollmentPayload {
     }
 
     // Enrollment Ed25519 keys.
-    // The onboard tool stores the DER-encoded private key in enrollment_sec
-    // and the raw 32-byte public key in enrollment_pub. We extract the
-    // 32-byte seed from the DER and combine with the public key to form the
+    // enrollment_pub is the raw 32-byte public key. enrollment_sec carries the
+    // private seed, but different producers encode it differently:
+    //   * The shell `cryptic-onboard` tool emits PKCS#8 DER (~48 bytes) where
+    //     the 32-byte seed is the *last* 32 bytes.
+    //   * The web-admin Erlang packager emits the libsodium 64-byte secret key
+    //     (seed||pub) where the 32-byte seed is the *first* 32 bytes.
+    //   * A bare 32-byte seed is also accepted.
+    // We extract the seed and combine it with the public key to form the
     // 64-byte NaCl-style secret key expected by the Ed25519 signing code.
     final secB64 = map['enrollment_sec'] as String?;
     final pubB64 = map['enrollment_pub'] as String?;
@@ -169,15 +174,14 @@ class EnrollmentPayload {
         'Missing enrollment_sec or enrollment_pub in payload',
       );
     }
-    final secDer = base64.decode(secB64);
+    final secBytes = base64.decode(secB64);
     final pubRaw = base64.decode(pubB64);
     if (pubRaw.length != 32) {
       throw EnrollmentException(
         'Invalid enrollment public key size: ${pubRaw.length} (expected 32)',
       );
     }
-    // The 32-byte seed is the last 32 bytes of the PKCS#8 DER encoding.
-    final seed = secDer.sublist(secDer.length - 32);
+    final seed = _extractSeed(secBytes, pubRaw);
     final enrollmentKey = Uint8List(64)
       ..setRange(0, 32, seed)
       ..setRange(32, 64, pubRaw);
@@ -241,6 +245,45 @@ class EnrollmentPayload {
   /// Securely erase the enrollment key from memory.
   void eraseKey() {
     enrollmentSecretKey.fillRange(0, enrollmentSecretKey.length, 0);
+  }
+
+  /// Extract the 32-byte Ed25519 seed from an `enrollment_sec` value.
+  ///
+  /// Supports the encodings produced by the different enrollment packagers:
+  ///   * 32 bytes  → raw seed.
+  ///   * 64 bytes  → libsodium secret key. Normally `seed||pub` (seed first),
+  ///                 disambiguated against [pubRaw]; falls back to the first
+  ///                 32 bytes if neither half matches.
+  ///   * otherwise → PKCS#8 DER (e.g. 48 bytes); the seed is the last 32 bytes.
+  static Uint8List _extractSeed(Uint8List sec, Uint8List pubRaw) {
+    if (sec.length == 32) {
+      return Uint8List.fromList(sec);
+    }
+    if (sec.length == 64) {
+      final leading = sec.sublist(0, 32);
+      final trailing = sec.sublist(32, 64);
+      if (_bytesEqual(trailing, pubRaw)) {
+        return leading; // seed||pub (libsodium / web-admin layout)
+      }
+      if (_bytesEqual(leading, pubRaw)) {
+        return trailing; // pub||seed (defensive)
+      }
+      return leading; // default to libsodium seed-first layout
+    }
+    // PKCS#8 DER or similar: the seed is the trailing 32 bytes.
+    return sec.sublist(sec.length - 32);
+  }
+
+  static bool _bytesEqual(Uint8List a, Uint8List b) {
+    if (a.length != b.length) {
+      return false;
+    }
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) {
+        return false;
+      }
+    }
+    return true;
   }
 }
 

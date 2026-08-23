@@ -215,6 +215,7 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
   Future<void> checkAuthState() async {
     final hasCerts = await _authService.hasStoredCertificates();
     if (!hasCerts) {
+      // No enrollment certificate → user must enroll first.
       state = state.copyWith(
         state: AuthState.needsSetup,
         error: 'No certificates found',
@@ -222,12 +223,13 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
       return;
     }
 
-    final hasKeys = await _authService.hasIdentityKeys();
-    if (!hasKeys) {
-      state = state.copyWith(state: AuthState.needsSetup);
-    } else {
-      state = state.copyWith(state: AuthState.unauthenticated);
-    }
+    // Certificates exist → enrollment is complete, so proceed to login.
+    // The X3DH identity keys are generated automatically on first connect,
+    // so their absence must NOT bounce the user back to enrollment.
+    state = state.copyWith(
+      state: AuthState.unauthenticated,
+      clearError: true,
+    );
   }
 }
 
