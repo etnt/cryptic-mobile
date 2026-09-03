@@ -77,19 +77,29 @@ class KeyStorageService {
 
   /// Loads the identity key pair.
   ///
-  /// Returns null if no identity keys are stored.
+  /// Returns null if no identity keys are stored, or if the stored value
+  /// is corrupt / undecryptable (e.g. a stale encryption envelope left over
+  /// from a previous enrollment). In the corrupt case the bad entry is
+  /// discarded so fresh keys can be regenerated instead of crashing with a
+  /// null type-cast.
   Future<IdentityKeyPair?> loadIdentityKeyPair() async {
     final map = await _secureStorage.readJson(
       key: KeyStorageKeys.identityKeys,
     );
     if (map == null) return null;
+    if (map['sign_public_key'] is! String) {
+      await _secureStorage.delete(key: KeyStorageKeys.identityKeys);
+      return null;
+    }
     return IdentityKeyPair.fromMap(map);
   }
 
-  /// Checks if identity keys exist.
-  Future<bool> hasIdentityKeys() async => await _secureStorage.containsKey(
-      key: KeyStorageKeys.identityKeys,
-    );
+  /// Checks if valid identity keys exist.
+  ///
+  /// Validates by loading so a corrupt blob is treated as "no keys",
+  /// allowing the engine to regenerate a fresh identity.
+  Future<bool> hasIdentityKeys() async =>
+      (await loadIdentityKeyPair()) != null;
 
   /// Deletes the identity key pair.
   Future<void> deleteIdentityKeyPair() async {
