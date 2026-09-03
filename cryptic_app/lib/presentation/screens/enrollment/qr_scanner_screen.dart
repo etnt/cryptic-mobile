@@ -20,36 +20,25 @@ class QrScannerScreen extends ConsumerStatefulWidget {
 }
 
 class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
-  MobileScannerController? _controller;
+  late final MobileScannerController _controller;
   bool _scanned = false;
-  bool _cameraFailed = false;
 
   @override
   void initState() {
     super.initState();
-    _initCamera();
-  }
-
-  Future<void> _initCamera() async {
-    try {
-      final ctrl = MobileScannerController(
-        formats: [BarcodeFormat.qrCode],
-      );
-      await ctrl.start();
-      if (!mounted) {
-        ctrl.dispose();
-        return;
-      }
-      ctrl.barcodes.listen(_onDetect);
-      setState(() => _controller = ctrl);
-    } catch (_) {
-      if (mounted) setState(() => _cameraFailed = true);
-    }
+    // Create the controller with autoStart enabled (the default). The
+    // MobileScanner widget below attaches to this controller and starts the
+    // camera itself. Do NOT call start() manually here: in mobile_scanner v7
+    // start() waits for the widget to attach and throws controllerNotAttached
+    // if it is called before the widget is built.
+    _controller = MobileScannerController(
+      formats: const [BarcodeFormat.qrCode],
+    );
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -128,31 +117,19 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _cameraFailed
-                ? _buildNoCameraFallback(theme)
-                : (_controller != null
-                    ? MobileScanner(
-                        controller: _controller!,
-                        errorBuilder: (_, __) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted && !_cameraFailed) {
-                              setState(() => _cameraFailed = true);
-                            }
-                          });
-                          return _buildNoCameraFallback(theme);
-                        },
-                      )
-                    : const Center(child: CircularProgressIndicator())),
+            child: MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+              errorBuilder: (context, error) =>
+                  _buildNoCameraFallback(theme),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              _cameraFailed
-                  ? 'No camera available.\n'
-                      'Paste the enrollment QR data using the button above\n'
-                      'or tap "Enter Manually" below.'
-                  : 'Point your camera at the enrollment QR code\n'
-                      'provided by your administrator.',
+              'Point your camera at the enrollment QR code\n'
+              'provided by your administrator.\n'
+              'No camera? Use the paste button above or "Enter Manually".',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
