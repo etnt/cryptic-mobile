@@ -1,0 +1,127 @@
+name: Build Release APKs
+
+# Builds signed release APKs (universal + per-ABI) when a version tag is pushed
+# and attaches them to a GitHub Release.
+#
+# Required repository secrets (Settings > Secrets and variables > Actions):
+#   ANDROID_KEYSTORE_BASE64    - base64 of your release keystore (.jks)
+#   ANDROID_KEYSTORE_PASSWORD  - store password
+#   ANDROID_KEY_ALIAS          - key alias
+#   ANDROID_KEY_PASSWORD       - key password
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.0'
+
+jobs:
+  build:
+    name: Build & publish release APKs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cryptic_app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      - name: Verify signing secret is present
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 secret is not set. Configure the Android signing secrets before tagging a release."
+            exit 1
+          fi
+
+      - name: Decode signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          {
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > android/key.properties
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Derive version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build universal APK
+        run: flutter build apk --release
+
+      - name: Stage universal APK
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p ../dist
+          mv build/app/outputs/flutter-apk/app-release.apk "../dist/cryptic-$V-universal.apk"
+
+      - name: Build split-per-ABI APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Stage split APKs
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          D=build/app/outputs/flutter-apk
+          mv "$D/app-arm64-v8a-release.apk"   "../dist/cryptic-$V-arm64-v8a.apk"
+          mv "$D/app-armeabi-v7a-release.apk" "../dist/cryptic-$V-armeabi-v7a.apk"
+          mv "$D/app-x86_64-release.apk"      "../dist/cryptic-$V-x86_64.apk"
+
+      - name: Generate SHA-256 checksums
+        env:
+          V: ${{ steps.version.outputs.version }}
+        run: |
+          cd ../dist
+          sha256sum cryptic-*.apk > "cryptic-$V-SHA256SUMS.txt"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/cryptic-*.apk
+            dist/cryptic-*-SHA256SUMS.txt
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            Release APKs for Cryptic Mobile ${{ github.ref_name }}.
+
+            > **Educational software, not audited.** Use at your own risk.
+
+            **Which APK?** Install `cryptic-*-arm64-v8a.apk` for modern phones
+            (recommended). Use `cryptic-*-universal.apk` if unsure; it works on
+            all devices but is larger. Verify downloads against
+            `cryptic-*-SHA256SUMS.txt`.
