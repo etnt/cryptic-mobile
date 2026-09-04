@@ -5,9 +5,10 @@ name: Build Release APKs
 #
 # Required repository secrets (Settings > Secrets and variables > Actions):
 #   ANDROID_KEYSTORE_BASE64    - base64 of your release keystore (.jks)
-#   ANDROID_KEYSTORE_PASSWORD  - store password
-#   ANDROID_KEY_ALIAS          - key alias
-#   ANDROID_KEY_PASSWORD       - key password
+#   ANDROID_KEYSTORE_PASSWORD  - keystore password (used for both store and key)
+#
+# The keystore must use the alias "cryptic" and the same password for the store
+# and the key entry (create it with `keytool ... -alias cryptic` and one -storepass).
 
 on:
   push:
@@ -60,14 +61,12 @@ jobs:
 
       - name: Create key.properties
         env:
-          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           {
-            echo "storePassword=$STORE_PASSWORD"
-            echo "keyPassword=$KEY_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=cryptic"
             echo "storeFile=upload-keystore.jks"
           } > android/key.properties
 

@@ -54,11 +54,10 @@ SHA-256 checksums.
 | Secret | Description |
 |--------|-------------|
 | `ANDROID_KEYSTORE_BASE64` | base64 of your release keystore (`.jks`) |
-| `ANDROID_KEYSTORE_PASSWORD` | keystore (store) password |
-| `ANDROID_KEY_ALIAS` | key alias |
-| `ANDROID_KEY_PASSWORD` | key password |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password (used for both store and key) |
 
-Generate a keystore, encode it, then tag a release:
+The workflow expects the alias `cryptic` and the same password for the store and
+key entry. Generate a keystore, encode it, then tag a release:
 
 ```bash
 keytool -genkey -v -keystore cryptic-release.jks \
