@@ -149,16 +149,11 @@ class MtlsConfig {
   /// The returned client can be used for HTTPS requests
   /// that require mutual TLS authentication.
   HttpClient createHttpClient() {
-    final client = HttpClient(context: createSecurityContext());
-
-    // Allow self-signed or custom CA certificates
-    client.badCertificateCallback = (cert, host, port) {
-      // In production, you might want to do additional validation
-      // For now, we trust the CA we configured
-      return true;
-    };
-
-    return client;
+    // The SecurityContext pins the deployment CA, so Dart's default TLS
+    // validation (chain + hostname/SAN) is exactly what we want. We must NOT
+    // override badCertificateCallback to blanket-accept: that would defeat CA
+    // pinning and allow a MITM to impersonate the server.
+    return HttpClient(context: createSecurityContext());
   }
 
   /// Get the WebSocket URL for secure connection.

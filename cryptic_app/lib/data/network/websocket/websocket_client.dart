@@ -123,9 +123,20 @@ class WebSocketClient {
       AppLogger.info('WebSocket connecting to: $url', tag: 'WebSocket');
       final context = mtlsConfig.createSecurityContext();
 
-      // Create HTTP client with mTLS
+      // Create HTTP client with mTLS. The SecurityContext above pins the
+      // deployment CA, so Dart validates that the server's leaf certificate
+      // chains to that CA *and* that its SAN matches the host we dial. We must
+      // NOT blanket-accept here: returning true would defeat CA pinning and
+      // allow a MITM to impersonate the server on the messaging channel.
       final httpClient = HttpClient(context: context);
-      httpClient.badCertificateCallback = (cert, host, port) => true;
+      httpClient.badCertificateCallback = (cert, host, port) {
+        AppLogger.error(
+          'Rejecting server certificate that failed TLS validation '
+          '(host=$host port=$port subject=${cert.subject})',
+          tag: 'WebSocket',
+        );
+        return false;
+      };
 
       // Connect WebSocket
       _socket = await WebSocket.connect(
