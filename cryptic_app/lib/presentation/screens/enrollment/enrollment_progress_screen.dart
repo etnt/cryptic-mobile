@@ -26,7 +26,8 @@ class EnrollmentProgressScreen extends ConsumerWidget {
     }
 
     if (status.isFailed) {
-      return _buildFailure(context, theme, ref, status.error ?? 'Unknown error');
+      return _buildFailure(
+          context, theme, ref, status.error ?? 'Unknown error');
     }
 
     return _buildProgress(context, theme, status.stage);
@@ -36,35 +37,36 @@ class EnrollmentProgressScreen extends ConsumerWidget {
     BuildContext context,
     ThemeData theme,
     EnrollmentStage? stage,
-  ) => Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 32),
-                Text(
-                  'Setting up your device...',
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _stageLabel(stage),
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+  ) =>
+      Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Setting up your device...',
+                    style: theme.textTheme.headlineSmall,
                   ),
-                ),
-                const SizedBox(height: 48),
-                _buildStepList(theme, stage),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    _stageLabel(stage),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  _buildStepList(theme, stage),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
   Widget _buildStepList(ThemeData theme, EnrollmentStage? currentStage) {
     const stages = EnrollmentStage.values;
@@ -118,106 +120,108 @@ class EnrollmentProgressScreen extends ConsumerWidget {
     BuildContext context,
     ThemeData theme,
     EnrollmentResult result,
-  ) => Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 80,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Enrollment Complete!',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+  ) =>
+      Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 80,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Welcome, ${result.username}',
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Connected to ${result.serverHost}:${result.serverPort}',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 24),
+                  Text(
+                    'Enrollment Complete!',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 48),
-                FilledButton.icon(
-                  onPressed: onComplete,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('Continue to Login'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Welcome, ${result.username}',
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Connected to ${result.serverHost}:${result.serverPort}',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  FilledButton.icon(
+                    onPressed: onComplete,
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('Continue to Login'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
   Widget _buildFailure(
     BuildContext context,
     ThemeData theme,
     WidgetRef ref,
     String error,
-  ) => Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  size: 80,
-                  color: theme.colorScheme.error,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Enrollment Failed',
-                  style: theme.textTheme.headlineSmall?.copyWith(
+  ) =>
+      Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 80,
                     color: theme.colorScheme.error,
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  error,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 32),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    ref.read(enrollmentProvider.notifier).reset();
-                  },
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Try Again'),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  Text(
+                    'Enrollment Failed',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    error,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 32),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref.read(enrollmentProvider.notifier).reset();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try Again'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
   String _stageLabel(EnrollmentStage? stage) => switch (stage) {
-      EnrollmentStage.parsingQr => 'Parsing QR code...',
-      EnrollmentStage.decrypting => 'Decrypting enrollment data...',
-      EnrollmentStage.verifyingCa => 'Verifying CA certificate...',
-      EnrollmentStage.generatingCsr => 'Generating TLS keys...',
-      EnrollmentStage.signingCsr => 'Signing certificate request...',
-      EnrollmentStage.submittingCsr => 'Submitting to server...',
-      EnrollmentStage.storingCertificate => 'Storing certificate...',
-      EnrollmentStage.complete => 'Complete!',
-      null => 'Preparing...',
-    };
+        EnrollmentStage.parsingQr => 'Parsing QR code...',
+        EnrollmentStage.decrypting => 'Decrypting enrollment data...',
+        EnrollmentStage.verifyingCa => 'Verifying CA certificate...',
+        EnrollmentStage.generatingCsr => 'Generating TLS keys...',
+        EnrollmentStage.signingCsr => 'Signing certificate request...',
+        EnrollmentStage.submittingCsr => 'Submitting to server...',
+        EnrollmentStage.storingCertificate => 'Storing certificate...',
+        EnrollmentStage.complete => 'Complete!',
+        null => 'Preparing...',
+      };
 }

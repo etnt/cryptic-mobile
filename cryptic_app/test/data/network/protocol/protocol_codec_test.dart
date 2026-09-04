@@ -65,7 +65,10 @@ void main() {
 
     group('decodeMap', () {
       test('should decode from map', () {
-        final map = {'type': 'users', 'users': ['alice', 'bob']};
+        final map = {
+          'type': 'users',
+          'users': ['alice', 'bob']
+        };
 
         final message = ProtocolCodec.decodeMap(map);
 

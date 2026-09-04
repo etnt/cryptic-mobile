@@ -80,10 +80,12 @@ class UploadKeysUseCase implements UseCase<UploadKeysParams, UploadKeysResult> {
 
       // TODO: Implement key upload via engine
       // For now, return success as the engine handles key upload on connect
-      return const UseCaseSuccess(UploadKeysResult(
-        identityKeysUploaded: true,
-        prekeysUploaded: 0,
-      ),);
+      return const UseCaseSuccess(
+        UploadKeysResult(
+          identityKeysUploaded: true,
+          prekeysUploaded: 0,
+        ),
+      );
     } catch (e) {
       return UseCaseError('Failed to upload keys', e);
     }

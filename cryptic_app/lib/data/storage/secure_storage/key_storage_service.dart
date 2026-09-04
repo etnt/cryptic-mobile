@@ -4,7 +4,6 @@
 //
 
 import 'dart:convert';
-import 'dart:typed_data';
 
 import '../../../core/errors/app_exceptions.dart';
 import '../../crypto/keys/identity_key_pair.dart';
@@ -98,8 +97,7 @@ class KeyStorageService {
   ///
   /// Validates by loading so a corrupt blob is treated as "no keys",
   /// allowing the engine to regenerate a fresh identity.
-  Future<bool> hasIdentityKeys() async =>
-      (await loadIdentityKeyPair()) != null;
+  Future<bool> hasIdentityKeys() async => (await loadIdentityKeyPair()) != null;
 
   /// Deletes the identity key pair.
   Future<void> deleteIdentityKeyPair() async {
@@ -252,9 +250,10 @@ class KeyStorageService {
   }
 
   /// Checks if a session exists for a peer.
-  Future<bool> hasSession({required String peerUsername}) async => await _secureStorage.containsKey(
-      key: KeyStorageKeys.sessionKey(peerUsername),
-    );
+  Future<bool> hasSession({required String peerUsername}) async =>
+      await _secureStorage.containsKey(
+        key: KeyStorageKeys.sessionKey(peerUsername),
+      );
 
   /// Deletes a session for a peer.
   Future<void> deleteSession({required String peerUsername}) async {
@@ -295,7 +294,8 @@ class KeyStorageService {
   }
 
   /// Loads the current username.
-  Future<String?> loadUsername() async => await _secureStorage.read(key: KeyStorageKeys.username);
+  Future<String?> loadUsername() async =>
+      await _secureStorage.read(key: KeyStorageKeys.username);
 
   /// Saves server connection info.
   Future<void> saveServerInfo({

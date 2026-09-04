@@ -71,16 +71,17 @@ class Contact {
     bool? isVerified,
     bool? isTrusted,
     DateTime? addedAt,
-  }) => Contact(
-      username: username ?? this.username,
-      displayName: displayName ?? this.displayName,
-      status: status ?? this.status,
-      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
-      hasSession: hasSession ?? this.hasSession,
-      isVerified: isVerified ?? this.isVerified,
-      isTrusted: isTrusted ?? this.isTrusted,
-      addedAt: addedAt ?? this.addedAt,
-    );
+  }) =>
+      Contact(
+        username: username ?? this.username,
+        displayName: displayName ?? this.displayName,
+        status: status ?? this.status,
+        lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+        hasSession: hasSession ?? this.hasSession,
+        isVerified: isVerified ?? this.isVerified,
+        isTrusted: isTrusted ?? this.isTrusted,
+        addedAt: addedAt ?? this.addedAt,
+      );
 
   @override
   bool operator ==(Object other) =>

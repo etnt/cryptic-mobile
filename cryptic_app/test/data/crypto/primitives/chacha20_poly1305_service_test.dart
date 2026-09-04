@@ -99,7 +99,8 @@ void main() {
 
         // Verify tag is appended correctly
         final expectedCombined = Uint8List(result.ciphertext.length + 16);
-        expectedCombined.setRange(0, result.ciphertext.length, result.ciphertext);
+        expectedCombined.setRange(
+            0, result.ciphertext.length, result.ciphertext);
         expectedCombined.setRange(
           result.ciphertext.length,
           expectedCombined.length,

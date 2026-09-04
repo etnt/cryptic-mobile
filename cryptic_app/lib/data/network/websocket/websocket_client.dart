@@ -153,8 +153,12 @@ class WebSocketClient {
       AppLogger.info('WebSocket connected successfully', tag: 'WebSocket');
       _setState(ConnectionState.connected);
     } catch (e, stackTrace) {
-      AppLogger.error('WebSocket connection failed', 
-          tag: 'WebSocket', error: e, stackTrace: stackTrace,);
+      AppLogger.error(
+        'WebSocket connection failed',
+        tag: 'WebSocket',
+        error: e,
+        stackTrace: stackTrace,
+      );
       _setState(ConnectionState.error, e);
       rethrow;
     }
@@ -203,14 +207,16 @@ class WebSocketClient {
   }
 
   void _setState(ConnectionState newState, [Object? error]) {
-    print('[WebSocket] State change: $_state -> $newState${error != null ? ' (error: $error)' : ''}');
+    print(
+        '[WebSocket] State change: $_state -> $newState${error != null ? ' (error: $error)' : ''}');
     _state = newState;
     _eventController.add(ConnectionStateEvent(newState, error));
   }
 
   void _onData(dynamic data) {
     if (data is String) {
-      print('[WebSocket] _onData received: ${data.length > 200 ? data.substring(0, 200) : data}');
+      print(
+          '[WebSocket] _onData received: ${data.length > 200 ? data.substring(0, 200) : data}');
       final message = ProtocolCodec.decode(data);
       if (message != null) {
         print('[WebSocket] Decoded message type: ${message.type}');
@@ -218,12 +224,15 @@ class WebSocketClient {
         _eventController.add(MessageReceivedEvent(message));
       } else {
         print('[WebSocket] Failed to decode message');
-        AppLogger.debug('WebSocket RX (raw): ${data.substring(0, data.length > 100 ? 100 : data.length)}...', tag: 'WebSocket');
+        AppLogger.debug(
+            'WebSocket RX (raw): ${data.substring(0, data.length > 100 ? 100 : data.length)}...',
+            tag: 'WebSocket');
         _eventController.add(RawMessageEvent(data));
       }
     } else {
       print('[WebSocket] _onData received binary: ${data.runtimeType}');
-      AppLogger.debug('WebSocket RX (binary): ${data.runtimeType}', tag: 'WebSocket');
+      AppLogger.debug('WebSocket RX (binary): ${data.runtimeType}',
+          tag: 'WebSocket');
       _eventController.add(RawMessageEvent(data));
     }
   }
@@ -235,8 +244,11 @@ class WebSocketClient {
   void _onDone() {
     final closeCode = _socket?.closeCode;
     final closeReason = _socket?.closeReason;
-    print('[WebSocket] _onDone called - connection closed (code=$closeCode, reason=$closeReason)');
-    AppLogger.warning('WebSocket connection closed (_onDone called, code=$closeCode, reason=$closeReason)', tag: 'WebSocket');
+    print(
+        '[WebSocket] _onDone called - connection closed (code=$closeCode, reason=$closeReason)');
+    AppLogger.warning(
+        'WebSocket connection closed (_onDone called, code=$closeCode, reason=$closeReason)',
+        tag: 'WebSocket');
     _socket = null;
     _socketSubscription = null;
     if (_state != ConnectionState.disconnected) {

@@ -21,7 +21,7 @@ enum Environment {
 /// logging, and other runtime configuration.
 enum AppConfig {
   /// Development configuration (localhost).
-  /// 
+  ///
   /// Note: Uses '10.0.2.2' which is the Android emulator's alias for the host
   /// machine's localhost. For iOS Simulator, 'localhost' also works, but
   /// '10.0.2.2' is automatically resolved on both platforms.
@@ -131,7 +131,8 @@ enum AppConfig {
   bool get isProduction => environment == Environment.production;
 
   @override
-  String toString() => 'AppConfig(${environment.name}, $serverHost:$serverPort)';
+  String toString() =>
+      'AppConfig(${environment.name}, $serverHost:$serverPort)';
 }
 
 /// Log levels for filtering output.

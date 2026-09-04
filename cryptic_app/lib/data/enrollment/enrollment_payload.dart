@@ -26,7 +26,6 @@ import '../../core/errors/app_exceptions.dart';
 /// }
 /// ```
 class EnrollmentEnvelope {
-
   /// Parse from QR code JSON string.
   factory EnrollmentEnvelope.fromQrData(String qrData) {
     try {
@@ -116,7 +115,6 @@ class EnrollmentEnvelope {
 ///
 /// Contains all information the mobile client needs to enroll.
 class EnrollmentPayload {
-
   /// Parse from decrypted JSON.
   factory EnrollmentPayload.fromJson(String json) {
     try {

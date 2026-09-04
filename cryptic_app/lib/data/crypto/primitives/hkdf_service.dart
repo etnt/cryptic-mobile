@@ -37,7 +37,8 @@ class HkdfService {
   /// Returns the derived key material.
   Future<Uint8List> deriveKey({
     required Uint8List inputKeyMaterial,
-    required String info, Uint8List? salt,
+    required String info,
+    Uint8List? salt,
     int outputLength = 32,
   }) async {
     if (inputKeyMaterial.isEmpty) {
@@ -182,7 +183,8 @@ class HkdfService {
       inputKeyMaterial: messageKey,
       salt: Uint8List(CryptoConstants.hkdfSaltSize),
       info: CryptoConstants.ratchetMessageInfo,
-      outputLength: CryptoConstants.chaChaKeySize + CryptoConstants.chaChaNonceSize,
+      outputLength:
+          CryptoConstants.chaChaKeySize + CryptoConstants.chaChaNonceSize,
     );
 
     return (

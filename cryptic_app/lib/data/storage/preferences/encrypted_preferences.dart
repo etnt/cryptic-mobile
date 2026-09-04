@@ -148,7 +148,8 @@ class EncryptedPreferences {
   }
 
   /// Gets a string preference.
-  Future<String?> getString(String key) async => await _secureStorage.read(key: key);
+  Future<String?> getString(String key) async =>
+      await _secureStorage.read(key: key);
 
   /// Sets a string preference.
   Future<void> setString(String key, String value) async {
@@ -165,8 +166,7 @@ class EncryptedPreferences {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Whether biometric authentication is enabled.
-  Future<bool> get biometricEnabled =>
-      getBool(PreferenceKeys.biometricEnabled);
+  Future<bool> get biometricEnabled => getBool(PreferenceKeys.biometricEnabled);
 
   /// Sets biometric authentication enabled.
   Future<void> setBiometricEnabled(bool value) =>
@@ -217,8 +217,7 @@ class EncryptedPreferences {
       setBool(PreferenceKeys.typingIndicatorsEnabled, value);
 
   /// Whether last seen is visible.
-  Future<bool> get lastSeenVisible =>
-      getBool(PreferenceKeys.lastSeenVisible);
+  Future<bool> get lastSeenVisible => getBool(PreferenceKeys.lastSeenVisible);
 
   /// Sets last seen visible.
   Future<void> setLastSeenVisible(bool value) =>
@@ -367,24 +366,24 @@ class EncryptedPreferences {
 
   /// Gets all preferences as a map (for debugging).
   Future<Map<String, dynamic>> getAllPreferences() async => {
-      'biometric_enabled': await biometricEnabled,
-      'auto_lock_timeout': await autoLockTimeout,
-      'show_message_previews': await showMessagePreviews,
-      'require_unlock_on_start': await requireUnlockOnStart,
-      'read_receipts_enabled': await readReceiptsEnabled,
-      'typing_indicators_enabled': await typingIndicatorsEnabled,
-      'last_seen_visible': await lastSeenVisible,
-      'clear_clipboard_after_paste': await clearClipboardAfterPaste,
-      'theme_mode': await themeMode,
-      'font_size_scale': await fontSizeScale,
-      'high_contrast_enabled': await highContrastEnabled,
-      'connection_timeout': await connectionTimeout,
-      'auto_reconnect': await autoReconnect,
-      'max_reconnect_attempts': await maxReconnectAttempts,
-      'message_retention_days': await messageRetentionDays,
-      'max_media_cache_mb': await maxMediaCacheMb,
-      'auto_download_media': await autoDownloadMedia,
-      'onboarding_completed': await onboardingCompleted,
-      'last_app_version': await lastAppVersion,
-    };
+        'biometric_enabled': await biometricEnabled,
+        'auto_lock_timeout': await autoLockTimeout,
+        'show_message_previews': await showMessagePreviews,
+        'require_unlock_on_start': await requireUnlockOnStart,
+        'read_receipts_enabled': await readReceiptsEnabled,
+        'typing_indicators_enabled': await typingIndicatorsEnabled,
+        'last_seen_visible': await lastSeenVisible,
+        'clear_clipboard_after_paste': await clearClipboardAfterPaste,
+        'theme_mode': await themeMode,
+        'font_size_scale': await fontSizeScale,
+        'high_contrast_enabled': await highContrastEnabled,
+        'connection_timeout': await connectionTimeout,
+        'auto_reconnect': await autoReconnect,
+        'max_reconnect_attempts': await maxReconnectAttempts,
+        'message_retention_days': await messageRetentionDays,
+        'max_media_cache_mb': await maxMediaCacheMb,
+        'auto_download_media': await autoDownloadMedia,
+        'onboarding_completed': await onboardingCompleted,
+        'last_app_version': await lastAppVersion,
+      };
 }

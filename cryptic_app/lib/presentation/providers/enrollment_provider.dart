@@ -68,13 +68,14 @@ class EnrollmentStatus {
     String? error,
     EnrollmentResult? result,
     bool clearError = false,
-  }) => EnrollmentStatus(
-      phase: phase ?? this.phase,
-      qrData: qrData ?? this.qrData,
-      stage: stage ?? this.stage,
-      error: clearError ? null : (error ?? this.error),
-      result: result ?? this.result,
-    );
+  }) =>
+      EnrollmentStatus(
+        phase: phase ?? this.phase,
+        qrData: qrData ?? this.qrData,
+        stage: stage ?? this.stage,
+        error: clearError ? null : (error ?? this.error),
+        result: result ?? this.result,
+      );
 }
 
 /// Notifier for enrollment flow.

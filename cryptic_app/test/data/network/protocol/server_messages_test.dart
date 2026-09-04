@@ -15,24 +15,30 @@ void main() {
       expect(ServerMessageType.messageSent.value, 'message_sent');
       expect(ServerMessageType.error.value, 'error');
       expect(ServerMessageType.userStatus.value, 'user_status');
-      expect(ServerMessageType.pendingMessagesDelivered.value, 'pending_messages_delivered');
+      expect(ServerMessageType.pendingMessagesDelivered.value,
+          'pending_messages_delivered');
     });
 
     test('should parse from value', () {
       expect(ServerMessageType.fromValue('welcome'), ServerMessageType.welcome);
-      expect(ServerMessageType.fromValue('key_bundle'), ServerMessageType.keyBundle);
+      expect(ServerMessageType.fromValue('key_bundle'),
+          ServerMessageType.keyBundle);
       expect(ServerMessageType.fromValue('unknown'), isNull);
     });
   });
 
   group('ServerMessage.fromJson', () {
     test('should parse welcome message', () {
-      final json = {'type': 'welcome', 'message': 'Connected to Cryptic Server'};
+      final json = {
+        'type': 'welcome',
+        'message': 'Connected to Cryptic Server'
+      };
 
       final message = ServerMessage.fromJson(json);
 
       expect(message, isA<WelcomeMessage>());
-      expect((message! as WelcomeMessage).message, 'Connected to Cryptic Server');
+      expect(
+          (message! as WelcomeMessage).message, 'Connected to Cryptic Server');
     });
 
     test('should parse success message', () {

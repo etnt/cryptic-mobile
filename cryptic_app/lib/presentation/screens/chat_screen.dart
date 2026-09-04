@@ -139,7 +139,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
       return;
     }
-    print('[ChatScreen] Sending message to ${widget.peerId}: $text (engine.isConnected=${engine.isConnected})');
+    print(
+        '[ChatScreen] Sending message to ${widget.peerId}: $text (engine.isConnected=${engine.isConnected})');
     try {
       await engine.sendMessage(widget.peerId, text);
       print('[ChatScreen] Message sent successfully');
@@ -148,7 +149,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       print('[ChatScreen] Stack: $stack');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Send failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Send failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -160,7 +162,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     print('[ChatScreen] Resetting session with ${widget.peerId}');
     await engine.clearSession(widget.peerId);
-    
+
     // Show confirmation
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -181,7 +183,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
       next.whenData((event) {
         if (event is MessageReceived && event.fromUser == widget.peerId) {
-          print('[ChatScreen] Received message from ${event.fromUser}: ${event.plaintext}');
+          print(
+              '[ChatScreen] Received message from ${event.fromUser}: ${event.plaintext}');
           _addIncomingMessage(event);
         }
       });

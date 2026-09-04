@@ -103,8 +103,7 @@ class _PassphraseScreenState extends ConsumerState<PassphraseScreen> {
                         icon: Icon(
                           _obscure ? Icons.visibility : Icons.visibility_off,
                         ),
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
+                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                       border: const OutlineInputBorder(),
                     ),

@@ -28,7 +28,8 @@ abstract class ServerMessage {
       ServerMessageType.welcome => WelcomeMessage.fromJson(json),
       ServerMessageType.success => SuccessMessage.fromJson(json),
       ServerMessageType.users => UsersMessage.fromJson(json),
-      ServerMessageType.onlineUsers => OnlineUsersResponseMessage.fromJson(json),
+      ServerMessageType.onlineUsers =>
+        OnlineUsersResponseMessage.fromJson(json),
       ServerMessageType.keyBundle => KeyBundleMessage.fromJson(json),
       ServerMessageType.message => IncomingMessage.fromJson(json),
       ServerMessageType.messageSent => MessageSentMessage.fromJson(json),
@@ -47,7 +48,8 @@ abstract class ServerMessage {
     } catch (e, stack) {
       print('[ServerMessage] Error parsing JSON: $e');
       print('[ServerMessage] Stack: $stack');
-      print('[ServerMessage] Raw JSON: ${jsonString.substring(0, jsonString.length > 200 ? 200 : jsonString.length)}...');
+      print(
+          '[ServerMessage] Raw JSON: ${jsonString.substring(0, jsonString.length > 200 ? 200 : jsonString.length)}...');
       return null;
     }
   }
@@ -71,13 +73,13 @@ class UnknownServerMessage extends ServerMessage {
 
 /// Welcome message received on connection.
 class WelcomeMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory WelcomeMessage.fromJson(Map<String, dynamic> json) {
     return WelcomeMessage(
       message: json['message'] as String? ?? 'Connected to Cryptic Server',
     );
   }
+
   /// Creates a welcome message.
   WelcomeMessage({required this.message});
 
@@ -90,7 +92,6 @@ class WelcomeMessage extends ServerMessage {
 
 /// Success response for operations.
 class SuccessMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory SuccessMessage.fromJson(Map<String, dynamic> json) {
     return SuccessMessage(
@@ -98,6 +99,7 @@ class SuccessMessage extends ServerMessage {
       message: json['message'] as String? ?? 'Success',
     );
   }
+
   /// Creates a success message.
   SuccessMessage({
     required this.operation,
@@ -116,7 +118,6 @@ class SuccessMessage extends ServerMessage {
 
 /// List of registered users.
 class UsersMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory UsersMessage.fromJson(Map<String, dynamic> json) {
     final usersList = json['users'] as List<dynamic>? ?? [];
@@ -124,6 +125,7 @@ class UsersMessage extends ServerMessage {
       users: usersList.map((u) => u.toString()).toList(),
     );
   }
+
   /// Creates a users message.
   UsersMessage({required this.users});
 
@@ -136,7 +138,6 @@ class UsersMessage extends ServerMessage {
 
 /// List of online users (response to online_users command).
 class OnlineUsersResponseMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory OnlineUsersResponseMessage.fromJson(Map<String, dynamic> json) {
     final usersList = json['users'] as List<dynamic>? ?? [];
@@ -144,6 +145,7 @@ class OnlineUsersResponseMessage extends ServerMessage {
       users: usersList.map((u) => u.toString()).toList(),
     );
   }
+
   /// Creates an online users response message.
   OnlineUsersResponseMessage({required this.users});
 
@@ -156,7 +158,6 @@ class OnlineUsersResponseMessage extends ServerMessage {
 
 /// Signed prekey from key bundle.
 class SignedPrekey {
-
   /// Parse from JSON.
   factory SignedPrekey.fromJson(Map<String, dynamic> json) {
     return SignedPrekey(
@@ -165,6 +166,7 @@ class SignedPrekey {
       signature: json['signature'] as String? ?? '',
     );
   }
+
   /// Creates a signed prekey.
   SignedPrekey({
     required this.keyId,
@@ -190,7 +192,6 @@ class SignedPrekey {
 
 /// One-time prekey from key bundle.
 class ReceivedOneTimePrekey {
-
   /// Parse from JSON (legacy format with key_id/public_key).
   factory ReceivedOneTimePrekey.fromJson(Map<String, dynamic> json) {
     return ReceivedOneTimePrekey(
@@ -198,14 +199,15 @@ class ReceivedOneTimePrekey {
       publicKey: json['public_key'] as String? ?? '',
     );
   }
-  
+
   /// Parse from server JSON format (id/public as base64 strings).
   factory ReceivedOneTimePrekey.fromServerJson(Map<String, dynamic> json) {
     return ReceivedOneTimePrekey(
-      keyId: json['id'] as String? ?? '',  // Server sends 'id' as base64
-      publicKey: json['public'] as String? ?? '',  // Server sends 'public'
+      keyId: json['id'] as String? ?? '', // Server sends 'id' as base64
+      publicKey: json['public'] as String? ?? '', // Server sends 'public'
     );
   }
+
   /// Creates a one-time prekey.
   ReceivedOneTimePrekey({
     required this.keyId,
@@ -220,39 +222,43 @@ class ReceivedOneTimePrekey {
 
   /// Get public key as bytes.
   Uint8List get publicKeyBytes => base64Decode(publicKey);
-  
+
   /// Get key ID as bytes.
   Uint8List get keyIdBytes => base64Decode(keyId);
 }
 
 /// Key bundle response for X3DH.
 class KeyBundleMessage extends ServerMessage {
-
   /// Parse from JSON.
-  /// 
+  ///
   /// Server sends:
   /// - user (not username)
   /// - identity_sign_public (not identity_sign_key)
-  /// - identity_dh_public (not identity_dh_key)  
+  /// - identity_dh_public (not identity_dh_key)
   /// - signed_prekey (base64 string, not nested object)
   /// - signed_prekey_signature (separate field)
   /// - one_time_prekey: { id: base64, public: base64 } or null
   factory KeyBundleMessage.fromJson(Map<String, dynamic> json) {
     final oneTimePrekeyJson = json['one_time_prekey'] as Map<String, dynamic>?;
-    
+
     // Server sends signed_prekey and signed_prekey_signature as separate base64 strings
     // We need to construct a SignedPrekey from them
     // Note: Server doesn't send key_id for signed prekey in this response,
     // but we can extract it from the key_id field or default to 1
-    final signedPrekeyPublic = IncomingMessage._asString(json['signed_prekey']) ?? '';
-    final signedPrekeySignature = IncomingMessage._asString(json['signed_prekey_signature']) ?? '';
-    
+    final signedPrekeyPublic =
+        IncomingMessage._asString(json['signed_prekey']) ?? '';
+    final signedPrekeySignature =
+        IncomingMessage._asString(json['signed_prekey_signature']) ?? '';
+
     return KeyBundleMessage(
       username: IncomingMessage._asString(json['user']) ?? '',
-      identitySignKey: IncomingMessage._asString(json['identity_sign_public']) ?? '',
-      identityDhKey: IncomingMessage._asString(json['identity_dh_public']) ?? '',
+      identitySignKey:
+          IncomingMessage._asString(json['identity_sign_public']) ?? '',
+      identityDhKey:
+          IncomingMessage._asString(json['identity_dh_public']) ?? '',
       signedPrekey: SignedPrekey(
-        keyId: 1,  // Server doesn't send keyId for signed prekey in bundle response
+        keyId:
+            1, // Server doesn't send keyId for signed prekey in bundle response
         publicKey: signedPrekeyPublic,
         signature: signedPrekeySignature,
       ),
@@ -261,6 +267,7 @@ class KeyBundleMessage extends ServerMessage {
           : null,
     );
   }
+
   /// Creates a key bundle message.
   KeyBundleMessage({
     required this.username,
@@ -297,7 +304,6 @@ class KeyBundleMessage extends ServerMessage {
 
 /// Incoming encrypted message (X3DH or Ratchet).
 class IncomingMessage extends ServerMessage {
-
   /// Parse from JSON.
   ///
   /// The server sends incoming encrypted messages in this format:
@@ -321,8 +327,8 @@ class IncomingMessage extends ServerMessage {
     final msgTypeStr = _asString(msgData['message_type']) ?? 'ratchet';
 
     return IncomingMessage(
-      messageType:
-          EncryptedMessageType.fromValue(msgTypeStr) ?? EncryptedMessageType.ratchet,
+      messageType: EncryptedMessageType.fromValue(msgTypeStr) ??
+          EncryptedMessageType.ratchet,
       fromUser: _asString(json['from']) ?? _asString(msgData['from']) ?? '',
       toUser: _asString(json['to']) ?? _asString(msgData['to']) ?? '',
       rawData: msgData,
@@ -342,6 +348,7 @@ class IncomingMessage extends ServerMessage {
     }
     return null;
   }
+
   /// Creates an incoming message.
   IncomingMessage({
     required this.messageType,
@@ -374,9 +381,8 @@ class IncomingMessage extends ServerMessage {
 
 /// Parsed X3DH incoming message.
 class IncomingX3dhMessage {
-
   /// Parse from incoming message raw data.
-  /// 
+  ///
   /// Server sends X3DH messages with these field names:
   /// - from (not from_user)
   /// - to (not to_user)
@@ -396,13 +402,15 @@ class IncomingX3dhMessage {
       ciphertext: IncomingMessage._asString(data['ciphertext']) ?? '',
     );
   }
+
   /// Creates an X3DH incoming message.
   IncomingX3dhMessage({
     required this.fromUser,
     required this.toUser,
     required this.identityKey,
     required this.ephemeralKey,
-    required this.ciphertext, this.usedOneTimePrekeyId,
+    required this.ciphertext,
+    this.usedOneTimePrekeyId,
   });
 
   /// Sender username.
@@ -435,7 +443,6 @@ class IncomingX3dhMessage {
 
 /// Parsed ratchet incoming message.
 class IncomingRatchetMessage {
-
   /// Parse from incoming message raw data.
   factory IncomingRatchetMessage.fromRawData(Map<String, dynamic> data) {
     return IncomingRatchetMessage(
@@ -449,6 +456,7 @@ class IncomingRatchetMessage {
       nonce: IncomingMessage._asString(data['nonce']) ?? '',
     );
   }
+
   /// Creates a ratchet incoming message.
   IncomingRatchetMessage({
     required this.fromUser,
@@ -497,7 +505,6 @@ class IncomingRatchetMessage {
 
 /// Message sent acknowledgment.
 class MessageSentMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory MessageSentMessage.fromJson(Map<String, dynamic> json) {
     return MessageSentMessage(
@@ -506,6 +513,7 @@ class MessageSentMessage extends ServerMessage {
       timestamp: json['timestamp'] as int? ?? 0,
     );
   }
+
   /// Creates a message sent acknowledgment.
   MessageSentMessage({
     required this.messageId,
@@ -532,7 +540,6 @@ class MessageSentMessage extends ServerMessage {
 
 /// Error response from server.
 class ErrorMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory ErrorMessage.fromJson(Map<String, dynamic> json) {
     return ErrorMessage(
@@ -540,6 +547,7 @@ class ErrorMessage extends ServerMessage {
       success: json['success'] as bool? ?? false,
     );
   }
+
   /// Creates an error message.
   ErrorMessage({
     required this.message,
@@ -558,7 +566,6 @@ class ErrorMessage extends ServerMessage {
 
 /// User online/offline status notification.
 class UserStatusMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory UserStatusMessage.fromJson(Map<String, dynamic> json) {
     return UserStatusMessage(
@@ -566,6 +573,7 @@ class UserStatusMessage extends ServerMessage {
       isOnline: json['online'] as bool? ?? json['status'] == 'online',
     );
   }
+
   /// Creates a user status message.
   UserStatusMessage({
     required this.username,
@@ -584,13 +592,13 @@ class UserStatusMessage extends ServerMessage {
 
 /// Pending messages delivered notification.
 class PendingMessagesDeliveredMessage extends ServerMessage {
-
   /// Parse from JSON.
   factory PendingMessagesDeliveredMessage.fromJson(Map<String, dynamic> json) {
     return PendingMessagesDeliveredMessage(
       count: json['count'] as int? ?? 0,
     );
   }
+
   /// Creates a pending messages delivered message.
   PendingMessagesDeliveredMessage({required this.count});
 

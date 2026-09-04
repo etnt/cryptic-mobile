@@ -83,10 +83,8 @@ class CsrGenerator {
     pc.ECPublicKey publicKey,
     pc.ECPrivateKey privateKey,
   ) {
-    final ecPubOid =
-        ASN1ObjectIdentifier.fromIdentifierString(_ecPublicKeyOid);
-    final curveOid =
-        ASN1ObjectIdentifier.fromIdentifierString(_secp256r1Oid);
+    final ecPubOid = ASN1ObjectIdentifier.fromIdentifierString(_ecPublicKeyOid);
+    final curveOid = ASN1ObjectIdentifier.fromIdentifierString(_secp256r1Oid);
 
     // AlgorithmIdentifier: SEQUENCE { ecPublicKey OID, secp256r1 OID }
     final algIdSeq = ASN1Sequence(elements: [ecPubOid, curveOid]);
@@ -127,8 +125,7 @@ class CsrGenerator {
         _createSecureRandom(),
       ),
     );
-    final ecSig =
-        signer.generateSignature(certReqInfoDer) as pc.ECSignature;
+    final ecSig = signer.generateSignature(certReqInfoDer) as pc.ECSignature;
 
     // DER-encode ECDSA signature: SEQUENCE { INTEGER r, INTEGER s }
     final sigDer = ASN1Sequence(elements: [
@@ -212,10 +209,8 @@ class CsrGenerator {
     pc.ECPrivateKey privateKey,
     pc.ECPublicKey publicKey,
   ) {
-    final ecPubOid =
-        ASN1ObjectIdentifier.fromIdentifierString(_ecPublicKeyOid);
-    final curveOid =
-        ASN1ObjectIdentifier.fromIdentifierString(_secp256r1Oid);
+    final ecPubOid = ASN1ObjectIdentifier.fromIdentifierString(_ecPublicKeyOid);
+    final curveOid = ASN1ObjectIdentifier.fromIdentifierString(_secp256r1Oid);
 
     final algId = ASN1Sequence(elements: [ecPubOid, curveOid]);
 

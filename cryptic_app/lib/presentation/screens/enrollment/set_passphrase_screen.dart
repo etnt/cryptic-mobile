@@ -54,9 +54,7 @@ class _SetPassphraseScreenState extends ConsumerState<SetPassphraseScreen> {
       await encService.setPassphrase(passphrase);
 
       // 2. Encrypt all stored key material with the new passphrase
-      await ref
-          .read(enrollmentProvider.notifier)
-          .encryptStoredKeys(passphrase);
+      await ref.read(enrollmentProvider.notifier).encryptStoredKeys(passphrase);
 
       if (mounted) {
         widget.onComplete();
@@ -139,8 +137,7 @@ class _SetPassphraseScreenState extends ConsumerState<SetPassphraseScreen> {
                         icon: Icon(
                           _obscure ? Icons.visibility : Icons.visibility_off,
                         ),
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
+                        onPressed: () => setState(() => _obscure = !_obscure),
                       ),
                       border: const OutlineInputBorder(),
                     ),
@@ -169,8 +166,8 @@ class _SetPassphraseScreenState extends ConsumerState<SetPassphraseScreen> {
                               ? Icons.visibility
                               : Icons.visibility_off,
                         ),
-                        onPressed: () => setState(
-                            () => _obscureConfirm = !_obscureConfirm),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                       border: const OutlineInputBorder(),
                     ),
@@ -192,11 +189,11 @@ class _SetPassphraseScreenState extends ConsumerState<SetPassphraseScreen> {
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
                               color: Colors.white,
-                            ),  
+                            ),
                           )
                         : const Icon(Icons.check),
                     label: Text(
-                        _saving ? 'Encrypting keys...' : 'Set Passphrase',
+                      _saving ? 'Encrypting keys...' : 'Set Passphrase',
                     ),
                   ),
                 ],

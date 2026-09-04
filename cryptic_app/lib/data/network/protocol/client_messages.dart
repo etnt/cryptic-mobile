@@ -68,19 +68,19 @@ class UploadIdentityKeysMessage extends ProtocolMessage {
     required int signedPrekeyId,
     required Uint8List signedPrekeyPublic,
     required Uint8List signedPrekeySignature,
-  }) => UploadIdentityKeysMessage(
-      username: username,
-      identitySignPublic: base64Encode(identitySignPublic),
-      identityDhPublic: base64Encode(identityDhPublic),
-      signedPrekeyId: signedPrekeyId,
-      signedPrekeyPublic: base64Encode(signedPrekeyPublic),
-      signedPrekeySignature: base64Encode(signedPrekeySignature),
-    );
+  }) =>
+      UploadIdentityKeysMessage(
+        username: username,
+        identitySignPublic: base64Encode(identitySignPublic),
+        identityDhPublic: base64Encode(identityDhPublic),
+        signedPrekeyId: signedPrekeyId,
+        signedPrekeyPublic: base64Encode(signedPrekeyPublic),
+        signedPrekeySignature: base64Encode(signedPrekeySignature),
+      );
 }
 
 /// One-time prekey for upload.
 class OneTimePrekey {
-
   /// Create from raw bytes.
   factory OneTimePrekey.fromBytes({
     required int keyId,
@@ -91,6 +91,7 @@ class OneTimePrekey {
       publicKey: base64Encode(publicKey),
     );
   }
+
   /// Creates a one-time prekey.
   OneTimePrekey({
     required this.keyId,
@@ -162,7 +163,7 @@ class GetKeyBundleMessage extends ProtocolMessage {
   @override
   Map<String, dynamic> toJson() => {
         'type': type,
-        'user': username,  // Server expects 'user', not 'username'
+        'user': username, // Server expects 'user', not 'username'
       };
 }
 
@@ -179,7 +180,6 @@ class GetKeyBundleMessage extends ProtocolMessage {
 /// - `signature` - base64 encoded Ed25519 signature over metadata
 /// - `metadata` - base64 encoded serialized metadata JSON
 class X3dhMessage extends ProtocolMessage {
-
   /// Create from X3DH message blob output.
   factory X3dhMessage.fromMessageBlob({
     required String messageId,
@@ -204,13 +204,18 @@ class X3dhMessage extends ProtocolMessage {
       metadata: base64Encode(utf8.encode(metadataJson)),
     );
   }
+
   /// Creates an X3DH message.
   X3dhMessage({
     required this.messageId,
     required this.fromUser,
     required this.toUser,
     required this.ephemeralPublic,
-    required this.ciphertext, required this.nonce, required this.signature, required this.metadata, this.otpkId,
+    required this.ciphertext,
+    required this.nonce,
+    required this.signature,
+    required this.metadata,
+    this.otpkId,
   });
 
   /// Unique message ID for acknowledgment tracking (base64).
@@ -245,17 +250,17 @@ class X3dhMessage extends ProtocolMessage {
 
   @override
   Map<String, dynamic> toJson() => <String, dynamic>{
-      'type': type,
-      'message_id': messageId,
-      'from': fromUser,
-      'to': toUser,
-      'ephemeral_public': ephemeralPublic,
-      'otpk_id': otpkId,
-      'ciphertext': ciphertext,
-      'nonce': nonce,
-      'signature': signature,
-      'metadata': metadata,
-    };
+        'type': type,
+        'message_id': messageId,
+        'from': fromUser,
+        'to': toUser,
+        'ephemeral_public': ephemeralPublic,
+        'otpk_id': otpkId,
+        'ciphertext': ciphertext,
+        'nonce': nonce,
+        'signature': signature,
+        'metadata': metadata,
+      };
 }
 
 /// Send a ratchet message in an established session.
@@ -271,7 +276,6 @@ class X3dhMessage extends ProtocolMessage {
 /// - `ciphertext` - base64 encrypted data
 /// - `nonce` - base64 encryption nonce
 class RatchetMessage extends ProtocolMessage {
-
   /// Create from crypto layer RatchetMessage.
   factory RatchetMessage.fromCryptoMessage({
     required String messageId,
@@ -296,6 +300,7 @@ class RatchetMessage extends ProtocolMessage {
       nonce: base64Encode(nonce),
     );
   }
+
   /// Creates a ratchet message.
   RatchetMessage({
     required this.messageId,

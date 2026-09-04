@@ -13,7 +13,6 @@ import 'dart:typed_data';
 /// - Chain/message counters
 /// - Encrypted payload
 class RatchetMessage {
-
   /// Creates from a map (e.g., from JSON/WebSocket).
   factory RatchetMessage.fromMap(Map<String, dynamic> map) {
     return RatchetMessage(
@@ -25,6 +24,7 @@ class RatchetMessage {
       nonce: base64Decode(map['nonce'] as String),
     );
   }
+
   /// Creates a ratchet message.
   const RatchetMessage({
     required this.dhPublic,
@@ -55,11 +55,11 @@ class RatchetMessage {
 
   /// Converts to a map for JSON serialization.
   Map<String, dynamic> toMap() => {
-      'dh_public': base64Encode(dhPublic),
-      'dh_step': dhStep,
-      'prev_chain_length': prevChainLength,
-      'msg_number': messageNumber,
-      'ciphertext': base64Encode(ciphertext),
-      'nonce': base64Encode(nonce),
-    };
+        'dh_public': base64Encode(dhPublic),
+        'dh_step': dhStep,
+        'prev_chain_length': prevChainLength,
+        'msg_number': messageNumber,
+        'ciphertext': base64Encode(ciphertext),
+        'nonce': base64Encode(nonce),
+      };
 }

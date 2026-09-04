@@ -120,8 +120,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
             child: MobileScanner(
               controller: _controller,
               onDetect: _onDetect,
-              errorBuilder: (context, error) =>
-                  _buildNoCameraFallback(theme),
+              errorBuilder: (context, error) => _buildNoCameraFallback(theme),
             ),
           ),
           Padding(

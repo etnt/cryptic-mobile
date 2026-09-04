@@ -13,7 +13,8 @@ import '../../domain/models/message.dart';
 ///
 /// In a real implementation, this would load from storage.
 final conversationsProvider =
-    StateNotifierProvider<ConversationsNotifier, List<Conversation>>((ref) => ConversationsNotifier());
+    StateNotifierProvider<ConversationsNotifier, List<Conversation>>(
+        (ref) => ConversationsNotifier());
 
 /// Notifier for managing conversations.
 class ConversationsNotifier extends StateNotifier<List<Conversation>> {
@@ -22,7 +23,8 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
 
   /// Add or update a conversation.
   void upsertConversation(Conversation conversation) {
-    final index = state.indexWhere((c) => c.peerUsername == conversation.peerUsername);
+    final index =
+        state.indexWhere((c) => c.peerUsername == conversation.peerUsername);
     if (index >= 0) {
       state = [...state]..[index] = conversation;
     } else {
@@ -120,4 +122,3 @@ final sortedConversationsProvider = Provider<List<Conversation>>((ref) {
   });
   return sorted;
 });
-

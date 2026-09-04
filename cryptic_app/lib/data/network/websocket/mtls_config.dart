@@ -174,12 +174,12 @@ class MtlsConfig {
 
   @override
   String toString() => 'MtlsConfig('
-        'host: $serverHost, '
-        'port: $serverPort, '
-        'certSize: ${clientCertificate.length}, '
-        'keySize: ${clientPrivateKey.length}, '
-        'caSize: ${caCertificate.length}'
-        ')';
+      'host: $serverHost, '
+      'port: $serverPort, '
+      'certSize: ${clientCertificate.length}, '
+      'keySize: ${clientPrivateKey.length}, '
+      'caSize: ${caCertificate.length}'
+      ')';
 }
 
 /// Exception thrown when mTLS configuration fails.

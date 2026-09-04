@@ -55,7 +55,8 @@ class ConversationsScreen extends ConsumerWidget {
                       final conversation = conversations[index];
                       return ConversationTile(
                         conversation: conversation,
-                        onTap: () => _navigateToChat(context, ref, conversation.peerUsername),
+                        onTap: () => _navigateToChat(
+                            context, ref, conversation.peerUsername),
                       );
                     },
                   ),

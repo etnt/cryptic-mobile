@@ -36,8 +36,12 @@ class MessageBubble extends StatelessWidget {
     final isOutgoing = message.isOutgoing;
 
     final bubbleColor = isOutgoing
-        ? (isDark ? AppColors.bubbleOutgoingDark : AppColors.bubbleOutgoingLight)
-        : (isDark ? AppColors.bubbleIncomingDark : AppColors.bubbleIncomingLight);
+        ? (isDark
+            ? AppColors.bubbleOutgoingDark
+            : AppColors.bubbleOutgoingLight)
+        : (isDark
+            ? AppColors.bubbleIncomingDark
+            : AppColors.bubbleIncomingLight);
 
     final textColor = isOutgoing && isDark
         ? Colors.white
@@ -127,38 +131,39 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status, Color color) => switch (status) {
-      MessageStatus.pending => Icon(
-          Icons.access_time,
-          size: 14,
-          color: color.withValues(alpha: 0.5),
-        ),
-      MessageStatus.sending => Icon(
-          Icons.access_time,
-          size: 14,
-          color: color.withValues(alpha: 0.5),
-        ),
-      MessageStatus.sent => Icon(
-          Icons.check,
-          size: 14,
-          color: color.withValues(alpha: 0.6),
-        ),
-      MessageStatus.delivered => Icon(
-          Icons.done_all,
-          size: 14,
-          color: color.withValues(alpha: 0.6),
-        ),
-      MessageStatus.read => const Icon(
-          Icons.done_all,
-          size: 14,
-          color: AppColors.primary,
-        ),
-      MessageStatus.failed => const Icon(
-          Icons.error_outline,
-          size: 14,
-          color: AppColors.error,
-        ),
-    };
+  Widget _buildStatusIcon(MessageStatus status, Color color) =>
+      switch (status) {
+        MessageStatus.pending => Icon(
+            Icons.access_time,
+            size: 14,
+            color: color.withValues(alpha: 0.5),
+          ),
+        MessageStatus.sending => Icon(
+            Icons.access_time,
+            size: 14,
+            color: color.withValues(alpha: 0.5),
+          ),
+        MessageStatus.sent => Icon(
+            Icons.check,
+            size: 14,
+            color: color.withValues(alpha: 0.6),
+          ),
+        MessageStatus.delivered => Icon(
+            Icons.done_all,
+            size: 14,
+            color: color.withValues(alpha: 0.6),
+          ),
+        MessageStatus.read => const Icon(
+            Icons.done_all,
+            size: 14,
+            color: AppColors.primary,
+          ),
+        MessageStatus.failed => const Icon(
+            Icons.error_outline,
+            size: 14,
+            color: AppColors.error,
+          ),
+      };
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();

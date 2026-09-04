@@ -120,5 +120,6 @@ class X25519Service {
     X25519KeyPair ourKeyPair,
     Uint8List theirPublicKey,
   ) =>
-      sharedSecret(privateKey: ourKeyPair.privateKey, publicKey: theirPublicKey);
+      sharedSecret(
+          privateKey: ourKeyPair.privateKey, publicKey: theirPublicKey);
 }

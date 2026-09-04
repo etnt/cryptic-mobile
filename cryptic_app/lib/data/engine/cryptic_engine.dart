@@ -141,8 +141,7 @@ class CrypticEngine {
   bool get isInitialized => _isInitialized;
 
   /// Whether the engine is connected.
-  bool get isConnected =>
-      _state.connectionStatus == ConnectionStatus.connected;
+  bool get isConnected => _state.connectionStatus == ConnectionStatus.connected;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Lifecycle
@@ -195,9 +194,11 @@ class CrypticEngine {
     _intentionalDisconnect = false;
     _reconnectAttempts = 0;
 
-    _updateState(_state.copyWith(
-      connectionStatus: ConnectionStatus.connecting,
-    ),);
+    _updateState(
+      _state.copyWith(
+        connectionStatus: ConnectionStatus.connecting,
+      ),
+    );
     _emitEvent(ConnectionStatusChanged(ConnectionStatus.connecting));
 
     try {
@@ -227,9 +228,11 @@ class CrypticEngine {
     _reconnectTimer?.cancel();
     _keepaliveTimer?.cancel();
     await _webSocketClient.disconnect();
-    _updateState(_state.copyWith(
-      connectionStatus: ConnectionStatus.disconnected,
-    ),);
+    _updateState(
+      _state.copyWith(
+        connectionStatus: ConnectionStatus.disconnected,
+      ),
+    );
     _emitEvent(ConnectionStatusChanged(ConnectionStatus.disconnected));
   }
 
@@ -263,7 +266,7 @@ class CrypticEngine {
   /// If no session exists, initiates X3DH key agreement first.
   Future<void> sendMessage(String toUser, String plaintext) async {
     print('[Engine] sendMessage called: to=$toUser, plaintext=$plaintext');
-    
+
     if (!_isInitialized) {
       print('[Engine] sendMessage: Not initialized!');
       throw StateError('CrypticEngine not initialized');
@@ -310,7 +313,8 @@ class CrypticEngine {
 
   /// Request a key bundle for a user.
   Future<void> requestKeyBundle(String username) async {
-    print('[Engine] requestKeyBundle: username=$username, isConnected=$isConnected');
+    print(
+        '[Engine] requestKeyBundle: username=$username, isConnected=$isConnected');
     if (!isConnected) {
       print('[Engine] requestKeyBundle: Not connected, skipping');
       return;
@@ -331,7 +335,8 @@ class CrypticEngine {
   /// Useful for debugging or recovering from stale session state.
   Future<void> clearSession(String peerUsername) async {
     final hadSession = _sessionManager.hasSession(peerUsername);
-    print('[Engine] clearSession: Clearing session with $peerUsername (had session: $hadSession)');
+    print(
+        '[Engine] clearSession: Clearing session with $peerUsername (had session: $hadSession)');
     await _sessionManager.deleteSession(peerUsername);
     final stillHasSession = _sessionManager.hasSession(peerUsername);
     print('[Engine] clearSession: After delete, hasSession=$stillHasSession');
@@ -350,7 +355,8 @@ class CrypticEngine {
   }
 
   /// Check if a session exists with a peer.
-  bool hasSession(String peerUsername) => _sessionManager.hasSession(peerUsername);
+  bool hasSession(String peerUsername) =>
+      _sessionManager.hasSession(peerUsername);
 
   /// Get list of peers with active sessions.
   List<String> get sessionPeers => _sessionManager.peerUsernames;
@@ -413,7 +419,8 @@ class CrypticEngine {
       };
 
       print('[Engine] Connection status changed: $status');
-      AppLogger.info('Engine: Connection status changed to $status', tag: 'Engine');
+      AppLogger.info('Engine: Connection status changed to $status',
+          tag: 'Engine');
       _updateState(_state.copyWith(connectionStatus: status));
       _emitEvent(ConnectionStatusChanged(status));
 
@@ -435,14 +442,17 @@ class CrypticEngine {
 
   void _scheduleReconnect() {
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print('[Engine] Max reconnect attempts ($_maxReconnectAttempts) reached, giving up');
-      _emitEvent(EngineError('Connection lost after $_maxReconnectAttempts reconnect attempts'));
+      print(
+          '[Engine] Max reconnect attempts ($_maxReconnectAttempts) reached, giving up');
+      _emitEvent(EngineError(
+          'Connection lost after $_maxReconnectAttempts reconnect attempts'));
       return;
     }
 
     _reconnectAttempts++;
     final delay = _calculateBackoff();
-    print('[Engine] Scheduling reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
+    print(
+        '[Engine] Scheduling reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () async {
@@ -577,10 +587,14 @@ class CrypticEngine {
     if (prekeys.isEmpty) return;
 
     // Convert crypto OneTimePrekey to protocol OneTimePrekey
-    final protocolPrekeys = prekeys.map((pk) => protocol.OneTimePrekey.fromBytes(
-      keyId: pk.keyId,
-      publicKey: pk.publicKey,
-    ),).toList();
+    final protocolPrekeys = prekeys
+        .map(
+          (pk) => protocol.OneTimePrekey.fromBytes(
+            keyId: pk.keyId,
+            publicKey: pk.publicKey,
+          ),
+        )
+        .toList();
 
     final message = protocol.UploadPrekeyBundleMessage(
       username: _username,
@@ -596,7 +610,7 @@ class CrypticEngine {
 
   Future<void> _initiateX3dh(String toUser, String plaintext) async {
     print('[Engine] _initiateX3dh: toUser=$toUser');
-    
+
     // Check if we already have a pending key bundle
     if (_pendingKeyBundles.containsKey(toUser)) {
       print('[Engine] _initiateX3dh: Have pending bundle, performing X3DH');
@@ -605,7 +619,8 @@ class CrypticEngine {
     }
 
     // Queue the message and request key bundle
-    print('[Engine] _initiateX3dh: No bundle, queuing message and requesting key bundle');
+    print(
+        '[Engine] _initiateX3dh: No bundle, queuing message and requesting key bundle');
     _pendingMessages.putIfAbsent(toUser, () => []);
     _pendingMessages[toUser]!.add(plaintext);
 
@@ -613,12 +628,17 @@ class CrypticEngine {
   }
 
   Future<void> _handleKeyBundleReceived(KeyBundleMessage message) async {
-    print('[Engine] _handleKeyBundleReceived: Got bundle for ${message.username}');
-    print('[Engine] _handleKeyBundleReceived: identitySignKey=${message.identitySignKey.substring(0, 20)}...');
-    print('[Engine] _handleKeyBundleReceived: identityDhKey=${message.identityDhKey.substring(0, 20)}...');
-    print('[Engine] _handleKeyBundleReceived: signedPrekey.keyId=${message.signedPrekey.keyId}');
-    print('[Engine] _handleKeyBundleReceived: oneTimePrekey=${message.oneTimePrekey != null ? "present, keyId=${message.oneTimePrekey!.keyId}" : "null"}');
-    
+    print(
+        '[Engine] _handleKeyBundleReceived: Got bundle for ${message.username}');
+    print(
+        '[Engine] _handleKeyBundleReceived: identitySignKey=${message.identitySignKey.substring(0, 20)}...');
+    print(
+        '[Engine] _handleKeyBundleReceived: identityDhKey=${message.identityDhKey.substring(0, 20)}...');
+    print(
+        '[Engine] _handleKeyBundleReceived: signedPrekey.keyId=${message.signedPrekey.keyId}');
+    print(
+        '[Engine] _handleKeyBundleReceived: oneTimePrekey=${message.oneTimePrekey != null ? "present, keyId=${message.oneTimePrekey!.keyId}" : "null"}');
+
     // Convert KeyBundleMessage to the Map format expected by KeyBundle
     final bundleMap = <String, dynamic>{
       'username': message.username,
@@ -635,17 +655,20 @@ class CrypticEngine {
           'public_key': message.oneTimePrekey!.publicKey,
         },
     };
-    
+
     try {
       final bundle = KeyBundle.fromServerResponse(bundleMap);
-      print('[Engine] _handleKeyBundleReceived: KeyBundle created successfully');
+      print(
+          '[Engine] _handleKeyBundleReceived: KeyBundle created successfully');
       _pendingKeyBundles[message.username] = bundle;
 
       // Check for pending messages
-      print('[Engine] _handleKeyBundleReceived: Pending messages for ${message.username}: ${_pendingMessages[message.username]}');
+      print(
+          '[Engine] _handleKeyBundleReceived: Pending messages for ${message.username}: ${_pendingMessages[message.username]}');
       final pendingMsgs = _pendingMessages.remove(message.username);
       if (pendingMsgs != null && pendingMsgs.isNotEmpty) {
-        print('[Engine] _handleKeyBundleReceived: Have ${pendingMsgs.length} pending messages, performing X3DH');
+        print(
+            '[Engine] _handleKeyBundleReceived: Have ${pendingMsgs.length} pending messages, performing X3DH');
         // Send first pending message with X3DH
         await _performX3dhWithBundle(message.username, pendingMsgs.first);
 
@@ -654,7 +677,8 @@ class CrypticEngine {
           await _sendRatchetMessage(message.username, pendingMsgs[i]);
         }
       } else {
-        print('[Engine] _handleKeyBundleReceived: No pending messages for ${message.username}');
+        print(
+            '[Engine] _handleKeyBundleReceived: No pending messages for ${message.username}');
       }
     } catch (e, stack) {
       print('[Engine] _handleKeyBundleReceived: ERROR: $e');
@@ -695,17 +719,25 @@ class CrypticEngine {
     final messageBlob = x3dhResult.messageBlob;
     final metadata = messageBlob.metadata;
     final metadataJson = jsonEncode(metadata.toMap());
-    
+
     print('[Engine] _performX3dhWithBundle: Building X3DH message');
-    print('[Engine] _performX3dhWithBundle: messageId=${base64Encode(x3dhResult.messageId)}');
-    print('[Engine] _performX3dhWithBundle: fromUser=$_username, toUser=$toUser');
-    print('[Engine] _performX3dhWithBundle: ephemeralPublic len=${metadata.ephemeralPublic.length}');
-    print('[Engine] _performX3dhWithBundle: otpkId=${metadata.otpkId != null ? "present" : "null"}');
-    print('[Engine] _performX3dhWithBundle: ciphertext len=${messageBlob.ciphertext.length}');
-    print('[Engine] _performX3dhWithBundle: nonce len=${messageBlob.nonce.length}');
-    print('[Engine] _performX3dhWithBundle: signature len=${messageBlob.signature.length}');
-    print('[Engine] _performX3dhWithBundle: metadata=${metadataJson.substring(0, metadataJson.length.clamp(0, 100))}...');
-    
+    print(
+        '[Engine] _performX3dhWithBundle: messageId=${base64Encode(x3dhResult.messageId)}');
+    print(
+        '[Engine] _performX3dhWithBundle: fromUser=$_username, toUser=$toUser');
+    print(
+        '[Engine] _performX3dhWithBundle: ephemeralPublic len=${metadata.ephemeralPublic.length}');
+    print(
+        '[Engine] _performX3dhWithBundle: otpkId=${metadata.otpkId != null ? "present" : "null"}');
+    print(
+        '[Engine] _performX3dhWithBundle: ciphertext len=${messageBlob.ciphertext.length}');
+    print(
+        '[Engine] _performX3dhWithBundle: nonce len=${messageBlob.nonce.length}');
+    print(
+        '[Engine] _performX3dhWithBundle: signature len=${messageBlob.signature.length}');
+    print(
+        '[Engine] _performX3dhWithBundle: metadata=${metadataJson.substring(0, metadataJson.length.clamp(0, 100))}...');
+
     final x3dhMessage = protocol.X3dhMessage.fromMessageBlob(
       messageId: base64Encode(x3dhResult.messageId),
       fromUser: _username,
@@ -718,7 +750,8 @@ class CrypticEngine {
       metadataJson: metadataJson,
     );
 
-    print('[Engine] _performX3dhWithBundle: Final JSON=${jsonEncode(x3dhMessage.toJson())}');
+    print(
+        '[Engine] _performX3dhWithBundle: Final JSON=${jsonEncode(x3dhMessage.toJson())}');
     _webSocketClient.send(x3dhMessage);
 
     // Update state with new session
@@ -740,8 +773,9 @@ class CrypticEngine {
 
   Future<void> _sendRatchetMessage(String toUser, String plaintext) async {
     final diag = _sessionManager.getSessionDiagnostics(toUser);
-    print('[Engine] _sendRatchetMessage: toUser=$toUser, from=$_username, sessionDiag=$diag');
-    
+    print(
+        '[Engine] _sendRatchetMessage: toUser=$toUser, from=$_username, sessionDiag=$diag');
+
     // Encrypt with Double Ratchet
     final ratchetMsg = await _sessionManager.encryptMessage(
       peerUsername: toUser,
@@ -762,7 +796,8 @@ class CrypticEngine {
       nonce: ratchetMsg.nonce,
     );
 
-    print('[Engine] _sendRatchetMessage: Sending ratchet to $toUser (dhStep=${ratchetMsg.dhStep}, msgNum=${ratchetMsg.messageNumber}, from=$_username)');
+    print(
+        '[Engine] _sendRatchetMessage: Sending ratchet to $toUser (dhStep=${ratchetMsg.dhStep}, msgNum=${ratchetMsg.messageNumber}, from=$_username)');
     _webSocketClient.send(message);
 
     // Update session state

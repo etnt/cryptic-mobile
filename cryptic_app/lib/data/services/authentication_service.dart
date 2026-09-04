@@ -82,8 +82,7 @@ class AuthenticationService {
     CertificateStorageService? certificateStorage,
     KeyRepository? keyRepository,
     SessionRepository? sessionRepository,
-  })  : _certificateStorage =
-            certificateStorage ?? CertificateStorageService(),
+  })  : _certificateStorage = certificateStorage ?? CertificateStorageService(),
         _keyRepository = keyRepository ?? KeyRepository(),
         _sessionRepository = sessionRepository ?? SessionRepository();
 
@@ -116,7 +115,8 @@ class AuthenticationService {
   }
 
   /// Check if identity keys exist for a user.
-  Future<bool> hasIdentityKeys() async => await _keyRepository.hasIdentityKeys();
+  Future<bool> hasIdentityKeys() async =>
+      await _keyRepository.hasIdentityKeys();
 
   /// Authenticate and connect to the server.
   ///
@@ -149,7 +149,8 @@ class AuthenticationService {
         // and re-encrypts on write.
         final encStorage = EncryptedSecureStorage(passphrase: passphrase);
         final keyStorageSvc = KeyStorageService(secureStorage: encStorage);
-        certificateStorage = CertificateStorageService(secureStorage: encStorage);
+        certificateStorage =
+            CertificateStorageService(secureStorage: encStorage);
         keyRepository = KeyRepository(keyStorage: keyStorageSvc);
         sessionRepository = SessionRepository(keyStorage: keyStorageSvc);
       } else {
@@ -249,7 +250,8 @@ class AuthenticationService {
     ServerConnectionConfig config,
   ) async {
     try {
-      final clientCert = await rootBundle.load('assets/certificates/client.crt');
+      final clientCert =
+          await rootBundle.load('assets/certificates/client.crt');
       final clientKey = await rootBundle.load('assets/certificates/client.key');
       final caCert = await rootBundle.load('assets/certificates/ca.crt');
 
@@ -296,8 +298,10 @@ class AuthenticationService {
     required String serverHost,
     required int serverPort,
   }) async {
-    final clientCert = await rootBundle.loadString('assets/certificates/client.crt');
-    final clientKey = await rootBundle.loadString('assets/certificates/client.key');
+    final clientCert =
+        await rootBundle.loadString('assets/certificates/client.crt');
+    final clientKey =
+        await rootBundle.loadString('assets/certificates/client.key');
     final caCert = await rootBundle.loadString('assets/certificates/ca.crt');
 
     await importCertificates(
@@ -344,13 +348,11 @@ class AuthenticationService {
     }
 
     // Network errors
-    if (raw.contains('SocketException') ||
-        raw.contains('Connection refused')) {
+    if (raw.contains('SocketException') || raw.contains('Connection refused')) {
       return 'Cannot reach the server.\n'
           'Check the host and port, and your network connection.';
     }
-    if (raw.contains('Connection timed out') ||
-        raw.contains('timed out')) {
+    if (raw.contains('Connection timed out') || raw.contains('timed out')) {
       return 'Connection timed out.\n'
           'Check your network connection and server address.';
     }
@@ -361,8 +363,7 @@ class AuthenticationService {
     }
 
     // DNS errors
-    if (raw.contains('Failed host lookup') ||
-        raw.contains('getaddrinfo')) {
+    if (raw.contains('Failed host lookup') || raw.contains('getaddrinfo')) {
       return 'Cannot resolve server hostname.\n'
           'Check the server address.';
     }

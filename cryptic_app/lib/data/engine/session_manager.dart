@@ -72,13 +72,13 @@ class SessionManager {
 
   /// Get all session infos.
   Map<String, PeerSession> getAllSessionInfos() => {
-      for (final entry in _sessions.entries)
-        entry.key: PeerSession(
-          peerUsername: entry.key,
-          hasSession: true,
-          messageCount: entry.value.sendMessageNumber,
-        ),
-    };
+        for (final entry in _sessions.entries)
+          entry.key: PeerSession(
+            peerUsername: entry.key,
+            hasSession: true,
+            messageCount: entry.value.sendMessageNumber,
+          ),
+      };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Session Creation
@@ -182,7 +182,8 @@ class SessionManager {
     }
 
     final peers = await _sessionRepository.listPeers();
-    print('[SessionManager] loadAllSessions: found ${peers.length} peers: $peers');
+    print(
+        '[SessionManager] loadAllSessions: found ${peers.length} peers: $peers');
 
     for (final peer in peers) {
       try {
@@ -201,7 +202,8 @@ class SessionManager {
         try {
           await _sessionRepository.deleteSession(peerUsername: peer);
         } catch (deleteError) {
-          print('[SessionManager] Could not delete session for $peer: $deleteError');
+          print(
+              '[SessionManager] Could not delete session for $peer: $deleteError');
         }
       }
     }
@@ -317,10 +319,9 @@ class SessionManager {
 
   /// Get diagnostics for all sessions.
   Map<String, Map<String, dynamic>> getAllSessionDiagnostics() => {
-      for (final peer in _sessions.keys)
-        if (getSessionDiagnostics(peer) case final diag?)
-          peer: diag,
-    };
+        for (final peer in _sessions.keys)
+          if (getSessionDiagnostics(peer) case final diag?) peer: diag,
+      };
 
   // ─────────────────────────────────────────────────────────────────────────
   // Private Helpers

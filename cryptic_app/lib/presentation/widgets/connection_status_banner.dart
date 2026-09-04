@@ -95,30 +95,30 @@ class ConnectionStatusBanner extends StatelessWidget {
   }
 
   (Color, IconData, String) _getStatusInfo() => switch (status) {
-      ConnectionStatus.disconnected => (
-          AppColors.disconnected,
-          Icons.cloud_off,
-          'Disconnected',
-        ),
-      ConnectionStatus.connecting => (
-          AppColors.connecting,
-          Icons.cloud_sync,
-          'Connecting...',
-        ),
-      ConnectionStatus.connected => (
-          AppColors.connected,
-          Icons.cloud_done,
-          'Connected',
-        ),
-      ConnectionStatus.reconnecting => (
-          AppColors.connecting,
-          Icons.cloud_sync,
-          'Reconnecting...',
-        ),
-      ConnectionStatus.error => (
-          AppColors.connectionError,
-          Icons.cloud_off,
-          'Connection error',
-        ),
-    };
+        ConnectionStatus.disconnected => (
+            AppColors.disconnected,
+            Icons.cloud_off,
+            'Disconnected',
+          ),
+        ConnectionStatus.connecting => (
+            AppColors.connecting,
+            Icons.cloud_sync,
+            'Connecting...',
+          ),
+        ConnectionStatus.connected => (
+            AppColors.connected,
+            Icons.cloud_done,
+            'Connected',
+          ),
+        ConnectionStatus.reconnecting => (
+            AppColors.connecting,
+            Icons.cloud_sync,
+            'Reconnecting...',
+          ),
+        ConnectionStatus.error => (
+            AppColors.connectionError,
+            Icons.cloud_off,
+            'Connection error',
+          ),
+      };
 }

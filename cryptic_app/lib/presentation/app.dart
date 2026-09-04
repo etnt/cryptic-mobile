@@ -24,10 +24,13 @@ import 'screens/users_screen.dart';
 enum AppScreen {
   /// Splash/loading screen.
   splash,
+
   /// Enrollment flow (no certificates yet).
   enrollment,
+
   /// Login/setup screen.
   login,
+
   /// Main conversations screen.
   home,
 }
@@ -70,9 +73,9 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
             );
             repo.saveIncomingMessage(msg);
             ref.read(conversationsProvider.notifier).addMessage(
-              event.fromUser,
-              msg,
-            );
+                  event.fromUser,
+                  msg,
+                );
 
             // Show local notification (suppressed if that chat is open)
             NotificationService.instance.showMessageNotification(
@@ -113,39 +116,39 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
   }
 
   Widget _buildCurrentScreen() => switch (_currentScreen) {
-      AppScreen.splash => SplashScreen(
-          onInitialized: (needsSetup) {
-            setState(() {
-              _currentScreen =
-                  needsSetup ? AppScreen.enrollment : AppScreen.login;
-            });
-          },
-        ),
-      AppScreen.enrollment => EnrollmentFlowScreen(
-          onComplete: () async {
-            ref.read(enrollmentProvider.notifier).reset();
-            await ref.read(authProvider.notifier).checkAuthState();
-            if (mounted) {
+        AppScreen.splash => SplashScreen(
+            onInitialized: (needsSetup) {
               setState(() {
-                _loginKey++;
-                _currentScreen = AppScreen.login;
+                _currentScreen =
+                    needsSetup ? AppScreen.enrollment : AppScreen.login;
               });
-            }
-          },
-        ),
-      AppScreen.login => LoginScreen(
-          key: ValueKey(_loginKey),
-          onLoginSuccess: () {
-            setState(() {
-              _currentScreen = AppScreen.home;
-            });
-          },
-          onReenroll: () {
-            setState(() {
-              _currentScreen = AppScreen.enrollment;
-            });
-          },
-        ),
-      AppScreen.home => const UsersScreen(),
-    };
+            },
+          ),
+        AppScreen.enrollment => EnrollmentFlowScreen(
+            onComplete: () async {
+              ref.read(enrollmentProvider.notifier).reset();
+              await ref.read(authProvider.notifier).checkAuthState();
+              if (mounted) {
+                setState(() {
+                  _loginKey++;
+                  _currentScreen = AppScreen.login;
+                });
+              }
+            },
+          ),
+        AppScreen.login => LoginScreen(
+            key: ValueKey(_loginKey),
+            onLoginSuccess: () {
+              setState(() {
+                _currentScreen = AppScreen.home;
+              });
+            },
+            onReenroll: () {
+              setState(() {
+                _currentScreen = AppScreen.enrollment;
+              });
+            },
+          ),
+        AppScreen.home => const UsersScreen(),
+      };
 }

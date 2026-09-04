@@ -77,19 +77,20 @@ class Conversation {
     bool? isMuted,
     bool? isArchived,
     DateTime? createdAt,
-  }) => Conversation(
-      id: id ?? this.id,
-      peerUsername: peerUsername ?? this.peerUsername,
-      peerDisplayName: peerDisplayName ?? this.peerDisplayName,
-      lastMessage: lastMessage ?? this.lastMessage,
-      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
-      unreadCount: unreadCount ?? this.unreadCount,
-      hasActiveSession: hasActiveSession ?? this.hasActiveSession,
-      isPinned: isPinned ?? this.isPinned,
-      isMuted: isMuted ?? this.isMuted,
-      isArchived: isArchived ?? this.isArchived,
-      createdAt: createdAt ?? this.createdAt,
-    );
+  }) =>
+      Conversation(
+        id: id ?? this.id,
+        peerUsername: peerUsername ?? this.peerUsername,
+        peerDisplayName: peerDisplayName ?? this.peerDisplayName,
+        lastMessage: lastMessage ?? this.lastMessage,
+        lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+        unreadCount: unreadCount ?? this.unreadCount,
+        hasActiveSession: hasActiveSession ?? this.hasActiveSession,
+        isPinned: isPinned ?? this.isPinned,
+        isMuted: isMuted ?? this.isMuted,
+        isArchived: isArchived ?? this.isArchived,
+        createdAt: createdAt ?? this.createdAt,
+      );
 
   @override
   bool operator ==(Object other) =>

@@ -23,7 +23,8 @@ class QueueEntry {
   final DateTime enqueuedAt;
 
   /// Check if this entry has expired.
-  bool isExpired(Duration maxAge) => DateTime.now().difference(enqueuedAt) > maxAge;
+  bool isExpired(Duration maxAge) =>
+      DateTime.now().difference(enqueuedAt) > maxAge;
 }
 
 /// Priority levels for queued messages.
@@ -82,10 +83,12 @@ class MessageQueue {
       _queue.removeFirst();
     }
 
-    _queue.add(QueueEntry(
-      message: message,
-      enqueuedAt: DateTime.now(),
-    ),);
+    _queue.add(
+      QueueEntry(
+        message: message,
+        enqueuedAt: DateTime.now(),
+      ),
+    );
 
     return true;
   }
@@ -149,11 +152,11 @@ class MessageQueue {
 
   /// Get queue statistics.
   QueueStats get stats => QueueStats(
-      length: _queue.length,
-      maxSize: maxSize,
-      oldestAge: oldestMessageAge,
-      isFull: isFull,
-    );
+        length: _queue.length,
+        maxSize: maxSize,
+        oldestAge: oldestMessageAge,
+        isFull: isFull,
+      );
 }
 
 /// Statistics about the message queue.
@@ -162,7 +165,8 @@ class QueueStats {
   const QueueStats({
     required this.length,
     required this.maxSize,
-    required this.isFull, this.oldestAge,
+    required this.isFull,
+    this.oldestAge,
   });
 
   /// Number of messages in queue.
@@ -179,8 +183,8 @@ class QueueStats {
 
   @override
   String toString() => 'QueueStats(length: $length/$maxSize, '
-        'oldest: ${oldestAge?.inSeconds ?? 0}s, '
-        'full: $isFull)';
+      'oldest: ${oldestAge?.inSeconds ?? 0}s, '
+      'full: $isFull)';
 }
 
 /// A priority-aware message queue.
@@ -207,7 +211,8 @@ class PriorityMessageQueue {
       _highQueue.isEmpty && _normalQueue.isEmpty && _lowQueue.isEmpty;
 
   /// Add a message with specified priority.
-  void enqueue(ProtocolMessage message, {MessagePriority priority = MessagePriority.normal}) {
+  void enqueue(ProtocolMessage message,
+      {MessagePriority priority = MessagePriority.normal}) {
     final queue = switch (priority) {
       MessagePriority.high => _highQueue,
       MessagePriority.normal => _normalQueue,
@@ -218,10 +223,10 @@ class PriorityMessageQueue {
 
   /// Remove and return all messages in priority order.
   List<ProtocolMessage> dequeueAll() => [
-      ..._highQueue.dequeueAll(),
-      ..._normalQueue.dequeueAll(),
-      ..._lowQueue.dequeueAll(),
-    ];
+        ..._highQueue.dequeueAll(),
+        ..._normalQueue.dequeueAll(),
+        ..._lowQueue.dequeueAll(),
+      ];
 
   /// Clear all queues.
   void clear() {

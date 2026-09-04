@@ -130,7 +130,8 @@ class MessageProcessor {
   }
 
   Future<ProcessingResult> _handleOnlineUsers(
-      OnlineUsersResponseMessage message,) async {
+    OnlineUsersResponseMessage message,
+  ) async {
     print('[MessageProcessor] Handling online_users: ${message.users}');
     final event = UsersListReceived(message.users);
     _eventController.add(event);
@@ -149,7 +150,8 @@ class MessageProcessor {
   Future<ProcessingResult> _handleMessageSent(
     MessageSentMessage message,
   ) async {
-    print('[MessageProcessor] message_sent received: messageId=${message.messageId}, toUser=${message.toUser}');
+    print(
+        '[MessageProcessor] message_sent received: messageId=${message.messageId}, toUser=${message.toUser}');
     final event = MessageSent(
       messageId: message.messageId,
       toUser: message.toUser,
@@ -167,7 +169,8 @@ class MessageProcessor {
   Future<ProcessingResult> _handleIncomingMessage(
     IncomingMessage message,
   ) async {
-    print('[MessageProcessor] Handling incoming message: type=${message.messageType}, from=${message.fromUser}, isX3dh=${message.isX3dh}');
+    print(
+        '[MessageProcessor] Handling incoming message: type=${message.messageType}, from=${message.fromUser}, isX3dh=${message.isX3dh}');
     return message.isX3dh
         ? _handleX3dhMessage(message)
         : _handleRatchetMessage(message);
@@ -248,7 +251,7 @@ class MessageProcessor {
   ) {
     // The server forwards the metadata as base64-encoded JSON
     final metadataB64 = rawData['metadata'] as String?;
-    
+
     X3dhMetadata metadata;
     if (metadataB64 != null && metadataB64.isNotEmpty) {
       // Decode the metadata: base64 -> UTF8 bytes -> JSON string -> Map
@@ -314,8 +317,9 @@ class MessageProcessor {
       print('[MessageProcessor] Failed to parse ratchet message');
       return ProcessingFailure('Failed to parse ratchet message');
     }
-    
-    print('[MessageProcessor] Parsed ratchet: from=${ratchet.fromUser}, dh_public=${ratchet.dhPublic.substring(0, 20)}..., dh_step=${ratchet.dhStep}, prev_chain=${ratchet.previousChainLength}, msg_num=${ratchet.messageNumber}');
+
+    print(
+        '[MessageProcessor] Parsed ratchet: from=${ratchet.fromUser}, dh_public=${ratchet.dhPublic.substring(0, 20)}..., dh_step=${ratchet.dhStep}, prev_chain=${ratchet.previousChainLength}, msg_num=${ratchet.messageNumber}');
 
     try {
       // Check if we have a session for this peer
@@ -325,7 +329,7 @@ class MessageProcessor {
           'No session for ${ratchet.fromUser}',
         );
       }
-      
+
       print('[MessageProcessor] Found session for ${ratchet.fromUser}');
 
       // Parse the ratchet message
@@ -337,7 +341,7 @@ class MessageProcessor {
         ciphertext: ratchet.ciphertextBytes,
         nonce: ratchet.nonceBytes,
       );
-      
+
       print('[MessageProcessor] RatchetMessage created, decrypting...');
 
       // Decrypt the message
@@ -345,7 +349,7 @@ class MessageProcessor {
         peerUsername: ratchet.fromUser,
         message: ratchetMessage,
       );
-      
+
       print('[MessageProcessor] Decrypted message: ${utf8.decode(plaintext)}');
 
       // Emit message received event

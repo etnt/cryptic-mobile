@@ -171,8 +171,7 @@ class EnrollmentService {
           serverHost: host,
           serverPort: port,
           importedAt: DateTime.now(),
-          expiresAt:
-              DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
+          expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
           fingerprint: enrollmentFp,
         ),
       );
@@ -184,8 +183,7 @@ class EnrollmentService {
         serverHost: host,
         serverPort: port,
         certSerial: serial,
-        expiresAt:
-            DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(expiresAtUnix * 1000),
       );
     } finally {
       // Always erase the enrollment key
@@ -236,8 +234,9 @@ class EnrollmentService {
     // Extract DER from PEM
     final lines = caCertPem.split('\n');
     final b64Lines = lines
-        .where((line) =>
-            !line.startsWith('-----') && line.trim().isNotEmpty,)
+        .where(
+          (line) => !line.startsWith('-----') && line.trim().isNotEmpty,
+        )
         .join();
     final derBytes = base64.decode(b64Lines);
 
@@ -314,9 +313,7 @@ class EnrollmentService {
   String _extractError(String body) {
     try {
       final map = jsonDecode(body) as Map<String, dynamic>;
-      return map['message'] as String? ??
-          map['error'] as String? ??
-          body;
+      return map['message'] as String? ?? map['error'] as String? ?? body;
     } catch (_) {
       return body;
     }

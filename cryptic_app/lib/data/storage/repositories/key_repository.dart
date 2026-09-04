@@ -31,7 +31,8 @@ class KeyRepository {
   }
 
   /// Loads identity key pair.
-  Future<IdentityKeyPair?> loadIdentityKeys() async => await _keyStorage.loadIdentityKeyPair();
+  Future<IdentityKeyPair?> loadIdentityKeys() async =>
+      await _keyStorage.loadIdentityKeyPair();
 
   /// Checks if identity keys exist.
   Future<bool> hasIdentityKeys() async => await _keyStorage.hasIdentityKeys();
@@ -51,7 +52,8 @@ class KeyRepository {
   }
 
   /// Loads signed prekey.
-  Future<SignedPrekey?> loadSignedPrekey() async => await _keyStorage.loadSignedPrekey();
+  Future<SignedPrekey?> loadSignedPrekey() async =>
+      await _keyStorage.loadSignedPrekey();
 
   /// Deletes signed prekey.
   Future<void> deleteSignedPrekey() async {
@@ -68,7 +70,8 @@ class KeyRepository {
   }
 
   /// Loads all one-time prekeys.
-  Future<List<OneTimePrekey>> loadOneTimePrekeys() async => await _keyStorage.loadOneTimePrekeys();
+  Future<List<OneTimePrekey>> loadOneTimePrekeys() async =>
+      await _keyStorage.loadOneTimePrekeys();
 
   /// Adds new one-time prekeys.
   Future<void> addOneTimePrekeys(List<OneTimePrekey> prekeys) async {
@@ -81,7 +84,8 @@ class KeyRepository {
   }
 
   /// Gets a one-time prekey by ID.
-  Future<OneTimePrekey?> getOneTimePrekey(int keyId) async => await _keyStorage.getOneTimePrekey(keyId);
+  Future<OneTimePrekey?> getOneTimePrekey(int keyId) async =>
+      await _keyStorage.getOneTimePrekey(keyId);
 
   /// Gets the count of remaining one-time prekeys.
   Future<int> getOneTimePrekeyCount() async {
@@ -166,7 +170,8 @@ class KeyRepository {
   }
 
   /// Loads server info.
-  Future<({String host, int port})?> loadServerInfo() async => await _keyStorage.loadServerInfo();
+  Future<({String host, int port})?> loadServerInfo() async =>
+      await _keyStorage.loadServerInfo();
 
   // ─────────────────────────────────────────────────────────────────────────
   // Data Management

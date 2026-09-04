@@ -104,20 +104,21 @@ class ChatMessage {
     String? failureReason,
     bool? isDeleted,
     String? replyToId,
-  }) => ChatMessage(
-      id: id ?? this.id,
-      conversationId: conversationId ?? this.conversationId,
-      senderId: senderId ?? this.senderId,
-      content: content ?? this.content,
-      timestamp: timestamp ?? this.timestamp,
-      direction: direction ?? this.direction,
-      status: status ?? this.status,
-      readAt: readAt ?? this.readAt,
-      deliveredAt: deliveredAt ?? this.deliveredAt,
-      failureReason: failureReason ?? this.failureReason,
-      isDeleted: isDeleted ?? this.isDeleted,
-      replyToId: replyToId ?? this.replyToId,
-    );
+  }) =>
+      ChatMessage(
+        id: id ?? this.id,
+        conversationId: conversationId ?? this.conversationId,
+        senderId: senderId ?? this.senderId,
+        content: content ?? this.content,
+        timestamp: timestamp ?? this.timestamp,
+        direction: direction ?? this.direction,
+        status: status ?? this.status,
+        readAt: readAt ?? this.readAt,
+        deliveredAt: deliveredAt ?? this.deliveredAt,
+        failureReason: failureReason ?? this.failureReason,
+        isDeleted: isDeleted ?? this.isDeleted,
+        replyToId: replyToId ?? this.replyToId,
+      );
 
   /// Whether this message is from the current user.
   bool get isOutgoing => direction == MessageDirection.outgoing;
@@ -140,6 +141,5 @@ class ChatMessage {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() =>
-      'ChatMessage(id: $id, from: $senderId, status: $status)';
+  String toString() => 'ChatMessage(id: $id, from: $senderId, status: $status)';
 }

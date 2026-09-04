@@ -19,28 +19,28 @@ class EmptyState extends StatelessWidget {
 
   /// Factory for no conversations state.
   factory EmptyState.noConversations({VoidCallback? onStartChat}) => EmptyState(
-      icon: Icons.chat_bubble_outline,
-      title: 'No conversations yet',
-      message: 'Start a new chat to begin messaging',
-      actionLabel: 'Start Chat',
-      onAction: onStartChat,
-    );
+        icon: Icons.chat_bubble_outline,
+        title: 'No conversations yet',
+        message: 'Start a new chat to begin messaging',
+        actionLabel: 'Start Chat',
+        onAction: onStartChat,
+      );
 
   /// Factory for no messages state.
   factory EmptyState.noMessages() => const EmptyState(
-      icon: Icons.message_outlined,
-      title: 'No messages',
-      message: 'Send a message to start the conversation',
-    );
+        icon: Icons.message_outlined,
+        title: 'No messages',
+        message: 'Send a message to start the conversation',
+      );
 
   /// Factory for no users state.
   factory EmptyState.noUsers({VoidCallback? onRefresh}) => EmptyState(
-      icon: Icons.people_outline,
-      title: 'No users available',
-      message: 'No other users are registered on the server',
-      actionLabel: 'Refresh',
-      onAction: onRefresh,
-    );
+        icon: Icons.people_outline,
+        title: 'No users available',
+        message: 'No other users are registered on the server',
+        actionLabel: 'Refresh',
+        onAction: onRefresh,
+      );
 
   /// The icon to display.
   final IconData icon;
@@ -85,7 +85,8 @@ class EmptyState extends StatelessWidget {
               Text(
                 message!,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                  color:
+                      theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
               ),

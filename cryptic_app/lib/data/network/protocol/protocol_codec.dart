@@ -5,7 +5,6 @@ library;
 
 import 'dart:convert';
 
-import 'client_messages.dart';
 import 'protocol_message.dart';
 import 'server_messages.dart';
 
@@ -17,12 +16,14 @@ class ProtocolCodec {
   /// Decode a server message from JSON string.
   ///
   /// Returns null if the message cannot be decoded.
-  static ServerMessage? decode(String jsonString) => ServerMessage.fromJsonString(jsonString);
+  static ServerMessage? decode(String jsonString) =>
+      ServerMessage.fromJsonString(jsonString);
 
   /// Decode a server message from JSON map.
   ///
   /// Returns null if the message cannot be decoded.
-  static ServerMessage? decodeMap(Map<String, dynamic> json) => ServerMessage.fromJson(json);
+  static ServerMessage? decodeMap(Map<String, dynamic> json) =>
+      ServerMessage.fromJson(json);
 
   /// Parse raw JSON string to map.
   ///
@@ -40,10 +41,12 @@ class ProtocolCodec {
   }
 
   /// Check if a message type is a known server message type.
-  static bool isKnownServerType(String type) => ServerMessageType.fromValue(type) != null;
+  static bool isKnownServerType(String type) =>
+      ServerMessageType.fromValue(type) != null;
 
   /// Check if a message type is a known client message type.
-  static bool isKnownClientType(String type) => ClientMessageType.fromValue(type) != null;
+  static bool isKnownClientType(String type) =>
+      ClientMessageType.fromValue(type) != null;
 }
 
 /// Extension methods for easier message handling.

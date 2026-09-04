@@ -41,7 +41,8 @@ class UsersScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               final engine = ref.read(engineProvider);
-              print('[UsersScreen] Refresh pressed, engine=$engine, isConnected=${engine?.isConnected}');
+              print(
+                  '[UsersScreen] Refresh pressed, engine=$engine, isConnected=${engine?.isConnected}');
               engine?.requestUserList();
             },
           ),
@@ -56,7 +57,8 @@ class UsersScreen extends ConsumerWidget {
           ? EmptyState.noUsers(
               onRefresh: () {
                 final engine = ref.read(engineProvider);
-                print('[UsersScreen] Empty state refresh, engine=$engine, isConnected=${engine?.isConnected}');
+                print(
+                    '[UsersScreen] Empty state refresh, engine=$engine, isConnected=${engine?.isConnected}');
                 engine?.requestUserList();
               },
             )

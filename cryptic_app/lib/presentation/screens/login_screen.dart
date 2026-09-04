@@ -58,7 +58,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final savedConfig = await storage.readJson(key: _kServerConfigKey);
       if (savedConfig != null && mounted) {
         _usernameController.text = savedConfig['username'] as String? ?? '';
-        _serverHostController.text = savedConfig['host'] as String? ?? 'localhost';
+        _serverHostController.text =
+            savedConfig['host'] as String? ?? 'localhost';
         _serverPortController.text =
             (savedConfig['port'] as int? ?? 8443).toString();
         _showServerConfig = true;
@@ -148,257 +149,264 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: _isLoadingConfig
           ? const Center(child: CircularProgressIndicator())
           : LoadingOverlay(
-        isLoading: authState.isAuthenticating,
-        message: _isNewUser ? 'Connecting & setting up...' : 'Connecting...',
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Logo/Icon
-                    Icon(
-                      Icons.lock_outline,
-                      size: 80,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Title
-                    Text(
-                      'Cryptic',
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _isNewUser
-                          ? 'Create your account'
-                          : 'End-to-end encrypted messaging',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 48),
-
-                    // Error message
-                    if (authState.error != null)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          authState.error!,
-                          style: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
-                          ),
-                        ),
-                      ),
-
-                    // Username field
-                    TextFormField(
-                      controller: _usernameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      textInputAction: TextInputAction.next,
-                      autocorrect: false,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter a username';
-                        }
-                        if (value.trim().length < 3) {
-                          return 'Username must be at least 3 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Passphrase field
-                    TextFormField(
-                      controller: _passphraseController,
-                      decoration: InputDecoration(
-                        labelText: 'Passphrase',
-                        prefixIcon: const Icon(Icons.key_outlined),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassphrase
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassphrase = !_obscurePassphrase;
-                            });
-                          },
-                        ),
-                      ),
-                      obscureText: _obscurePassphrase,
-                      textInputAction: TextInputAction.next,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a passphrase';
-                        }
-                        if (_isNewUser && value.length < 6) {
-                          return 'Passphrase must be at least 6 characters';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Server configuration toggle
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _showServerConfig = !_showServerConfig;
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _showServerConfig
-                                  ? Icons.expand_less
-                                  : Icons.expand_more,
-                              size: 20,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Server Configuration',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Server config fields (collapsible)
-                    AnimatedCrossFade(
-                      duration: const Duration(milliseconds: 200),
-                      crossFadeState: _showServerConfig
-                          ? CrossFadeState.showFirst
-                          : CrossFadeState.showSecond,
-                      firstChild: Column(
+              isLoading: authState.isAuthenticating,
+              message:
+                  _isNewUser ? 'Connecting & setting up...' : 'Connecting...',
+              child: SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 2,
-                                child: TextFormField(
-                                  controller: _serverHostController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Server Host',
-                                    prefixIcon: Icon(Icons.dns_outlined),
-                                    hintText: 'localhost',
-                                  ),
-                                  textInputAction: TextInputAction.next,
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Required';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: _serverPortController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Port',
-                                    hintText: '8443',
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  textInputAction: TextInputAction.done,
-                                  onFieldSubmitted: (_) => _submit(),
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Required';
-                                    }
-                                    final port = int.tryParse(value.trim());
-                                    if (port == null || port < 1 || port > 65535) {
-                                      return 'Invalid';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                              ),
-                            ],
+                          // Logo/Icon
+                          Icon(
+                            Icons.lock_outline,
+                            size: 80,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Title
+                          Text(
+                            'Cryptic',
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Using bundled certificates',
-                            style: theme.textTheme.bodySmall?.copyWith(
+                            _isNewUser
+                                ? 'Create your account'
+                                : 'End-to-end encrypted messaging',
+                            style: theme.textTheme.bodyLarge?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
+                            textAlign: TextAlign.center,
                           ),
+                          const SizedBox(height: 48),
+
+                          // Error message
+                          if (authState.error != null)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                authState.error!,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onErrorContainer,
+                                ),
+                              ),
+                            ),
+
+                          // Username field
+                          TextFormField(
+                            controller: _usernameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                              prefixIcon: Icon(Icons.person_outline),
+                            ),
+                            textInputAction: TextInputAction.next,
+                            autocorrect: false,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter a username';
+                              }
+                              if (value.trim().length < 3) {
+                                return 'Username must be at least 3 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Passphrase field
+                          TextFormField(
+                            controller: _passphraseController,
+                            decoration: InputDecoration(
+                              labelText: 'Passphrase',
+                              prefixIcon: const Icon(Icons.key_outlined),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassphrase
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassphrase = !_obscurePassphrase;
+                                  });
+                                },
+                              ),
+                            ),
+                            obscureText: _obscurePassphrase,
+                            textInputAction: TextInputAction.next,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter a passphrase';
+                              }
+                              if (_isNewUser && value.length < 6) {
+                                return 'Passphrase must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Server configuration toggle
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _showServerConfig = !_showServerConfig;
+                              });
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _showServerConfig
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 20,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Server Configuration',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          // Server config fields (collapsible)
+                          AnimatedCrossFade(
+                            duration: const Duration(milliseconds: 200),
+                            crossFadeState: _showServerConfig
+                                ? CrossFadeState.showFirst
+                                : CrossFadeState.showSecond,
+                            firstChild: Column(
+                              children: [
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: TextFormField(
+                                        controller: _serverHostController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Server Host',
+                                          prefixIcon: Icon(Icons.dns_outlined),
+                                          hintText: 'localhost',
+                                        ),
+                                        textInputAction: TextInputAction.next,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Required';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _serverPortController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Port',
+                                          hintText: '8443',
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) => _submit(),
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Required';
+                                          }
+                                          final port =
+                                              int.tryParse(value.trim());
+                                          if (port == null ||
+                                              port < 1 ||
+                                              port > 65535) {
+                                            return 'Invalid';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Using bundled certificates',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            secondChild: const SizedBox.shrink(),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Submit button
+                          FilledButton(
+                            onPressed:
+                                authState.isAuthenticating ? null : _submit,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Text(
+                                _isNewUser ? 'Create & Connect' : 'Connect',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Toggle new user
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isNewUser = !_isNewUser;
+                              });
+                            },
+                            child: Text(
+                              _isNewUser
+                                  ? 'Already have an account? Sign in'
+                                  : 'New user? Create account',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Re-enroll
+                          if (widget.onReenroll != null)
+                            TextButton.icon(
+                              onPressed: widget.onReenroll,
+                              icon: const Icon(Icons.qr_code, size: 18),
+                              label: const Text('Re-enroll with QR code'),
+                            ),
                         ],
                       ),
-                      secondChild: const SizedBox.shrink(),
                     ),
-                    const SizedBox(height: 24),
-
-                    // Submit button
-                    FilledButton(
-                      onPressed: authState.isAuthenticating ? null : _submit,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          _isNewUser ? 'Create & Connect' : 'Connect',
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Toggle new user
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _isNewUser = !_isNewUser;
-                        });
-                      },
-                      child: Text(
-                        _isNewUser
-                            ? 'Already have an account? Sign in'
-                            : 'New user? Create account',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Re-enroll
-                    if (widget.onReenroll != null)
-                      TextButton.icon(
-                        onPressed: widget.onReenroll,
-                        icon: const Icon(Icons.qr_code, size: 18),
-                        label: const Text('Re-enroll with QR code'),
-                      ),
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -95,11 +95,13 @@ class KeyGenerator {
       final keyPair = await _x25519.generateKeyPair();
       final keyId = _nextKeyId++;
 
-      prekeys.add(OneTimePrekey(
-        keyId: keyId,
-        publicKey: keyPair.publicKey,
-        privateKey: keyPair.privateKey,
-      ),);
+      prekeys.add(
+        OneTimePrekey(
+          keyId: keyId,
+          publicKey: keyPair.publicKey,
+          privateKey: keyPair.privateKey,
+        ),
+      );
     }
 
     return OneTimePrekeyBatch(prekeys: prekeys);
@@ -137,10 +139,12 @@ class KeyGenerator {
   /// Generates a new ephemeral key pair for X3DH.
   ///
   /// Ephemeral keys are used once during initial key agreement.
-  Future<X25519KeyPair> generateEphemeralKeyPair() async => _x25519.generateKeyPair();
+  Future<X25519KeyPair> generateEphemeralKeyPair() async =>
+      _x25519.generateKeyPair();
 
   /// Generates a new ratchet key pair for Double Ratchet.
   ///
   /// Ratchet keys are rotated with each message exchange.
-  Future<X25519KeyPair> generateRatchetKeyPair() async => _x25519.generateKeyPair();
+  Future<X25519KeyPair> generateRatchetKeyPair() async =>
+      _x25519.generateKeyPair();
 }

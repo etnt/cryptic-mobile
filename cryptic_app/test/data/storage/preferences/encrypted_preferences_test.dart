@@ -24,8 +24,7 @@ void main() {
   group('EncryptedPreferences', () {
     group('Generic accessors', () {
       test('getBool returns default when key not found', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => null);
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => null);
 
         final result = await prefs.getBool('test_key', defaultValue: true);
 
@@ -33,8 +32,7 @@ void main() {
       });
 
       test('getBool parses true value', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => 'true');
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => 'true');
 
         final result = await prefs.getBool('test_key');
 
@@ -60,8 +58,7 @@ void main() {
       });
 
       test('getInt returns default when key not found', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => null);
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => null);
 
         final result = await prefs.getInt('test_key', defaultValue: 42);
 
@@ -69,8 +66,7 @@ void main() {
       });
 
       test('getInt parses integer value', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => '123');
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => '123');
 
         final result = await prefs.getInt('test_key');
 
@@ -87,8 +83,7 @@ void main() {
       });
 
       test('getDouble returns default when key not found', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => null);
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => null);
 
         final result = await prefs.getDouble('test_key', defaultValue: 1.5);
 
@@ -96,8 +91,7 @@ void main() {
       });
 
       test('getDouble parses double value', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => '3.14');
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => '3.14');
 
         final result = await prefs.getDouble('test_key');
 
@@ -105,8 +99,7 @@ void main() {
       });
 
       test('getString returns null when key not found', () async {
-        when(mockStorage.read(key: 'test_key'))
-            .thenAnswer((_) async => null);
+        when(mockStorage.read(key: 'test_key')).thenAnswer((_) async => null);
 
         final result = await prefs.getString('test_key');
 
@@ -134,17 +127,21 @@ void main() {
       });
 
       test('setBiometricEnabled stores value', () async {
-        when(mockStorage.write(
-          key: PreferenceKeys.biometricEnabled,
-          value: 'true',
-        ),).thenAnswer((_) async {});
+        when(
+          mockStorage.write(
+            key: PreferenceKeys.biometricEnabled,
+            value: 'true',
+          ),
+        ).thenAnswer((_) async {});
 
         await prefs.setBiometricEnabled(true);
 
-        verify(mockStorage.write(
-          key: PreferenceKeys.biometricEnabled,
-          value: 'true',
-        ),).called(1);
+        verify(
+          mockStorage.write(
+            key: PreferenceKeys.biometricEnabled,
+            value: 'true',
+          ),
+        ).called(1);
       });
 
       test('autoLockTimeout defaults to 60', () async {
@@ -302,17 +299,21 @@ void main() {
 
     group('App state', () {
       test('recordAppOpened stores current timestamp', () async {
-        when(mockStorage.write(
-          key: anyNamed('key'),
-          value: anyNamed('value'),
-        ),).thenAnswer((_) async {});
+        when(
+          mockStorage.write(
+            key: anyNamed('key'),
+            value: anyNamed('value'),
+          ),
+        ).thenAnswer((_) async {});
 
         await prefs.recordAppOpened();
 
-        verify(mockStorage.write(
-          key: PreferenceKeys.lastOpenedAt,
-          value: anyNamed('value'),
-        ),).called(1);
+        verify(
+          mockStorage.write(
+            key: PreferenceKeys.lastOpenedAt,
+            value: anyNamed('value'),
+          ),
+        ).called(1);
       });
 
       test('lastOpenedAt returns null when never opened', () async {
@@ -336,13 +337,14 @@ void main() {
 
     group('Bulk operations', () {
       test('resetToDefaults removes all preference keys', () async {
-        when(mockStorage.readAll()).thenAnswer((_) async => {
-              'cryptic_pref_key1': 'value1',
-              'cryptic_pref_key2': 'value2',
-              'cryptic_other_key': 'value3',
-            },);
-        when(mockStorage.delete(key: anyNamed('key')))
-            .thenAnswer((_) async {});
+        when(mockStorage.readAll()).thenAnswer(
+          (_) async => {
+            'cryptic_pref_key1': 'value1',
+            'cryptic_pref_key2': 'value2',
+            'cryptic_other_key': 'value3',
+          },
+        );
+        when(mockStorage.delete(key: anyNamed('key'))).thenAnswer((_) async {});
 
         await prefs.resetToDefaults();
 

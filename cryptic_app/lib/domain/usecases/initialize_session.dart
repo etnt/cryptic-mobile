@@ -80,14 +80,17 @@ class InitializeSessionUseCase
       }
 
       // Check if session already exists
-      final hasSession = _engine.state.sessions.containsKey(params.peerUsername);
+      final hasSession =
+          _engine.state.sessions.containsKey(params.peerUsername);
 
       if (hasSession) {
         // Session exists
-        return UseCaseSuccess(SessionInitResult(
-          peerUsername: params.peerUsername,
-          isNewSession: false,
-        ),);
+        return UseCaseSuccess(
+          SessionInitResult(
+            peerUsername: params.peerUsername,
+            isNewSession: false,
+          ),
+        );
       }
 
       // Request key bundle to trigger X3DH
@@ -95,10 +98,12 @@ class InitializeSessionUseCase
       // when the key bundle response is received
       await _engine.requestKeyBundle(params.peerUsername);
 
-      return UseCaseSuccess(SessionInitResult(
-        peerUsername: params.peerUsername,
-        isNewSession: true,
-      ),);
+      return UseCaseSuccess(
+        SessionInitResult(
+          peerUsername: params.peerUsername,
+          isNewSession: true,
+        ),
+      );
     } catch (e) {
       return UseCaseError('Failed to initialize session', e);
     }

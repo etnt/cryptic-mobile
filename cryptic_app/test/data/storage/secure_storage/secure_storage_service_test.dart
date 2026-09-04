@@ -81,10 +81,12 @@ void main() {
       });
 
       test('readAll returns all stored values', () async {
-        when(mockStorage.readAll()).thenAnswer((_) async => {
-              'key1': 'value1',
-              'key2': 'value2',
-            },);
+        when(mockStorage.readAll()).thenAnswer(
+          (_) async => {
+            'key1': 'value1',
+            'key2': 'value2',
+          },
+        );
 
         final result = await service.readAll();
 

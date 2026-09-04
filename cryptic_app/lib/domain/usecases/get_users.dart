@@ -57,9 +57,11 @@ class GetUsersUseCase implements NoInputUseCase<GetUsersResult> {
       await _engine.requestUserList();
 
       // Return current cached list
-      return UseCaseSuccess(GetUsersResult(
-        users: _engine.state.users,
-      ),);
+      return UseCaseSuccess(
+        GetUsersResult(
+          users: _engine.state.users,
+        ),
+      );
     } catch (e) {
       return UseCaseError('Failed to get users', e);
     }

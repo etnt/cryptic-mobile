@@ -38,17 +38,21 @@ void main() {
           dhPrivateKey: Uint8List(32)..fillRange(0, 32, 4),
         );
 
-        when(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.identityKeys,
-          value: keyPair.toMap(),
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.identityKeys,
+            value: keyPair.toMap(),
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveIdentityKeyPair(keyPair);
 
-        verify(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.identityKeys,
-          value: keyPair.toMap(),
-        ),).called(1);
+        verify(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.identityKeys,
+            value: keyPair.toMap(),
+          ),
+        ).called(1);
       });
 
       test('loadIdentityKeyPair returns null when not found', () async {
@@ -99,17 +103,21 @@ void main() {
           timestamp: DateTime(2024, 1),
         );
 
-        when(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.signedPrekey,
-          value: prekey.toMap(),
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.signedPrekey,
+            value: prekey.toMap(),
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveSignedPrekey(prekey);
 
-        verify(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.signedPrekey,
-          value: prekey.toMap(),
-        ),).called(1);
+        verify(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.signedPrekey,
+            value: prekey.toMap(),
+          ),
+        ).called(1);
       });
 
       test('loadSignedPrekey returns null when not found', () async {
@@ -139,17 +147,21 @@ void main() {
 
         final expectedJson = jsonEncode(prekeys.map((p) => p.toMap()).toList());
 
-        when(mockSecureStorage.write(
-          key: KeyStorageKeys.oneTimePrekeys,
-          value: expectedJson,
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.write(
+            key: KeyStorageKeys.oneTimePrekeys,
+            value: expectedJson,
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveOneTimePrekeys(prekeys);
 
-        verify(mockSecureStorage.write(
-          key: KeyStorageKeys.oneTimePrekeys,
-          value: expectedJson,
-        ),).called(1);
+        verify(
+          mockSecureStorage.write(
+            key: KeyStorageKeys.oneTimePrekeys,
+            value: expectedJson,
+          ),
+        ).called(1);
       });
 
       test('loadOneTimePrekeys returns empty list when not found', () async {
@@ -201,26 +213,32 @@ void main() {
           createdAt: DateTime(2024, 1),
         );
 
-        when(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.sessionKey('alice'),
-          value: state.toMap(),
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.sessionKey('alice'),
+            value: state.toMap(),
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveSessionState(
           peerUsername: 'alice',
           state: state,
         );
 
-        verify(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.sessionKey('alice'),
-          value: state.toMap(),
-        ),).called(1);
+        verify(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.sessionKey('alice'),
+            value: state.toMap(),
+          ),
+        ).called(1);
       });
 
       test('loadSessionState returns null when not found', () async {
-        when(mockSecureStorage.readJson(
-          key: KeyStorageKeys.sessionKey('bob'),
-        ),).thenAnswer((_) async => null);
+        when(
+          mockSecureStorage.readJson(
+            key: KeyStorageKeys.sessionKey('bob'),
+          ),
+        ).thenAnswer((_) async => null);
 
         final result = await keyStorage.loadSessionState(peerUsername: 'bob');
 
@@ -228,9 +246,11 @@ void main() {
       });
 
       test('hasSession returns correct value', () async {
-        when(mockSecureStorage.containsKey(
-          key: KeyStorageKeys.sessionKey('alice'),
-        ),).thenAnswer((_) async => true);
+        when(
+          mockSecureStorage.containsKey(
+            key: KeyStorageKeys.sessionKey('alice'),
+          ),
+        ).thenAnswer((_) async => true);
 
         final result = await keyStorage.hasSession(peerUsername: 'alice');
 
@@ -238,11 +258,13 @@ void main() {
       });
 
       test('listSessionPeers extracts peer names', () async {
-        when(mockSecureStorage.readAll()).thenAnswer((_) async => {
-              'cryptic_session_alice': 'data1',
-              'cryptic_session_bob': 'data2',
-              'cryptic_other_key': 'data3',
-            },);
+        when(mockSecureStorage.readAll()).thenAnswer(
+          (_) async => {
+            'cryptic_session_alice': 'data1',
+            'cryptic_session_bob': 'data2',
+            'cryptic_other_key': 'data3',
+          },
+        );
 
         final result = await keyStorage.listSessionPeers();
 
@@ -253,17 +275,21 @@ void main() {
 
     group('User Metadata', () {
       test('saveUsername stores username', () async {
-        when(mockSecureStorage.write(
-          key: KeyStorageKeys.username,
-          value: 'testuser',
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.write(
+            key: KeyStorageKeys.username,
+            value: 'testuser',
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveUsername('testuser');
 
-        verify(mockSecureStorage.write(
-          key: KeyStorageKeys.username,
-          value: 'testuser',
-        ),).called(1);
+        verify(
+          mockSecureStorage.write(
+            key: KeyStorageKeys.username,
+            value: 'testuser',
+          ),
+        ).called(1);
       });
 
       test('loadUsername returns stored username', () async {
@@ -276,17 +302,21 @@ void main() {
       });
 
       test('saveServerInfo stores host and port', () async {
-        when(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.serverInfo,
-          value: {'host': 'localhost', 'port': 8443},
-        ),).thenAnswer((_) async {});
+        when(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.serverInfo,
+            value: {'host': 'localhost', 'port': 8443},
+          ),
+        ).thenAnswer((_) async {});
 
         await keyStorage.saveServerInfo(host: 'localhost', port: 8443);
 
-        verify(mockSecureStorage.writeJson(
-          key: KeyStorageKeys.serverInfo,
-          value: {'host': 'localhost', 'port': 8443},
-        ),).called(1);
+        verify(
+          mockSecureStorage.writeJson(
+            key: KeyStorageKeys.serverInfo,
+            value: {'host': 'localhost', 'port': 8443},
+          ),
+        ).called(1);
       });
 
       test('loadServerInfo returns stored info', () async {

@@ -20,7 +20,6 @@ import 'signed_prekey.dart';
 /// - Signed prekey (medium-term, rotated weekly)
 /// - One-time prekey (optional, used once then deleted)
 class KeyBundle {
-
   /// Creates from a server response map.
   ///
   /// Handles the Cryptic server's response format.
@@ -49,6 +48,7 @@ class KeyBundle {
       oneTimePrekey: otpk,
     );
   }
+
   /// Creates a key bundle.
   const KeyBundle({
     required this.username,
@@ -78,12 +78,12 @@ class KeyBundle {
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() => {
-      'username': username,
-      'identity_sign_key': base64Encode(identitySignKey),
-      'identity_dh_key': base64Encode(identityDhKey),
-      'signed_prekey': signedPrekey.toMap(),
-      if (oneTimePrekey != null) 'one_time_prekey': oneTimePrekey!.toMap(),
-    };
+        'username': username,
+        'identity_sign_key': base64Encode(identitySignKey),
+        'identity_dh_key': base64Encode(identityDhKey),
+        'signed_prekey': signedPrekey.toMap(),
+        if (oneTimePrekey != null) 'one_time_prekey': oneTimePrekey!.toMap(),
+      };
 }
 
 /// User's own complete key material.
@@ -91,7 +91,6 @@ class KeyBundle {
 /// Contains both public and private components of all keys.
 /// This is stored encrypted locally, never shared.
 class OwnKeyBundle {
-
   /// Creates from a deserialized map.
   factory OwnKeyBundle.fromMap(Map<String, dynamic> map) {
     final otpkMap = map['one_time_prekeys'] as Map<String, dynamic>;
@@ -112,6 +111,7 @@ class OwnKeyBundle {
       oneTimePrekeys: oneTimePrekeys,
     );
   }
+
   /// Creates an own key bundle.
   const OwnKeyBundle({
     required this.identity,
@@ -130,17 +130,18 @@ class OwnKeyBundle {
 
   /// Creates a key bundle for upload to server.
   KeyBundle toPublicBundle(String username) => KeyBundle(
-      username: username,
-      identitySignKey: identity.signPublicKey,
-      identityDhKey: identity.dhPublicKey,
-      signedPrekey: signedPrekey.publicPart,
-      oneTimePrekey: null, // One-time prekeys uploaded separately
-    );
+        username: username,
+        identitySignKey: identity.signPublicKey,
+        identityDhKey: identity.dhPublicKey,
+        signedPrekey: signedPrekey.publicPart,
+        oneTimePrekey: null, // One-time prekeys uploaded separately
+      );
 
   /// Gets a one-time prekey by ID and removes it from the pool.
   ///
   /// Returns null if the key ID is not found.
-  OneTimePrekey? consumeOneTimePrekey(int keyId) => oneTimePrekeys.remove(keyId);
+  OneTimePrekey? consumeOneTimePrekey(int keyId) =>
+      oneTimePrekeys.remove(keyId);
 
   /// How many one-time prekeys remain in the pool.
   int get remainingOneTimePrekeys => oneTimePrekeys.length;
@@ -151,10 +152,10 @@ class OwnKeyBundle {
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() => {
-      'identity': identity.toMap(),
-      'signed_prekey': signedPrekey.toMap(),
-      'one_time_prekeys': oneTimePrekeys.map(
-        (id, pk) => MapEntry(id.toString(), pk.toMap()),
-      ),
-    };
+        'identity': identity.toMap(),
+        'signed_prekey': signedPrekey.toMap(),
+        'one_time_prekeys': oneTimePrekeys.map(
+          (id, pk) => MapEntry(id.toString(), pk.toMap()),
+        ),
+      };
 }

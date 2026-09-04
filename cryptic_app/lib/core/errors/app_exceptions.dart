@@ -60,8 +60,7 @@ class StorageLockedExcpetion extends StorageException {
 /// Exception thrown when a required key is not found.
 class KeyNotFoundException extends StorageException {
   /// Creates a new key not found exception.
-  const KeyNotFoundException(String keyType)
-      : super('Key not found: $keyType');
+  const KeyNotFoundException(String keyType) : super('Key not found: $keyType');
 }
 
 /// Exception thrown when network operations fail.
@@ -96,8 +95,7 @@ class ProtocolException extends CrypticException {
 /// Exception thrown when no session exists for a peer.
 class NoSessionException extends ProtocolException {
   /// Creates a new no session exception.
-  const NoSessionException(String peer)
-      : super('No session with peer: $peer');
+  const NoSessionException(String peer) : super('No session with peer: $peer');
 }
 
 /// Exception thrown when message ordering is violated.

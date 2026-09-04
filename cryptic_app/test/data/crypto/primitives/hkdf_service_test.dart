@@ -277,10 +277,16 @@ void main() {
           final ckStr = newChainKey.join(',');
           final mkStr = messageKey.join(',');
 
-          expect(seenChainKeys.contains(ckStr), false,
-              reason: 'Chain key repeated at iteration $i',);
-          expect(seenMessageKeys.contains(mkStr), false,
-              reason: 'Message key repeated at iteration $i',);
+          expect(
+            seenChainKeys.contains(ckStr),
+            false,
+            reason: 'Chain key repeated at iteration $i',
+          );
+          expect(
+            seenMessageKeys.contains(mkStr),
+            false,
+            reason: 'Message key repeated at iteration $i',
+          );
 
           seenChainKeys.add(ckStr);
           seenMessageKeys.add(mkStr);

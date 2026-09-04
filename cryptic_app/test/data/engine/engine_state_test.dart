@@ -396,8 +396,7 @@ void main() {
       expect(event.message, 'Connection failed');
       expect(event.cause, isNull);
 
-      final eventWithCause =
-          EngineError('Network error', Exception('timeout'));
+      final eventWithCause = EngineError('Network error', Exception('timeout'));
       expect(eventWithCause.message, 'Network error');
       expect(eventWithCause.cause, isA<Exception>());
     });

@@ -53,14 +53,17 @@ class DoubleRatchet {
     required Uint8List rootKey,
     required (Uint8List, Uint8List) dhKeyPair,
   }) async {
-    print('[DoubleRatchet] initSender: rootKey(sessionKey)=${_bytesToHex(rootKey)}');
+    print(
+        '[DoubleRatchet] initSender: rootKey(sessionKey)=${_bytesToHex(rootKey)}');
     // Derive initial sending chain from root key
     final sendChainKey = await _deriveChainKey(rootKey, 'init');
-    print('[DoubleRatchet] initSender: sendChainKey(init)=${_bytesToHex(sendChainKey)}');
+    print(
+        '[DoubleRatchet] initSender: sendChainKey(init)=${_bytesToHex(sendChainKey)}');
 
     // Derive initial receiving chain (for Bob's replies)
     final recvChainKey = await _deriveChainKey(rootKey, 'resp');
-    print('[DoubleRatchet] initSender: recvChainKey(resp)=${_bytesToHex(recvChainKey)}');
+    print(
+        '[DoubleRatchet] initSender: recvChainKey(resp)=${_bytesToHex(recvChainKey)}');
 
     return RatchetState(
       rootKey: rootKey,
@@ -136,7 +139,8 @@ class DoubleRatchet {
     // Derive encryption key from message key
     final encKey = await _deriveEncryptionKey(messageKey);
 
-    print('[DR-DEBUG] encryptMessage: msgNum=${currentState.sendMessageNumber}');
+    print(
+        '[DR-DEBUG] encryptMessage: msgNum=${currentState.sendMessageNumber}');
     print('[DR-DEBUG] sendChainKey=${_bytesToHex(currentState.sendChainKey)}');
     print('[DR-DEBUG] messageKey=${_bytesToHex(messageKey)}');
     print('[DR-DEBUG] encKey=${_bytesToHex(encKey)}');
@@ -147,8 +151,10 @@ class DoubleRatchet {
       key: encKey,
     );
 
-    print('[DR-DEBUG] nonce(${encrypted.nonce.length} bytes)=${_bytesToHex(encrypted.nonce)}');
-    print('[DR-DEBUG] ciphertextWithTag(${encrypted.ciphertextWithTag.length} bytes)=${_bytesToHex(encrypted.ciphertextWithTag)}');
+    print(
+        '[DR-DEBUG] nonce(${encrypted.nonce.length} bytes)=${_bytesToHex(encrypted.nonce)}');
+    print(
+        '[DR-DEBUG] ciphertextWithTag(${encrypted.ciphertextWithTag.length} bytes)=${_bytesToHex(encrypted.ciphertextWithTag)}');
 
     // Build message (ciphertext includes tag appended)
     final message = RatchetMessage(
@@ -181,9 +187,11 @@ class DoubleRatchet {
     required RatchetMessage message,
     required RatchetState state,
   }) async {
-    print('[DoubleRatchet] decryptMessage: msg.dhStep=${message.dhStep}, msg.msgNum=${message.messageNumber}');
-    print('[DoubleRatchet] decryptMessage: state.dhRatchetStep=${state.dhRatchetStep}, state.recvMsgNum=${state.recvMessageNumber}');
-    
+    print(
+        '[DoubleRatchet] decryptMessage: msg.dhStep=${message.dhStep}, msg.msgNum=${message.messageNumber}');
+    print(
+        '[DoubleRatchet] decryptMessage: state.dhRatchetStep=${state.dhRatchetStep}, state.recvMsgNum=${state.recvMessageNumber}');
+
     // Check if DH ratchet step needed
     final dhRatchetNeeded = _needsDhRatchet(message, state);
     print('[DoubleRatchet] decryptMessage: dhRatchetNeeded=$dhRatchetNeeded');
@@ -225,18 +233,22 @@ class DoubleRatchet {
     }
 
     // Derive message key from receiving chain
-    print('[DoubleRatchet] decryptMessage: recvChainKey=${_bytesToHex(currentState.recvChainKey.sublist(0, 8))}...');
-    print('[DoubleRatchet] decryptMessage: recvMessageNumber=${currentState.recvMessageNumber}');
-    
+    print(
+        '[DoubleRatchet] decryptMessage: recvChainKey=${_bytesToHex(currentState.recvChainKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] decryptMessage: recvMessageNumber=${currentState.recvMessageNumber}');
+
     final (newChainKey, messageKey) = await _advanceReceivingChain(
       currentState.recvChainKey,
       currentState.recvMessageNumber,
     );
-    print('[DoubleRatchet] decryptMessage: messageKey=${_bytesToHex(messageKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] decryptMessage: messageKey=${_bytesToHex(messageKey.sublist(0, 8))}...');
 
     // Derive encryption key
     final encKey = await _deriveEncryptionKey(messageKey);
-    print('[DoubleRatchet] decryptMessage: encKey=${_bytesToHex(encKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] decryptMessage: encKey=${_bytesToHex(encKey.sublist(0, 8))}...');
 
     // Decrypt message
     final plaintext = await _chacha.decrypt(
@@ -276,7 +288,7 @@ class DoubleRatchet {
   // ==================== Private Methods ====================
 
   /// Derives a chain key from root key with context.
-  /// 
+  ///
   /// Uses Blake2b-based KDF to match Erlang server's kdf_derive_chain_key.
   Future<Uint8List> _deriveChainKey(Uint8List rootKey, String context) async {
     // kdf_derive(32, 0, Context, RootKey) in Erlang
@@ -289,7 +301,7 @@ class DoubleRatchet {
   }
 
   /// Advances sending chain and derives message key.
-  /// 
+  ///
   /// Uses Blake2b-based KDF to match Erlang server's advance_sending_chain.
   Future<(Uint8List, Uint8List)> _advanceSendingChain(
     Uint8List chainKey,
@@ -304,18 +316,19 @@ class DoubleRatchet {
   }
 
   /// Advances receiving chain and derives message key.
-  /// 
+  ///
   /// Uses Blake2b-based KDF to match Erlang server's advance_receiving_chain.
   Future<(Uint8List, Uint8List)> _advanceReceivingChain(
     Uint8List chainKey,
     int messageNumber,
-  ) async => _kdf.deriveMessageKey(
-      chainKey: chainKey,
-      messageNumber: messageNumber,
-    );
+  ) async =>
+      _kdf.deriveMessageKey(
+        chainKey: chainKey,
+        messageNumber: messageNumber,
+      );
 
   /// Derives encryption key from message key.
-  /// 
+  ///
   /// Uses Blake2b-based KDF to match Erlang server's kdf_mk.
   Future<Uint8List> _deriveEncryptionKey(Uint8List messageKey) async {
     // Match Erlang: EncKey = kdf_derive(32, 0, "enc", MessageKey)
@@ -345,7 +358,8 @@ class DoubleRatchet {
     }
 
     if (state.dhRemote == null) {
-      throw const CryptoException('Cannot activate sending chain: no remote DH key');
+      throw const CryptoException(
+          'Cannot activate sending chain: no remote DH key');
     }
 
     // Derive sending chain from root key
@@ -363,10 +377,13 @@ class DoubleRatchet {
     RatchetMessage message,
     RatchetState state,
   ) async {
-    print('[DoubleRatchet] _performDhRatchetOnReceive: message.dhStep=${message.dhStep}, state.dhRatchetStep=${state.dhRatchetStep}');
-    print('[DoubleRatchet] _performDhRatchetOnReceive: our dhSelf pubkey=${_bytesToHex(state.dhSelf.$1.sublist(0, 8))}...');
-    print('[DoubleRatchet] _performDhRatchetOnReceive: their dhPublic=${_bytesToHex(message.dhPublic.sublist(0, 8))}...');
-    
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: message.dhStep=${message.dhStep}, state.dhRatchetStep=${state.dhRatchetStep}');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: our dhSelf pubkey=${_bytesToHex(state.dhSelf.$1.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: their dhPublic=${_bytesToHex(message.dhPublic.sublist(0, 8))}...');
+
     // Store previous chain length
     final prevLength = state.recvMessageNumber;
 
@@ -375,26 +392,31 @@ class DoubleRatchet {
       privateKey: state.dhSelf.$2,
       publicKey: message.dhPublic,
     );
-    print('[DoubleRatchet] _performDhRatchetOnReceive: dhOutput=${_bytesToHex(dhOutput.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: dhOutput=${_bytesToHex(dhOutput.sublist(0, 8))}...');
 
     // Generate new DH keypair for our next send
     final newDhKeyPair = await _x25519.generateKeyPair();
 
     // Derive new root key and chain keys
     // Per Erlang: On receive, use InitChainKey for FUTURE sending, RespChainKey for RECEIVING
-    final (newRootKey, initChainKey, respChainKey) = await _kdf.deriveRatchetKeys(
+    final (newRootKey, initChainKey, respChainKey) =
+        await _kdf.deriveRatchetKeys(
       rootKey: state.rootKey,
       dhOutput: dhOutput,
     );
-    print('[DoubleRatchet] _performDhRatchetOnReceive: newRootKey=${_bytesToHex(newRootKey.sublist(0, 8))}...');
-    print('[DoubleRatchet] _performDhRatchetOnReceive: initChainKey (for future send)=${_bytesToHex(initChainKey.sublist(0, 8))}...');
-    print('[DoubleRatchet] _performDhRatchetOnReceive: respChainKey (for recv)=${_bytesToHex(respChainKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: newRootKey=${_bytesToHex(newRootKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: initChainKey (for future send)=${_bytesToHex(initChainKey.sublist(0, 8))}...');
+    print(
+        '[DoubleRatchet] _performDhRatchetOnReceive: respChainKey (for recv)=${_bytesToHex(respChainKey.sublist(0, 8))}...');
 
     return state.copyWith(
       rootKey: newRootKey,
-      sendChainKey: initChainKey,  // For FUTURE sending
+      sendChainKey: initChainKey, // For FUTURE sending
       sendMessageNumber: 0,
-      recvChainKey: respChainKey,  // For current RECEIVING
+      recvChainKey: respChainKey, // For current RECEIVING
       recvMessageNumber: 0,
       prevRecvChainLength: prevLength,
       dhSelf: (newDhKeyPair.publicKey, newDhKeyPair.privateKey),
@@ -404,8 +426,9 @@ class DoubleRatchet {
       receivingChainActive: true,
     );
   }
-  
-  String _bytesToHex(Uint8List bytes) => bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+  String _bytesToHex(Uint8List bytes) =>
+      bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 
   /// Performs DH ratchet step on send.
   Future<RatchetState> _performDhRatchetOnSend(RatchetState state) async {
@@ -455,7 +478,8 @@ class DoubleRatchet {
     // Pre-derive and cache skipped keys
     var chainKey = state.recvChainKey;
     for (var i = state.recvMessageNumber; i < incomingMsgNum; i++) {
-      final (newChainKey, messageKey) = await _advanceReceivingChain(chainKey, i);
+      final (newChainKey, messageKey) =
+          await _advanceReceivingChain(chainKey, i);
 
       final keyId = SkippedKeyId(incomingDhStep, i);
       state.skippedKeys[keyId] = SkippedKeyEntry(

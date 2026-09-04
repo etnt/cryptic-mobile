@@ -68,11 +68,12 @@ class AuthStatus {
     String? username,
     String? error,
     bool clearError = false,
-  }) => AuthStatus(
-      state: state ?? this.state,
-      username: username ?? this.username,
-      error: clearError ? null : (error ?? this.error),
-    );
+  }) =>
+      AuthStatus(
+        state: state ?? this.state,
+        username: username ?? this.username,
+        error: clearError ? null : (error ?? this.error),
+      );
 }
 
 /// Notifier for authentication state.
@@ -234,7 +235,8 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
 }
 
 /// Provider for authentication state.
-final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>((ref) => AuthNotifier());
+final authProvider =
+    StateNotifierProvider<AuthNotifier, AuthStatus>((ref) => AuthNotifier());
 
 /// Provider for the authenticated engine.
 ///
@@ -242,7 +244,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthStatus>((ref) => Au
 final authenticatedEngineProvider = Provider<CrypticEngine?>((ref) {
   final authNotifier = ref.watch(authProvider.notifier);
   final authStatus = ref.watch(authProvider);
-  
+
   if (authStatus.isAuthenticated) {
     return authNotifier.engine;
   }

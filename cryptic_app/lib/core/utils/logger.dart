@@ -51,7 +51,8 @@ abstract class AppLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _log(LogLevel.debug, message, tag: tag, error: error, stackTrace: stackTrace);
+    _log(LogLevel.debug, message,
+        tag: tag, error: error, stackTrace: stackTrace);
   }
 
   /// Log an informational message.
@@ -63,7 +64,8 @@ abstract class AppLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _log(LogLevel.info, message, tag: tag, error: error, stackTrace: stackTrace);
+    _log(LogLevel.info, message,
+        tag: tag, error: error, stackTrace: stackTrace);
   }
 
   /// Log a warning message.
@@ -75,7 +77,8 @@ abstract class AppLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _log(LogLevel.warning, message, tag: tag, error: error, stackTrace: stackTrace);
+    _log(LogLevel.warning, message,
+        tag: tag, error: error, stackTrace: stackTrace);
   }
 
   /// Log an error message.
@@ -87,7 +90,8 @@ abstract class AppLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    _log(LogLevel.error, message, tag: tag, error: error, stackTrace: stackTrace);
+    _log(LogLevel.error, message,
+        tag: tag, error: error, stackTrace: stackTrace);
   }
 
   /// Log a message at the specified level.

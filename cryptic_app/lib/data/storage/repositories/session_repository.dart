@@ -36,10 +36,12 @@ class SessionRepository {
   /// Returns null if no session exists.
   Future<RatchetState?> loadSession({
     required String peerUsername,
-  }) async => await _keyStorage.loadSessionState(peerUsername: peerUsername);
+  }) async =>
+      await _keyStorage.loadSessionState(peerUsername: peerUsername);
 
   /// Checks if a session exists for a peer.
-  Future<bool> hasSession({required String peerUsername}) async => await _keyStorage.hasSession(peerUsername: peerUsername);
+  Future<bool> hasSession({required String peerUsername}) async =>
+      await _keyStorage.hasSession(peerUsername: peerUsername);
 
   /// Deletes a session for a peer.
   Future<void> deleteSession({required String peerUsername}) async {
@@ -47,7 +49,8 @@ class SessionRepository {
   }
 
   /// Lists all peers with active sessions.
-  Future<List<String>> listPeers() async => await _keyStorage.listSessionPeers();
+  Future<List<String>> listPeers() async =>
+      await _keyStorage.listSessionPeers();
 
   /// Deletes all sessions.
   Future<void> deleteAllSessions() async {

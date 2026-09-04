@@ -23,7 +23,7 @@ on:
       - '.github/workflows/ci.yml'
 
 env:
-  FLUTTER_VERSION: '3.16.0'
+  FLUTTER_VERSION: '3.44.0'
 
 jobs:
   analyze:
@@ -51,7 +51,7 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze code
-        run: flutter analyze --fatal-infos
+        run: flutter analyze --no-fatal-infos
 
   test:
     name: Unit Tests

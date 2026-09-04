@@ -35,7 +35,8 @@ class ConversationTile extends StatelessWidget {
 
     return ListTile(
       selected: isSelected,
-      selectedTileColor: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+      selectedTileColor:
+          theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
       leading: _buildAvatar(theme),
       title: Row(
         children: [
@@ -43,7 +44,9 @@ class ConversationTile extends StatelessWidget {
             child: Text(
               conversation.displayName,
               style: TextStyle(
-                fontWeight: conversation.hasUnread ? FontWeight.bold : FontWeight.normal,
+                fontWeight: conversation.hasUnread
+                    ? FontWeight.bold
+                    : FontWeight.normal,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -57,7 +60,9 @@ class ConversationTile extends StatelessWidget {
                 color: conversation.hasUnread
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurfaceVariant,
-                fontWeight: conversation.hasUnread ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: conversation.hasUnread
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
         ],
@@ -74,7 +79,9 @@ class ConversationTile extends StatelessWidget {
               lastMessage?.content ?? 'No messages yet',
               style: TextStyle(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: conversation.hasUnread ? FontWeight.w500 : FontWeight.normal,
+                fontWeight: conversation.hasUnread
+                    ? FontWeight.w500
+                    : FontWeight.normal,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -106,45 +113,46 @@ class ConversationTile extends StatelessWidget {
   }
 
   Widget _buildAvatar(ThemeData theme) => CircleAvatar(
-      backgroundColor: theme.colorScheme.primaryContainer,
-      child: Text(
-        conversation.displayName.isNotEmpty
-            ? conversation.displayName[0].toUpperCase()
-            : '?',
-        style: TextStyle(
-          color: theme.colorScheme.onPrimaryContainer,
-          fontWeight: FontWeight.bold,
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          conversation.displayName.isNotEmpty
+              ? conversation.displayName[0].toUpperCase()
+              : '?',
+          style: TextStyle(
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-    );
+      );
 
-  Widget _buildStatusIcon(MessageStatus status, ThemeData theme) => switch (status) {
-      MessageStatus.pending || MessageStatus.sending => Icon(
-          Icons.access_time,
-          size: 16,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      MessageStatus.sent => Icon(
-          Icons.check,
-          size: 16,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      MessageStatus.delivered => Icon(
-          Icons.done_all,
-          size: 16,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      MessageStatus.read => Icon(
-          Icons.done_all,
-          size: 16,
-          color: theme.colorScheme.primary,
-        ),
-      MessageStatus.failed => Icon(
-          Icons.error_outline,
-          size: 16,
-          color: theme.colorScheme.error,
-        ),
-    };
+  Widget _buildStatusIcon(MessageStatus status, ThemeData theme) =>
+      switch (status) {
+        MessageStatus.pending || MessageStatus.sending => Icon(
+            Icons.access_time,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        MessageStatus.sent => Icon(
+            Icons.check,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        MessageStatus.delivered => Icon(
+            Icons.done_all,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        MessageStatus.read => Icon(
+            Icons.done_all,
+            size: 16,
+            color: theme.colorScheme.primary,
+          ),
+        MessageStatus.failed => Icon(
+            Icons.error_outline,
+            size: 16,
+            color: theme.colorScheme.error,
+          ),
+      };
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();

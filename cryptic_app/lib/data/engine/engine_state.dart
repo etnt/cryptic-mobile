@@ -65,12 +65,13 @@ class UserIdentity {
     String? username,
     Uint8List? identitySignPublicKey,
     Uint8List? identityDhPublicKey,
-  }) => UserIdentity(
-      username: username ?? this.username,
-      identitySignPublicKey:
-          identitySignPublicKey ?? this.identitySignPublicKey,
-      identityDhPublicKey: identityDhPublicKey ?? this.identityDhPublicKey,
-    );
+  }) =>
+      UserIdentity(
+        username: username ?? this.username,
+        identitySignPublicKey:
+            identitySignPublicKey ?? this.identitySignPublicKey,
+        identityDhPublicKey: identityDhPublicKey ?? this.identityDhPublicKey,
+      );
 
   @override
   bool operator ==(Object other) {
@@ -108,11 +109,12 @@ class ServerConfig {
     String? host,
     int? port,
     String? path,
-  }) => ServerConfig(
-      host: host ?? this.host,
-      port: port ?? this.port,
-      path: path ?? this.path,
-    );
+  }) =>
+      ServerConfig(
+        host: host ?? this.host,
+        port: port ?? this.port,
+        path: path ?? this.path,
+      );
 
   @override
   bool operator ==(Object other) {
@@ -158,12 +160,13 @@ class PeerSession {
     bool? hasSession,
     int? messageCount,
     DateTime? lastMessageAt,
-  }) => PeerSession(
-      peerUsername: peerUsername ?? this.peerUsername,
-      hasSession: hasSession ?? this.hasSession,
-      messageCount: messageCount ?? this.messageCount,
-      lastMessageAt: lastMessageAt ?? this.lastMessageAt,
-    );
+  }) =>
+      PeerSession(
+        peerUsername: peerUsername ?? this.peerUsername,
+        hasSession: hasSession ?? this.hasSession,
+        messageCount: messageCount ?? this.messageCount,
+        lastMessageAt: lastMessageAt ?? this.lastMessageAt,
+      );
 }
 
 /// Immutable engine state.
@@ -261,23 +264,24 @@ class EngineState {
     bool? keysUploaded,
     DateTime? lastConnectedAt,
     int? reconnectAttempts,
-  }) => EngineState(
-      status: status ?? this.status,
-      connectionStatus: connectionStatus ?? this.connectionStatus,
-      identity: identity ?? this.identity,
-      serverConfig: serverConfig ?? this.serverConfig,
-      sessions: sessions ?? this.sessions,
-      users: users ?? this.users,
-      error: clearError ? null : (error ?? this.error),
-      keysUploaded: keysUploaded ?? this.keysUploaded,
-      lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
-      reconnectAttempts: reconnectAttempts ?? this.reconnectAttempts,
-    );
+  }) =>
+      EngineState(
+        status: status ?? this.status,
+        connectionStatus: connectionStatus ?? this.connectionStatus,
+        identity: identity ?? this.identity,
+        serverConfig: serverConfig ?? this.serverConfig,
+        sessions: sessions ?? this.sessions,
+        users: users ?? this.users,
+        error: clearError ? null : (error ?? this.error),
+        keysUploaded: keysUploaded ?? this.keysUploaded,
+        lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
+        reconnectAttempts: reconnectAttempts ?? this.reconnectAttempts,
+      );
 
   /// Copy with a session added or updated.
   EngineState withSession(PeerSession session) => copyWith(
-      sessions: {...sessions, session.peerUsername: session},
-    );
+        sessions: {...sessions, session.peerUsername: session},
+      );
 
   /// Copy with a session removed.
   EngineState withoutSession(String peerUsername) {
@@ -288,20 +292,20 @@ class EngineState {
 
   /// Copy with error set.
   EngineState withError(String errorMessage) => copyWith(
-      error: errorMessage,
-      status: EngineStatus.failed,
-    );
+        error: errorMessage,
+        status: EngineStatus.failed,
+      );
 
   /// Copy with error cleared.
   EngineState clearingError() => copyWith(clearError: true);
 
   @override
   String toString() => 'EngineState('
-        'status: $status, '
-        'connection: $connectionStatus, '
-        'user: ${identity?.username}, '
-        'sessions: ${sessions.length}'
-        ')';
+      'status: $status, '
+      'connection: $connectionStatus, '
+      'user: ${identity?.username}, '
+      'sessions: ${sessions.length}'
+      ')';
 }
 
 /// Engine event types for state changes.
@@ -406,7 +410,6 @@ class EngineError extends EngineEvent {
 
   /// Error message.
   final String message;
-
 
   /// Underlying cause.
   final Object? cause;

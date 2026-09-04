@@ -13,16 +13,15 @@ import '../../../core/constants/crypto_constants.dart';
 
 /// A skipped message key entry for out-of-order message handling.
 class SkippedKeyEntry {
-
   /// Creates from a map.
   factory SkippedKeyEntry.fromMap(Map<String, dynamic> map) {
     return SkippedKeyEntry(
       messageKey: base64Decode(map['message_key'] as String),
-      timestamp:
-          DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(map['timestamp'] as int),
       dhPublic: base64Decode(map['dh_public'] as String),
     );
   }
+
   /// Creates a skipped key entry.
   const SkippedKeyEntry({
     required this.messageKey,
@@ -41,20 +40,20 @@ class SkippedKeyEntry {
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() => {
-      'message_key': base64Encode(messageKey),
-      'timestamp': timestamp.millisecondsSinceEpoch,
-      'dh_public': base64Encode(dhPublic),
-    };
+        'message_key': base64Encode(messageKey),
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'dh_public': base64Encode(dhPublic),
+      };
 }
 
 /// Key for the skipped keys map: (dhStep, messageNumber).
 class SkippedKeyId {
-
   /// Creates from a string key.
   factory SkippedKeyId.fromKey(String key) {
     final parts = key.split(':');
     return SkippedKeyId(int.parse(parts[0]), int.parse(parts[1]));
   }
+
   /// Creates a skipped key identifier.
   const SkippedKeyId(this.dhStep, this.messageNumber);
 
@@ -88,7 +87,6 @@ class SkippedKeyId {
 /// - DH ratchet keys
 /// - Skipped message key cache
 class RatchetState {
-
   /// Creates from a map.
   ///
   /// Throws [FormatException] if required fields are missing or null.
@@ -150,19 +148,19 @@ class RatchetState {
       dhRatchetStep: map['dh_ratchet_step'] as int,
       skippedKeys: skippedKeys,
       maxSkip: map['max_skip'] as int? ?? CryptoConstants.maxSkipPerStep,
-      maxCacheSize:
-          map['max_cache_size'] as int? ?? CryptoConstants.maxSkippedMessageKeys,
+      maxCacheSize: map['max_cache_size'] as int? ??
+          CryptoConstants.maxSkippedMessageKeys,
       maxCacheAge: Duration(
         milliseconds: map['max_cache_age_ms'] as int? ?? 86400000,
       ),
       sendingChainActive: map['sending_chain_active'] as bool? ?? false,
       receivingChainActive: map['receiving_chain_active'] as bool? ?? false,
-      createdAt:
-          DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
+      createdAt: DateTime.fromMillisecondsSinceEpoch(map['created_at'] as int),
       lastUpdated:
           DateTime.fromMillisecondsSinceEpoch(map['last_updated'] as int),
     );
   }
+
   /// Creates a ratchet state.
   RatchetState({
     required this.rootKey,
@@ -172,7 +170,11 @@ class RatchetState {
     required this.recvMessageNumber,
     required this.prevRecvChainLength,
     required this.dhSelf,
-    required this.dhRatchetStep, required this.sendingChainActive, required this.receivingChainActive, required this.createdAt, this.dhRemote,
+    required this.dhRatchetStep,
+    required this.sendingChainActive,
+    required this.receivingChainActive,
+    required this.createdAt,
+    this.dhRemote,
     Map<SkippedKeyId, SkippedKeyEntry>? skippedKeys,
     this.maxSkip = CryptoConstants.maxSkipPerStep,
     this.maxCacheSize = CryptoConstants.maxSkippedMessageKeys,
@@ -262,25 +264,26 @@ class RatchetState {
     bool? sendingChainActive,
     bool? receivingChainActive,
     DateTime? lastUpdated,
-  }) => RatchetState(
-      rootKey: rootKey ?? this.rootKey,
-      sendChainKey: sendChainKey ?? this.sendChainKey,
-      sendMessageNumber: sendMessageNumber ?? this.sendMessageNumber,
-      recvChainKey: recvChainKey ?? this.recvChainKey,
-      recvMessageNumber: recvMessageNumber ?? this.recvMessageNumber,
-      prevRecvChainLength: prevRecvChainLength ?? this.prevRecvChainLength,
-      dhSelf: dhSelf ?? this.dhSelf,
-      dhRemote: dhRemote ?? this.dhRemote,
-      dhRatchetStep: dhRatchetStep ?? this.dhRatchetStep,
-      skippedKeys: skippedKeys,
-      maxSkip: maxSkip,
-      maxCacheSize: maxCacheSize,
-      maxCacheAge: maxCacheAge,
-      sendingChainActive: sendingChainActive ?? this.sendingChainActive,
-      receivingChainActive: receivingChainActive ?? this.receivingChainActive,
-      createdAt: createdAt,
-      lastUpdated: lastUpdated ?? DateTime.now(),
-    );
+  }) =>
+      RatchetState(
+        rootKey: rootKey ?? this.rootKey,
+        sendChainKey: sendChainKey ?? this.sendChainKey,
+        sendMessageNumber: sendMessageNumber ?? this.sendMessageNumber,
+        recvChainKey: recvChainKey ?? this.recvChainKey,
+        recvMessageNumber: recvMessageNumber ?? this.recvMessageNumber,
+        prevRecvChainLength: prevRecvChainLength ?? this.prevRecvChainLength,
+        dhSelf: dhSelf ?? this.dhSelf,
+        dhRemote: dhRemote ?? this.dhRemote,
+        dhRatchetStep: dhRatchetStep ?? this.dhRatchetStep,
+        skippedKeys: skippedKeys,
+        maxSkip: maxSkip,
+        maxCacheSize: maxCacheSize,
+        maxCacheAge: maxCacheAge,
+        sendingChainActive: sendingChainActive ?? this.sendingChainActive,
+        receivingChainActive: receivingChainActive ?? this.receivingChainActive,
+        createdAt: createdAt,
+        lastUpdated: lastUpdated ?? DateTime.now(),
+      );
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() {
@@ -313,17 +316,17 @@ class RatchetState {
 
   /// Gets summary info (safe for logging).
   Map<String, dynamic> getInfo() => {
-      'dh_ratchet_step': dhRatchetStep,
-      'send_message_number': sendMessageNumber,
-      'recv_message_number': recvMessageNumber,
-      'prev_recv_chain_length': prevRecvChainLength,
-      'skipped_keys_count': skippedKeys.length,
-      'sending_chain_active': sendingChainActive,
-      'receiving_chain_active': receivingChainActive,
-      'has_remote_dh': dhRemote != null,
-      'created_at': createdAt.toIso8601String(),
-      'last_updated': lastUpdated.toIso8601String(),
-    };
+        'dh_ratchet_step': dhRatchetStep,
+        'send_message_number': sendMessageNumber,
+        'recv_message_number': recvMessageNumber,
+        'prev_recv_chain_length': prevRecvChainLength,
+        'skipped_keys_count': skippedKeys.length,
+        'sending_chain_active': sendingChainActive,
+        'receiving_chain_active': receivingChainActive,
+        'has_remote_dh': dhRemote != null,
+        'created_at': createdAt.toIso8601String(),
+        'last_updated': lastUpdated.toIso8601String(),
+      };
 
   /// Removes expired keys from the skipped keys cache.
   ///

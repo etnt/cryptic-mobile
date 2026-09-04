@@ -272,7 +272,8 @@ class MessageDatabase {
         conversationId: row['conversation_id']! as String,
         senderId: row['sender_id']! as String,
         content: row['content']! as String,
-        timestamp: DateTime.fromMillisecondsSinceEpoch(row['timestamp']! as int),
+        timestamp:
+            DateTime.fromMillisecondsSinceEpoch(row['timestamp']! as int),
         direction: MessageDirection.values.byName(row['direction']! as String),
         status: MessageStatus.values.byName(row['status']! as String),
         readAt: row['read_at'] != null

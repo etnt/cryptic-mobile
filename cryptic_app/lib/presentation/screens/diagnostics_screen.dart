@@ -173,7 +173,8 @@ class _KeysSection extends StatelessWidget {
       children: [
         _Row(
           'Signing key',
-          keys.signingKeyFingerprint ?? (keys.hasIdentityKeys ? 'present' : 'none'),
+          keys.signingKeyFingerprint ??
+              (keys.hasIdentityKeys ? 'present' : 'none'),
           copyable: keys.signingKeyFingerprint != null,
           mono: true,
         ),
@@ -203,7 +204,9 @@ class _SessionsSection extends StatelessWidget {
       title: 'Sessions (${sessions.length})',
       children: sessions.isEmpty
           ? [const _Row('', 'No active sessions')]
-          : sessions.entries.map((e) => _PeerTile(peer: e.key, data: e.value)).toList(),
+          : sessions.entries
+              .map((e) => _PeerTile(peer: e.key, data: e.value))
+              .toList(),
     );
   }
 }
@@ -336,9 +339,10 @@ class _Row extends StatelessWidget {
     if (label.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(value, style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        )),
+        child: Text(value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            )),
       );
     }
 

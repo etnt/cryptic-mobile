@@ -70,7 +70,6 @@ class X3dhReceiverResult {
 
 /// X3DH encrypted message blob structure.
 class X3dhMessageBlob {
-
   /// Creates from a map (e.g., from JSON).
   factory X3dhMessageBlob.fromMap(Map<String, dynamic> map) {
     return X3dhMessageBlob(
@@ -80,6 +79,7 @@ class X3dhMessageBlob {
       nonce: base64Decode(map['nonce'] as String),
     );
   }
+
   /// Creates an X3DH message blob.
   const X3dhMessageBlob({
     required this.metadata,
@@ -102,16 +102,15 @@ class X3dhMessageBlob {
 
   /// Converts to a map for JSON serialization.
   Map<String, dynamic> toMap() => {
-      'metadata': metadata.toMap(),
-      'signature': base64Encode(signature),
-      'ciphertext': base64Encode(ciphertext),
-      'nonce': base64Encode(nonce),
-    };
+        'metadata': metadata.toMap(),
+        'signature': base64Encode(signature),
+        'ciphertext': base64Encode(ciphertext),
+        'nonce': base64Encode(nonce),
+      };
 }
 
 /// X3DH message metadata.
 class X3dhMetadata {
-
   /// Creates from a map.
   factory X3dhMetadata.fromMap(Map<String, dynamic> map) {
     return X3dhMetadata(
@@ -131,6 +130,7 @@ class X3dhMetadata {
       timestamp: map['timestamp'] as int,
     );
   }
+
   /// Creates X3DH metadata.
   const X3dhMetadata({
     required this.version,
@@ -140,7 +140,9 @@ class X3dhMetadata {
     required this.senderIdentitySignPublic,
     required this.recipientId,
     required this.ephemeralPublic,
-    required this.messageId, required this.timestamp, this.otpkId,
+    required this.messageId,
+    required this.timestamp,
+    this.otpkId,
   });
 
   /// Protocol version.
@@ -175,17 +177,17 @@ class X3dhMetadata {
 
   /// Converts to a map for serialization.
   Map<String, dynamic> toMap() => {
-      'version': version,
-      'type': type,
-      'sender_id': base64Encode(senderId),
-      'sender_identity_dh_public': base64Encode(senderIdentityDhPublic),
-      'sender_identity_sign_public': base64Encode(senderIdentitySignPublic),
-      'recipient_id': base64Encode(recipientId),
-      'ephemeral_public': base64Encode(ephemeralPublic),
-      'otpk_id': otpkId != null ? base64Encode(otpkId!) : null,
-      'message_id': base64Encode(messageId),
-      'timestamp': timestamp,
-    };
+        'version': version,
+        'type': type,
+        'sender_id': base64Encode(senderId),
+        'sender_identity_dh_public': base64Encode(senderIdentityDhPublic),
+        'sender_identity_sign_public': base64Encode(senderIdentitySignPublic),
+        'recipient_id': base64Encode(recipientId),
+        'ephemeral_public': base64Encode(ephemeralPublic),
+        'otpk_id': otpkId != null ? base64Encode(otpkId!) : null,
+        'message_id': base64Encode(messageId),
+        'timestamp': timestamp,
+      };
 
   /// Serializes metadata to bytes for signing.
   Uint8List toBytes() {
@@ -282,8 +284,8 @@ class X3dhEngine {
         publicKey: recipientBundle.oneTimePrekey!.publicKey,
       );
       // Use raw key ID bytes if available (from server), otherwise convert from int
-      otpkId = recipientBundle.oneTimePrekey!.keyIdBytes ?? 
-               _intToBytes(recipientBundle.oneTimePrekey!.keyId);
+      otpkId = recipientBundle.oneTimePrekey!.keyIdBytes ??
+          _intToBytes(recipientBundle.oneTimePrekey!.keyId);
     }
 
     // 4. Derive session key from combined DH outputs
@@ -308,7 +310,8 @@ class X3dhEngine {
     final metadata = X3dhMetadata(
       version: 1,
       type: 'X3DH_INIT',
-      senderId: senderKeys.identity.signPublicKey.sublist(0, 8), // First 8 bytes as ID
+      senderId: senderKeys.identity.signPublicKey
+          .sublist(0, 8), // First 8 bytes as ID
       senderIdentityDhPublic: senderKeys.identity.dhPublicKey,
       senderIdentitySignPublic: senderKeys.identity.signPublicKey,
       recipientId: recipientBundle.identitySignKey.sublist(0, 8),
@@ -398,13 +401,13 @@ class X3dhEngine {
     Uint8List? dh4;
     if (metadata.otpkId != null) {
       final otpkKeyId = _bytesToInt(metadata.otpkId!);
-      
+
       // Try findOtpkPrivate callback first
       Uint8List? otpkPrivate;
       if (findOtpkPrivate != null) {
         otpkPrivate = findOtpkPrivate(otpkKeyId);
       }
-      
+
       // Fall back to receiver's key bundle
       otpkPrivate ??= receiverKeys.oneTimePrekeys[otpkKeyId]?.privateKey;
 

@@ -348,7 +348,8 @@ class ConnectionManager {
 
   Duration _calculateBackoff() {
     final baseDelay = config.initialReconnectDelay.inMilliseconds;
-    final multiplier = pow(config.reconnectBackoffMultiplier, _reconnectAttempts - 1);
+    final multiplier =
+        pow(config.reconnectBackoffMultiplier, _reconnectAttempts - 1);
     final delayMs = (baseDelay * multiplier).round();
     final maxDelayMs = config.maxReconnectDelay.inMilliseconds;
 

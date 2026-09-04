@@ -7,8 +7,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('ClientMessageType', () {
     test('should have correct wire values', () {
-      expect(ClientMessageType.uploadIdentityKeys.value, 'upload_identity_keys');
-      expect(ClientMessageType.uploadPrekeyBundle.value, 'upload_prekey_bundle');
+      expect(
+          ClientMessageType.uploadIdentityKeys.value, 'upload_identity_keys');
+      expect(
+          ClientMessageType.uploadPrekeyBundle.value, 'upload_prekey_bundle');
       expect(ClientMessageType.getKeyBundle.value, 'get_key_bundle');
       expect(ClientMessageType.x3dh.value, 'x3dh');
       expect(ClientMessageType.ratchet.value, 'ratchet');
@@ -18,8 +20,10 @@ void main() {
     });
 
     test('should parse from value', () {
-      expect(ClientMessageType.fromValue('upload_identity_keys'),
-          ClientMessageType.uploadIdentityKeys,);
+      expect(
+        ClientMessageType.fromValue('upload_identity_keys'),
+        ClientMessageType.uploadIdentityKeys,
+      );
       expect(ClientMessageType.fromValue('x3dh'), ClientMessageType.x3dh);
       expect(ClientMessageType.fromValue('unknown'), isNull);
     });
@@ -110,7 +114,7 @@ void main() {
       final json = message.toJson();
 
       expect(json['type'], 'get_key_bundle');
-      expect(json['user'], 'bob');  // Server expects 'user', not 'username'
+      expect(json['user'], 'bob'); // Server expects 'user', not 'username'
     });
   });
 

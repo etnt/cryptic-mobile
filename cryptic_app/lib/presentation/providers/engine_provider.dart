@@ -99,7 +99,7 @@ final usersProvider = Provider<List<String>>((ref) {
   // Watch the stream-based state provider to get reactive updates
   final asyncState = ref.watch(engineStateProvider);
   final onlineUsers = asyncState.valueOrNull?.users ?? [];
-  
+
   // Filter out the current user - can't chat with yourself
   final currentUsername = ref.watch(usernameProvider);
 
