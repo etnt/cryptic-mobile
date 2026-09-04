@@ -8,12 +8,6 @@ PODS:
   - FMDB/SQLCipher (2.7.12):
     - FMDB/Core
     - SQLCipher (~> 4.6)
-  - mobile_scanner (7.0.0):
-    - Flutter
-    - FlutterMacOS
-  - path_provider_foundation (0.0.1):
-    - Flutter
-    - FlutterMacOS
   - sqflite_sqlcipher (0.0.1):
     - Flutter
     - FMDB/SQLCipher (~> 2.7.5)
@@ -28,8 +22,6 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
-  - mobile_scanner (from `.symlinks/plugins/mobile_scanner/darwin`)
-  - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
   - sqflite_sqlcipher (from `.symlinks/plugins/sqflite_sqlcipher/ios`)
 
 SPEC REPOS:
@@ -44,10 +36,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_local_notifications/ios"
   flutter_secure_storage:
     :path: ".symlinks/plugins/flutter_secure_storage/ios"
-  mobile_scanner:
-    :path: ".symlinks/plugins/mobile_scanner/darwin"
-  path_provider_foundation:
-    :path: ".symlinks/plugins/path_provider_foundation/darwin"
   sqflite_sqlcipher:
     :path: ".symlinks/plugins/sqflite_sqlcipher/ios"
 
@@ -56,8 +44,6 @@ SPEC CHECKSUMS:
   flutter_local_notifications: 395056b3175ba4f08480a7c5de30cd36d69827e4
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13
   FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
-  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
-  path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
   sqflite_sqlcipher: 8e5bdaae6b2c254f8a277a564f07bc4e2a8642a3
   SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
 

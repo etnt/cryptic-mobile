@@ -33,7 +33,9 @@ class _PassphraseScreenState extends ConsumerState<PassphraseScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final host = _serverHostController.text.trim();
+    // Strip ALL whitespace: hostnames can't contain spaces, and iOS
+    // autocorrect/suggestions can inject them (e.g. "localhost" -> "local host").
+    final host = _serverHostController.text.replaceAll(RegExp(r'\s'), '');
     final port = int.tryParse(_serverPortController.text.trim());
     await ref.read(enrollmentProvider.notifier).enroll(
           _controller.text,
@@ -133,6 +135,10 @@ class _PassphraseScreenState extends ConsumerState<PassphraseScreen> {
                         flex: 3,
                         child: TextFormField(
                           controller: _serverHostController,
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textCapitalization: TextCapitalization.none,
                           decoration: const InputDecoration(
                             labelText: 'Host',
                             prefixIcon: Icon(Icons.dns),
