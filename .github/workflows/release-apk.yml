@@ -78,7 +78,7 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build universal APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=APP_VERSION=${{ steps.version.outputs.version }}
 
       - name: Stage universal APK
         env:
@@ -88,7 +88,7 @@ jobs:
           mv build/app/outputs/flutter-apk/app-release.apk "../dist/cryptic-$V-universal.apk"
 
       - name: Build split-per-ABI APKs
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --dart-define=APP_VERSION=${{ steps.version.outputs.version }}
 
       - name: Stage split APKs
         env:

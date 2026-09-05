@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/update/update_prompt.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
 import '../data/services/notification_service.dart';
@@ -49,6 +50,23 @@ class CrypticApp extends ConsumerStatefulWidget {
 class _CrypticAppState extends ConsumerState<CrypticApp> {
   AppScreen _currentScreen = AppScreen.splash;
   int _loginKey = 0;
+
+  /// Lets the startup update check show a dialog with a valid Navigator
+  /// context (this State sits above the MaterialApp's own Navigator).
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  @override
+  void initState() {
+    super.initState();
+    // Check GitHub Releases for a newer side-loaded APK once, after first
+    // frame so a Navigator/Overlay is available for the prompt.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _navigatorKey.currentContext;
+      if (ctx != null) {
+        checkAndPromptForUpdate(ctx);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,6 +127,7 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
     return MaterialApp(
       title: 'Cryptic',
       debugShowCheckedModeBanner: false,
+      navigatorKey: _navigatorKey,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: _buildCurrentScreen(),

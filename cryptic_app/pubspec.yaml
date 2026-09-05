@@ -22,6 +22,13 @@ dependencies:
   web_socket_channel: ^2.4.0
   http: ^1.1.0
 
+  # Self-update: checks GitHub Releases for a newer APK (side-loaded builds)
+  auto_upgrade:
+    git:
+      url: https://github.com/etnt/auto_upgrade.git
+  url_launcher: ^6.2.0
+  shared_preferences: ^2.3.0
+
   # Storage
   flutter_secure_storage: ^9.0.0
   sqflite_sqlcipher: ^3.0.0
