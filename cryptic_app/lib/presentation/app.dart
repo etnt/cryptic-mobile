@@ -81,7 +81,9 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
           final repo = ref.read(messageRepositoryProvider);
           if (repo != null) {
             final msg = ChatMessage(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              id: event.messageId.isNotEmpty
+                  ? event.messageId
+                  : DateTime.now().microsecondsSinceEpoch.toString(),
               conversationId: event.fromUser,
               senderId: event.fromUser,
               content: event.plaintext,

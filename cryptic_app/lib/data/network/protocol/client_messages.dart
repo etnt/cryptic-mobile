@@ -425,3 +425,26 @@ class RequestPendingMessagesMessage extends ProtocolMessage {
   @override
   Map<String, dynamic> toJson() => {'type': type};
 }
+
+/// Acknowledge receipt of a delivered message (store-and-forward).
+///
+/// The server stores every message it forwards and only removes its copy
+/// once the recipient acknowledges it. Sent after the client has
+/// successfully decrypted an incoming message, so it is not re-delivered
+/// on the next reconnect.
+class MessageAckMessage extends ProtocolMessage {
+  /// Creates a message acknowledgment for [messageId].
+  MessageAckMessage({required this.messageId});
+
+  /// The `message_id` of the message being acknowledged.
+  final String messageId;
+
+  @override
+  String get type => ClientMessageType.messageAck.value;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'type': type,
+        'message_id': messageId,
+      };
+}

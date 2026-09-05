@@ -69,7 +69,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   void _addIncomingMessage(MessageReceived event) {
     final message = ChatMessage(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: event.messageId.isNotEmpty
+          ? event.messageId
+          : DateTime.now().microsecondsSinceEpoch.toString(),
       conversationId: widget.peerId,
       senderId: event.fromUser,
       content: event.plaintext,

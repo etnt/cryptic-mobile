@@ -351,7 +351,11 @@ class MessageReceived extends EngineEvent {
     required this.fromUser,
     required this.plaintext,
     required this.timestamp,
+    this.messageId = '',
   });
+
+  /// Wire-level message ID used for persistence and de-duplication.
+  final String messageId;
 
   /// Sender username.
   final String fromUser;

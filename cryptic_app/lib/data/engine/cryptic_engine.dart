@@ -521,8 +521,18 @@ class CrypticEngine {
     // Delegate other messages to processor
     final result = await _messageProcessor.processMessage(message);
 
+    if (message is IncomingMessage &&
+        message.messageId.isNotEmpty &&
+        (result is ProcessingSuccess || result is ProcessingDuplicate)) {
+      _webSocketClient.send(
+        protocol.MessageAckMessage(messageId: message.messageId),
+      );
+    }
+
     // Handle session updates from X3DH messages
-    if (result is ProcessingSuccess && message is IncomingMessage) {
+    if (result is ProcessingSuccess &&
+        result.event is MessageReceived &&
+        message is IncomingMessage) {
       if (message.isX3dh) {
         final x3dh = message.asX3dh();
         if (x3dh != null) {

@@ -45,6 +45,9 @@ abstract class KeyStorageKeys {
 
   /// Pending one-time prekey IDs.
   static const pendingOtpkIds = '${prefix}pending_otpk_ids';
+
+  /// Recently processed incoming message IDs used for durable de-duplication.
+  static const processedMessageIds = '${prefix}processed_message_ids';
 }
 
 /// Service for securely storing cryptographic keys.
@@ -282,6 +285,48 @@ class KeyStorageService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Processed Message IDs
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Whether an incoming message has already been processed successfully.
+  Future<bool> hasProcessedMessage(String messageId) async {
+    final ids = await _loadProcessedMessageIds();
+    return ids.contains(messageId);
+  }
+
+  /// Persist an incoming message ID after successful decryption.
+  ///
+  /// The ledger is bounded because the server's pending queue is ephemeral and
+  /// only recent IDs are needed to survive reconnect/ack races.
+  Future<void> markMessageProcessed(String messageId) async {
+    const maxEntries = 2048;
+    final ids = await _loadProcessedMessageIds();
+    ids.remove(messageId);
+    ids.add(messageId);
+    if (ids.length > maxEntries) {
+      ids.removeRange(0, ids.length - maxEntries);
+    }
+    await _secureStorage.write(
+      key: KeyStorageKeys.processedMessageIds,
+      value: jsonEncode(ids),
+    );
+  }
+
+  Future<List<String>> _loadProcessedMessageIds() async {
+    final encoded = await _secureStorage.read(
+      key: KeyStorageKeys.processedMessageIds,
+    );
+    if (encoded == null || encoded.isEmpty) return <String>[];
+
+    try {
+      return (jsonDecode(encoded) as List<dynamic>).cast<String>();
+    } catch (_) {
+      await _secureStorage.delete(key: KeyStorageKeys.processedMessageIds);
+      return <String>[];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // User Metadata
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -343,6 +388,7 @@ class KeyStorageService {
     await _secureStorage.delete(key: KeyStorageKeys.username);
     await _secureStorage.delete(key: KeyStorageKeys.serverInfo);
     await _secureStorage.delete(key: KeyStorageKeys.pendingOtpkIds);
+    await _secureStorage.delete(key: KeyStorageKeys.processedMessageIds);
   }
 
   /// Checks if the storage has been initialized with keys.

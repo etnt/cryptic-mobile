@@ -266,6 +266,15 @@ class SessionManager {
     return plaintext;
   }
 
+  /// Whether an incoming message has already been processed successfully.
+  Future<bool> hasProcessedMessage(String messageId) async =>
+      _sessionRepository.hasProcessedMessage(messageId);
+
+  /// Persist an incoming message ID for de-duplication across reconnects.
+  Future<void> markMessageProcessed(String messageId) async {
+    await _sessionRepository.markMessageProcessed(messageId);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Session Management
   // ─────────────────────────────────────────────────────────────────────────

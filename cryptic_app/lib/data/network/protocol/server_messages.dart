@@ -377,6 +377,10 @@ class IncomingMessage extends ServerMessage {
 
   /// Check if this is a ratchet message.
   bool get isRatchet => messageType == EncryptedMessageType.ratchet;
+
+  /// The `message_id` carried by the encrypted blob, used for
+  /// store-and-forward acknowledgment and de-duplication. Empty if absent.
+  String get messageId => _asString(rawData['message_id']) ?? '';
 }
 
 /// Parsed X3DH incoming message.

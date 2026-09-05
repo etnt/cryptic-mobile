@@ -28,6 +28,9 @@ class ProcessingSuccess extends ProcessingResult {
   final EngineEvent? event;
 }
 
+/// Message was already processed and must only be acknowledged again.
+class ProcessingDuplicate extends ProcessingResult {}
+
 /// Message processing failed.
 class ProcessingFailure extends ProcessingResult {
   /// Creates a failure result.
@@ -171,9 +174,20 @@ class MessageProcessor {
   ) async {
     print(
         '[MessageProcessor] Handling incoming message: type=${message.messageType}, from=${message.fromUser}, isX3dh=${message.isX3dh}');
-    return message.isX3dh
+    final messageId = message.messageId;
+    if (messageId.isNotEmpty &&
+        await _sessionManager.hasProcessedMessage(messageId)) {
+      return ProcessingDuplicate();
+    }
+
+    final result = await (message.isX3dh
         ? _handleX3dhMessage(message)
-        : _handleRatchetMessage(message);
+        : _handleRatchetMessage(message));
+
+    if (result is ProcessingSuccess && messageId.isNotEmpty) {
+      await _sessionManager.markMessageProcessed(messageId);
+    }
+    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -226,6 +240,7 @@ class MessageProcessor {
 
       // Emit message received event (plaintext was decrypted by X3DH)
       final event = MessageReceived(
+        messageId: message.messageId,
         fromUser: x3dh.fromUser,
         plaintext: utf8.decode(x3dhResult.plaintext),
         timestamp: DateTime.now(),
@@ -354,6 +369,7 @@ class MessageProcessor {
 
       // Emit message received event
       final event = MessageReceived(
+        messageId: message.messageId,
         fromUser: ratchet.fromUser,
         plaintext: utf8.decode(plaintext),
         timestamp: DateTime.now(),

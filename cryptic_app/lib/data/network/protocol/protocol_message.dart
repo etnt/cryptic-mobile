@@ -45,7 +45,10 @@ enum ClientMessageType {
   sendMessage('send_message'),
 
   /// Request delivery of pending (offline) messages.
-  requestPendingMessages('request_pending_messages');
+  requestPendingMessages('request_pending_messages'),
+
+  /// Acknowledge receipt of a delivered message (store-and-forward).
+  messageAck('message_ack');
 
   const ClientMessageType(this.value);
 
