@@ -14,6 +14,11 @@ import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 import 'diagnostics_screen.dart';
 
+/// The app version injected at release build time via `--dart-define`.
+/// Local builds fall back to the `dev` sentinel.
+// ignore: do_not_use_environment
+const _appVersion = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
+
 /// Screen showing available users to chat with.
 class UsersScreen extends ConsumerWidget {
   /// Creates a users screen.
@@ -26,7 +31,24 @@ class UsersScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Users'),
+        centerTitle: false,
+        titleSpacing: 16,
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Cryptic'),
+            const SizedBox(width: 8),
+            Text(
+              _appVersion == 'dev' ? 'dev' : 'v$_appVersion',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
