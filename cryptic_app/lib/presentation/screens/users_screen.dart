@@ -93,7 +93,83 @@ class UsersScreen extends ConsumerWidget {
                 );
               },
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _promptNewChat(context, ref),
+        icon: const Icon(Icons.person_add_alt_1),
+        label: const Text('New chat'),
+      ),
     );
+  }
+
+  /// Prompts for a username and starts a chat with that peer.
+  ///
+  /// Presence is not required to message a peer: the engine fetches the
+  /// recipient's key bundle by username, runs X3DH, and the server queues
+  /// the encrypted message until the peer reconnects. This lets a user start
+  /// a conversation with anyone whose username they know, even while that
+  /// peer is offline and therefore absent from the online-users list.
+  Future<void> _promptNewChat(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final currentUsername = ref.read(currentUsernameProvider);
+
+    final username = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            void submit() {
+              final value = controller.text.trim();
+              if (value.isEmpty) {
+                setState(() => errorText = 'Enter a username');
+                return;
+              }
+              if (value == currentUsername) {
+                setState(() => errorText = "You can't chat with yourself");
+                return;
+              }
+              Navigator.of(dialogContext).pop(value);
+            }
+
+            return AlertDialog(
+              title: const Text('New chat'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'Username',
+                  hintText: 'Enter a username',
+                  errorText: errorText,
+                ),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setState(() => errorText = null);
+                  }
+                },
+                onSubmitted: (_) => submit(),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: submit,
+                  child: const Text('Start chat'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (username != null && context.mounted) {
+      _startChat(context, ref, username);
+    }
   }
 
   void _startChat(BuildContext context, WidgetRef ref, String username) {
