@@ -139,7 +139,12 @@ class ConnectionManager {
     required this.mtlsConfig,
     this.config = ConnectionConfig.defaultConfig,
     String path = '/ws',
-  }) : _client = WebSocketClient(mtlsConfig: mtlsConfig, path: path);
+  }) : _client = WebSocketClient(
+          mtlsConfig: mtlsConfig,
+          path: path,
+          pingInterval:
+              config.enableHeartbeat ? config.heartbeatInterval : null,
+        );
 
   /// mTLS configuration.
   final MtlsConfig mtlsConfig;
@@ -153,7 +158,6 @@ class ConnectionManager {
 
   StreamSubscription<WebSocketEvent>? _clientSubscription;
   Timer? _reconnectTimer;
-  Timer? _heartbeatTimer;
   int _reconnectAttempts = 0;
   bool _shouldReconnect = true;
   bool _disposed = false;
@@ -209,7 +213,6 @@ class ConnectionManager {
   Future<void> disconnect() async {
     _shouldReconnect = false;
     _cancelReconnect();
-    _stopHeartbeat();
     await _client.disconnect();
     _eventController.add(DisconnectedEvent());
   }
@@ -233,7 +236,6 @@ class ConnectionManager {
     _disposed = true;
     _shouldReconnect = false;
     _cancelReconnect();
-    _stopHeartbeat();
     await _clientSubscription?.cancel();
     await _client.dispose();
     await _eventController.close();
@@ -274,13 +276,10 @@ class ConnectionManager {
   void _onConnected() {
     _reconnectAttempts = 0;
     _eventController.add(ConnectedEvent());
-    _startHeartbeat();
     _flushQueue();
   }
 
   void _onDisconnected() {
-    _stopHeartbeat();
-
     if (_shouldReconnect && !_disposed) {
       _eventController.add(
         DisconnectedEvent(willReconnect: true),
@@ -294,7 +293,6 @@ class ConnectionManager {
   }
 
   void _onError(Object? error) {
-    _stopHeartbeat();
     if (_shouldReconnect && !_disposed) {
       _scheduleReconnect();
     }
@@ -363,33 +361,6 @@ class ConnectionManager {
   void _cancelReconnect() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
-  }
-
-  void _startHeartbeat() {
-    if (!config.enableHeartbeat) return;
-
-    _stopHeartbeat();
-    _heartbeatTimer = Timer.periodic(
-      config.heartbeatInterval,
-      (_) => _sendHeartbeat(),
-    );
-  }
-
-  void _stopHeartbeat() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = null;
-  }
-
-  void _sendHeartbeat() {
-    if (_client.isConnected) {
-      // Send a ping frame (WebSocket protocol level)
-      // The underlying WebSocket implementation handles pong responses
-      try {
-        _client.sendRaw('{"type":"ping"}');
-      } catch (_) {
-        // Ignore errors, connection state will handle it
-      }
-    }
   }
 
   void _flushQueue() {

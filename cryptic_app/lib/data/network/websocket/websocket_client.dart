@@ -75,6 +75,7 @@ class WebSocketClient {
   WebSocketClient({
     required this.mtlsConfig,
     this.path = '/ws',
+    this.pingInterval,
   });
 
   /// mTLS configuration for the connection.
@@ -82,6 +83,13 @@ class WebSocketClient {
 
   /// WebSocket endpoint path.
   final String path;
+
+  /// Interval for WebSocket protocol-level keepalive pings.
+  ///
+  /// When set, the socket sends periodic ping frames and closes the
+  /// connection if the server does not answer with a pong within the same
+  /// interval. `null` disables protocol pings.
+  final Duration? pingInterval;
 
   WebSocket? _socket;
   ConnectionState _state = ConnectionState.disconnected;
@@ -139,10 +147,13 @@ class WebSocketClient {
       };
 
       // Connect WebSocket
+      // Protocol-level keepalive. Dart's WebSocket sends ping frames on this
+      // interval and auto-replies pong to the server's pings; it also closes
+      // the connection if the server stops answering, feeding reconnect.
       _socket = await WebSocket.connect(
         url,
         customClient: httpClient,
-      );
+      )..pingInterval = pingInterval;
 
       _socketSubscription = _socket!.listen(
         _onData,
