@@ -110,12 +110,11 @@ class CrypticEngine {
   // Reconnection state
   bool _intentionalDisconnect = false;
   Timer? _reconnectTimer;
-  Timer? _keepaliveTimer;
+  bool _resumeReconnectInProgress = false;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 10;
   static const Duration _initialReconnectDelay = Duration(seconds: 1);
   static const Duration _maxReconnectDelay = Duration(seconds: 60);
-  static const Duration _keepaliveInterval = Duration(seconds: 30);
 
   // Message processing serialization – ensures only one message is
   // processed at a time so Double Ratchet state stays consistent.
@@ -186,13 +185,15 @@ class CrypticEngine {
   }
 
   /// Connect to the server.
-  Future<void> connect() async {
+  Future<void> connect({bool resetReconnectAttempts = true}) async {
     if (!_isInitialized) {
       throw StateError('CrypticEngine not initialized');
     }
 
     _intentionalDisconnect = false;
-    _reconnectAttempts = 0;
+    if (resetReconnectAttempts) {
+      _reconnectAttempts = 0;
+    }
 
     _updateState(
       _state.copyWith(
@@ -212,9 +213,6 @@ class CrypticEngine {
 
       // Request user list
       await requestUserList();
-
-      // Start keepalive to prevent server idle timeout
-      _startKeepalive();
     } catch (e) {
       _updateState(_state.withError('Connection failed: $e'));
       _emitEvent(EngineError('Connection failed: $e'));
@@ -226,7 +224,6 @@ class CrypticEngine {
   Future<void> disconnect() async {
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
-    _keepaliveTimer?.cancel();
     await _webSocketClient.disconnect();
     _updateState(
       _state.copyWith(
@@ -243,7 +240,6 @@ class CrypticEngine {
     _isDisposed = true;
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
-    _keepaliveTimer?.cancel();
 
     await _messageSubscription?.cancel();
     await _connectionSubscription?.cancel();
@@ -255,6 +251,31 @@ class CrypticEngine {
 
     await _eventController.close();
     await _stateController.close();
+  }
+
+  /// Re-establish the WebSocket after the operating system resumes the app.
+  ///
+  /// Mobile platforms suspend Dart timers and socket processing in the
+  /// background, while the server is free to time out the old connection.
+  /// Replacing the possibly stale socket guarantees that identity keys are
+  /// uploaded again and pending messages are requested immediately.
+  Future<void> reconnectAfterAppResume() async {
+    if (_isDisposed || !_isInitialized || _resumeReconnectInProgress) return;
+
+    _resumeReconnectInProgress = true;
+    _reconnectTimer?.cancel();
+    _intentionalDisconnect = true;
+
+    try {
+      await _webSocketClient.disconnect();
+      _intentionalDisconnect = false;
+      await connect();
+    } catch (_) {
+      _intentionalDisconnect = false;
+      _scheduleReconnect();
+    } finally {
+      _resumeReconnectInProgress = false;
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -425,11 +446,11 @@ class CrypticEngine {
       _emitEvent(ConnectionStatusChanged(status));
 
       // Auto-reconnect on unexpected disconnect
-      if (status == ConnectionStatus.disconnected &&
+      if ((status == ConnectionStatus.disconnected ||
+              status == ConnectionStatus.error) &&
           !_intentionalDisconnect &&
           !_isDisposed &&
           _isInitialized) {
-        _keepaliveTimer?.cancel();
         _scheduleReconnect();
       }
 
@@ -441,6 +462,8 @@ class CrypticEngine {
   }
 
   void _scheduleReconnect() {
+    if (_reconnectTimer?.isActive ?? false) return;
+
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       print(
           '[Engine] Max reconnect attempts ($_maxReconnectAttempts) reached, giving up');
@@ -459,10 +482,10 @@ class CrypticEngine {
       if (_isDisposed || _intentionalDisconnect) return;
       print('[Engine] Attempting reconnect #$_reconnectAttempts');
       try {
-        await connect();
+        await connect(resetReconnectAttempts: false);
       } catch (e) {
         print('[Engine] Reconnect attempt $_reconnectAttempts failed: $e');
-        // _handleWebSocketEvent will trigger another _scheduleReconnect
+        // The connection error event schedules the next attempt.
       }
     });
   }
@@ -475,21 +498,6 @@ class CrypticEngine {
     // Add ±10% jitter
     final jitter = (delayMs * 0.1 * (Random().nextDouble() * 2 - 1)).round();
     return Duration(milliseconds: min(delayMs + jitter, maxMs));
-  }
-
-  void _startKeepalive() {
-    _keepaliveTimer?.cancel();
-    _keepaliveTimer = Timer.periodic(_keepaliveInterval, (_) {
-      if (isConnected) {
-        try {
-          // Use online_users as keepalive — server recognizes it and
-          // it keeps the connection alive without a dedicated ping command.
-          _webSocketClient.sendRaw('{"type":"online_users"}');
-        } catch (_) {
-          // Connection error will be handled by _onDone/_onError
-        }
-      }
-    });
   }
 
   void _handleWebSocketError(Object error) {

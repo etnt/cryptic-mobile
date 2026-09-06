@@ -3,6 +3,8 @@
 // Root application widget
 //
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,9 +49,11 @@ class CrypticApp extends ConsumerStatefulWidget {
   ConsumerState<CrypticApp> createState() => _CrypticAppState();
 }
 
-class _CrypticAppState extends ConsumerState<CrypticApp> {
+class _CrypticAppState extends ConsumerState<CrypticApp>
+    with WidgetsBindingObserver {
   AppScreen _currentScreen = AppScreen.splash;
   int _loginKey = 0;
+  bool _wasBackgrounded = false;
 
   /// Lets the startup update check show a dialog with a valid Navigator
   /// context (this State sits above the MaterialApp's own Navigator).
@@ -58,6 +62,7 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Check GitHub Releases for a newer side-loaded APK once, after first
     // frame so a Navigator/Overlay is available for the prompt.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -66,6 +71,34 @@ class _CrypticAppState extends ConsumerState<CrypticApp> {
         checkAndPromptForUpdate(ctx);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        _wasBackgrounded = true;
+        break;
+      case AppLifecycleState.resumed:
+        if (_wasBackgrounded) {
+          _wasBackgrounded = false;
+          final engine = ref.read(authenticatedEngineProvider);
+          if (engine != null) {
+            unawaited(engine.reconnectAfterAppResume());
+          }
+        }
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   @override

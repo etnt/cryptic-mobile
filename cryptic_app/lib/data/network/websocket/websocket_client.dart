@@ -75,7 +75,7 @@ class WebSocketClient {
   WebSocketClient({
     required this.mtlsConfig,
     this.path = '/ws',
-    this.pingInterval,
+    this.pingInterval = const Duration(seconds: 30),
   });
 
   /// mTLS configuration for the connection.
@@ -153,7 +153,8 @@ class WebSocketClient {
       _socket = await WebSocket.connect(
         url,
         customClient: httpClient,
-      )..pingInterval = pingInterval;
+      )
+        ..pingInterval = pingInterval;
 
       _socketSubscription = _socket!.listen(
         _onData,
