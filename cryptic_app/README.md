@@ -1,107 +1,161 @@
 # Cryptic Mobile App
 
-A Flutter-based end-to-end encrypted messaging client for the Cryptic secure messaging system.
+A Flutter client for the Cryptic encrypted messaging system. The app talks to the Cryptic server over mutual TLS and encrypts every message before it leaves the device.
 
 ## Features
 
-- **End-to-end encryption** using X3DH key agreement and Double Ratchet protocol
-- **mTLS authentication** with client certificates
-- **Forward secrecy** with one-time prekeys
-- **Secure key storage** using platform-native secure storage (iOS Keychain / Android Keystore)
-- **Passphrase-encrypted keys** — all private key material is encrypted at rest with AES-256-CBC using an Argon2id-derived key from the user's passphrase, adding defence-in-depth on top of the platform keychain
-- **Encrypted local database** using SQLCipher
-- **QR-based mobile enrollment** — scan a QR code + passphrase to onboard (no GPG needed on device)
+- End-to-end encryption with X3DH key agreement and the Double Ratchet protocol
+- Mutual TLS authentication with client certificates
+- Forward secrecy with one-time prekeys
+- Key storage in the platform secure storage (iOS Keychain / Android Keystore)
+- Passphrase-encrypted keys. The app encrypts all private key material at rest with AES-256-CBC. It derives the AES key from the user passphrase with Argon2id. This adds protection on top of the platform keychain
+- Encrypted local database with SQLCipher
+- Enrollment with a QR code. You scan a QR code and enter an admin passphrase. The app then creates a certificate and asks you for a personal passphrase. No GPG key is needed on the device
 
 ## Prerequisites
 
-- Flutter SDK ≥3.16.0
-- Xcode ≥15.0 (for iOS development)
-- CocoaPods ≥1.14.0
+- Flutter SDK 3.16.0 or newer
+- Xcode 15.0 or newer (for iOS development)
+- CocoaPods 1.14.0 or newer
 
-Verify your setup:
+Check your setup with:
+
 ```bash
 flutter doctor -v
 ```
 
-## Getting Started
-
-### 1. Clone and Setup
+## Install dependencies
 
 ```bash
 cd cryptic_app
 flutter pub get
 ```
 
-### 2. iOS Simulator Setup
+## iOS Simulator setup
 
-If the iOS Simulator window doesn't appear or shows as headless:
+If the iOS Simulator window does not appear, or it runs without a window, use these commands.
+
+Show the Simulator window frame:
 
 ```bash
-# Fix Simulator chrome visibility
 defaults write com.apple.iphonesimulator ShowChrome -bool true
-
-# Kill any existing Simulator
-killall Simulator 2>/dev/null
-
-# Boot a specific device
-xcrun simctl boot "iPhone 17 Pro"
-
-# Launch Simulator with explicit device UDID
-open /Applications/Xcode.app/Contents/Developer/Applications/Simulator.app \
-  --args -CurrentDeviceUDID $(xcrun simctl list devices booted -j | grep -o '"udid" : "[^"]*"' | head -1 | cut -d'"' -f4)
 ```
 
-Or use the one-liner to list available simulators and boot one:
-```bash
-# List available iOS simulators
-xcrun simctl list devices available
+Stop a Simulator that runs without a window:
 
-# Boot and run
+```bash
+killall Simulator 2>/dev/null
+```
+
+List the available iOS simulators:
+
+```bash
+xcrun simctl list devices available
+```
+
+Start a simulator:
+
+```bash
 xcrun simctl boot "iPhone 17 Pro"
 open -a Simulator
 ```
 
-### 3. Android Emulator Setup
+If the window still does not appear, start the Simulator app with the device UDID. Get the UDID from the output of `xcrun simctl list devices booted -j`:
 
 ```bash
-# List available AVDs
+open /Applications/Xcode.app/Contents/Developer/Applications/Simulator.app \
+  --args -CurrentDeviceUDID $(xcrun simctl list devices booted -j | grep -o '"udid" : "[^"]*"' | head -1 | cut -d'"' -f4)
+```
+
+## Android emulator setup
+
+The Android SDK lives at `~/Library/Android/sdk` on macOS. All commands below use this path.
+
+List the available emulators (AVDs):
+
+```bash
 ~/Library/Android/sdk/emulator/emulator -list-avds
+```
 
-# Start the emulator
-~/Library/Android/sdk/emulator/emulator -avd <avd_name> &
+Start an emulator. Use an AVD name from the list:
 
-# Wait for it to boot, then verify
+```bash
+~/Library/Android/sdk/emulator/emulator -avd Pixel_6a_API34_GoogleAPIs -no-boot-anim &
+```
+
+Wait for the boot to finish, and then confirm it:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb wait-for-device
+~/Library/Android/sdk/platform-tools/adb shell getprop sys.boot_completed
+# The command prints 1 when the boot is complete.
+```
+
+Stop the emulator:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb -s emulator-5554 emu kill
+# Replace emulator-5554 with the device name from: adb devices
+```
+
+### Create a new emulator
+
+Create an AVD on a Google APIs image. A Google APIs image has Google Play Services, but no Play Store. It is stable for QR scanner testing:
+
+```bash
+echo no | ~/Library/Android/sdk/cmdline-tools/latest/bin/avdmanager create avd \
+  -n Pixel_6a_API34_GoogleAPIs \
+  -k "system-images;android-34;google_apis;arm64-v8a" \
+  -d pixel_6a
+```
+
+Do not use a system image with `PrivacySandbox` in the name. Its version of Google Play Services (23.18.18) crashes when an app uses ML Kit or Firebase. See Troubleshooting for the symptoms.
+
+### The emulator has no camera
+
+The emulator does not have a real camera. Two options exist for QR enrollment testing:
+
+Paste the QR data. Copy the enrollment QR payload text, then open the QR scanner screen in the app and tap the paste icon in the app bar.
+
+Or show the QR code to the virtual camera. The emulator simulates a camera that points at a 3D room:
+
+1. Create an image file with the enrollment QR code.
+2. Open the emulator menu with the three dots, then open Camera.
+3. Under Virtual scene images, tap Add image and select the QR code image.
+4. Start the scan in the app. Use the camera controls at the side of the emulator to turn the virtual camera toward the image.
+
+## Run the app
+
+List the connected devices:
+
+```bash
 flutter devices
 ```
 
-### 4. Run the App
+Run on a device. Use the device ID from the list:
 
 ```bash
-# List available devices
-flutter devices
-
-# Run on iOS Simulator (use device ID from flutter devices)
 flutter run -d <device-id>
+```
 
-# Example with specific iPhone 17 Pro simulator
+Example for an iOS simulator:
+
+```bash
 flutter run -d A2A02E78-F63D-4000-A309-18B0A4FF3351
 ```
 
-### 5. Certificate Setup
+## Certificate setup
 
-Certificates can be obtained in two ways:
+You can get certificates in two ways.
 
-**Option A — QR Enrollment (recommended for mobile):**
+### Option A: QR enrollment (recommended for mobile)
 
-An admin creates an enrollment package with `cryptic-onboard create-mobile-enrollment`.
-On first launch the app presents a QR scanner → admin passphrase → automatic
-certificate generation → **set your own passphrase** → login. The admin
-passphrase is ephemeral (used once to decrypt the QR envelope); the personal
-passphrase you choose protects all stored key material going forward.
+An admin creates an enrollment package with `cryptic-onboard create-mobile-enrollment`. On first launch the app shows a QR scanner, then asks for the admin passphrase, then creates a certificate, and then asks you to set a personal passphrase. The admin passphrase is valid for one use. The personal passphrase protects all stored key material from then on.
 
-**Option B — Manual certificate placement:**
+### Option B: Manual certificate placement
 
 Place pre-existing certificates in:
+
 ```
 assets/certificates/
 ├── ca.crt          # CA certificate
@@ -111,26 +165,28 @@ assets/certificates/
 
 ## Development
 
-### Hot Reload
-While the app is running:
-- Press `r` for hot reload (preserves state)
-- Press `R` for hot restart (resets state)
-- Press `q` to quit
+### Hot reload
 
-### Running Tests
+While the app runs:
+
+- Press `r` for hot reload. The app keeps its state.
+- Press `R` for hot restart. The app loses its state.
+- Press `q` to quit.
+
+### Run tests
 
 ```bash
 # Run all tests
 flutter test
 
-# Run specific test file
+# Run one test file
 flutter test test/data/network/protocol/client_messages_test.dart
 
 # Run with coverage
 flutter test --coverage
 ```
 
-### Static Analysis
+### Static analysis
 
 ```bash
 flutter analyze
@@ -138,7 +194,7 @@ flutter analyze
 
 ## Architecture
 
-The app follows clean architecture principles:
+The app follows a clean architecture pattern:
 
 ```
 lib/
@@ -154,44 +210,85 @@ lib/
 └── presentation/   # Screens, widgets, Riverpod providers
 ```
 
-### Passphrase-Based Key Encryption
+### Passphrase-based key encryption
 
-All sensitive stored data (identity keys, signed prekeys, one-time prekeys,
-session states, and the client TLS private key) is encrypted at rest using
-the user's personal passphrase:
+The app encrypts all sensitive stored data with the personal passphrase. This includes identity keys, signed prekeys, one-time prekeys, session states, and the client TLS private key.
 
-1. **Key derivation** — Argon2id (64 MiB memory, 3 iterations, 4 parallelism) derives a 32-byte AES key from the passphrase + a per-value random salt.
-2. **Encryption** — AES-256-CBC with PKCS7 padding and a random IV per value.
-3. **Verification** — A verifier (encrypted magic string) is stored so the passphrase can be validated on login without exposing key material.
-4. **Transparent I/O** — `EncryptedSecureStorage` wraps the platform secure storage, encrypting on write and decrypting on read for designated sensitive keys.
+1. The app derives a 32-byte AES key from the passphrase with Argon2id. It uses 64 MiB memory, 3 iterations, 4 parallelism, and a random salt per value.
+2. The app encrypts the value with AES-256-CBC and PKCS7 padding. It uses a random IV per value.
+3. The app stores a verifier at `cryptic_passphrase_verifier`. The verifier is an encrypted magic string. The app checks the passphrase on login with the verifier, and never reads key material for the check.
+4. `EncryptedSecureStorage` wraps the platform secure storage. It encrypts on write and decrypts on read for the sensitive keys.
 
-This adds defence-in-depth: even if the platform keychain is exported or
-backed up, the key material cannot be read without the user's passphrase.
+This gives extra protection. Even if an attacker exports the platform keychain, the attacker cannot read the key material without the passphrase.
 
 ## Troubleshooting
 
-### Simulator Issues
+### iOS simulator problems
 
-| Issue | Solution |
-|-------|----------|
-| Simulator window not visible | Run: `defaults write com.apple.iphonesimulator ShowChrome -bool true` then restart Simulator |
-| Simulator running headless | Kill and relaunch with explicit UDID (see above) |
-| Device not found | Run `xcrun simctl list devices available` to see available devices |
+The Simulator window is not visible:
 
-### Build Issues
+```bash
+defaults write com.apple.iphonesimulator ShowChrome -bool true
+```
 
-| Issue | Solution |
-|-------|----------|
-| CocoaPods not installed | `sudo gem install cocoapods && pod setup` |
-| iOS build fails | `cd ios && rm -rf Pods Podfile.lock && pod install` |
-| Flutter not finding device | Run `flutter doctor` and fix any issues |
+Then restart the Simulator app.
 
-## Related Documentation
+The Simulator runs without a window. Kill it, and start it again with an explicit UDID. See iOS Simulator setup above.
 
-- [Architecture Guide](../docs/FLUTTER-ARCHITECTURE.md)
-- [Implementation Plan](../docs/FLUTTER-IMPLEMENTATION-PLAN.md)
-- [Mobile Enrollment Plan](../docs/MOBILE-ENROLLMENT-PLAN.md)
-- [Agent Integration Guide](../AGENTS.md)
+No device is found. List the available devices with `xcrun simctl list devices available`.
+
+### Android emulator problems
+
+The app dies when the QR scanner opens. The connection to the device is lost.
+
+Google Play Services on the emulator restarts again and again in a crash loop. Each restart uses memory, until Android kills your app. The crash log shows `com.google.android.gms.persistent` and `java.lang.StackOverflowError`. The crash starts when the app opens the QR scanner, because ML Kit talks to Play Services.
+
+Confirm the problem. Count the fatal exceptions, and then look at the crash log:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb logcat -d -b crash | grep -c "FATAL EXCEPTION"
+~/Library/Android/sdk/platform-tools/adb logcat -d -b crash
+```
+
+Check if Play Services is stable. A stable system has one process with one PID that does not change:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb shell ps -A | grep gms
+```
+
+Fix 1: Cold boot with wiped data. A snapshot can contain broken state:
+
+```bash
+~/Library/Android/sdk/platform-tools/adb -s emulator-5554 emu kill
+~/Library/Android/sdk/emulator/emulator @Pixel_6a_API34_GoogleAPIs -no-snapshot -wipe-data
+```
+
+Warning: The `-wipe-data` flag deletes all app data on the emulator. You must install the app again.
+
+Fix 2: If the crash continues after a wipe, the system image is broken. Create a new AVD on a Google APIs image. See Create a new emulator above. Then run the app on the new AVD.
+
+### Build problems
+
+CocoaPods is not installed:
+
+```bash
+sudo gem install cocoapods && pod setup
+```
+
+The iOS build fails:
+
+```bash
+cd ios && rm -rf Pods Podfile.lock && pod install
+```
+
+Flutter does not find the device. Run `flutter doctor` and fix the reported problems.
+
+## Related documentation
+
+- [Architecture guide](../docs/FLUTTER-ARCHITECTURE.md)
+- [Implementation plan](../docs/FLUTTER-IMPLEMENTATION-PLAN.md)
+- [Mobile enrollment plan](../docs/MOBILE-ENROLLMENT-PLAN.md)
+- [Agent integration guide](../AGENTS.md)
 
 ## License
 
