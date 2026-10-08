@@ -1,36 +1,36 @@
 # Cryptic Mobile
 
-> Flutter client for the [Cryptic](https://github.com/etnt/cryptic) end-to-end
-> encrypted chat system — X3DH key agreement, Double Ratchet, mTLS WebSocket.
+A Flutter client for the [Cryptic](https://github.com/etnt/cryptic) encrypted chat system. The app uses X3DH key agreement, Double Ratchet encryption, and a mutual TLS WebSocket connection.
 
-**Educational software — not security audited. Use at your own risk.**
+This is educational software. Nobody audited it for security. You use it at your own risk.
 
 ## Features
 
-X3DH key agreement · Double Ratchet encryption · mTLS WebSocket (ECDSA P-256
-client certs) · QR-based mobile enrollment (Ed25519) · Argon2id-encrypted key
-storage · online user list · session persistence.
+- X3DH key agreement
+- Double Ratchet encryption
+- Mutual TLS WebSocket with ECDSA P-256 client certificates
+- Enrollment with a QR code and an Ed25519 signature
+- Key storage encrypted with Argon2id and AES-256-CBC
+- Online user list
+- Session persistence
 
-_Pending: certificate renewal, on-device message history._
+Pending work: certificate renewal and on-device message history.
 
 ## Install
 
-Download and install the latest **.apk** release file, found on the release page.
+Download the latest `.apk` file from the release page. Install it on your phone.
 
 ## Enrollment
 
-New devices onboard via a QR code — no GPG on mobile. An admin creates an
-enrollment package with `cryptic-onboard`; the app scans it, decrypts it with the
-admin passphrase, and requests an mTLS certificate. You then set a **personal
-passphrase** that encrypts all key material at rest (Argon2id + AES-256-CBC) and
-is required on every login.
+New devices enroll with a QR code. No GPG key is needed on the device.
+
+An admin creates an enrollment package with `cryptic-onboard`. You scan the QR code with the app. The app decrypts the package with the admin passphrase and asks the server for a certificate. You then set a personal passphrase. The passphrase encrypts all key material at rest with Argon2id and AES-256-CBC. The app asks for the passphrase at every login.
 
 See [docs/MOBILE-ENROLLMENT-PLAN.md](docs/MOBILE-ENROLLMENT-PLAN.md) for the full protocol.
 
 ## Build yourself
 
-Requires [Flutter](https://docs.flutter.dev/get-started/install) ≥ 3.2, a running
-[Cryptic server](https://github.com/etnt/cryptic), and Xcode / Android Studio.
+You need [Flutter](https://docs.flutter.dev/get-started/install) 3.2 or newer, a running [Cryptic server](https://github.com/etnt/cryptic), and Xcode or Android Studio.
 
 ```bash
 cd cryptic_app
@@ -38,26 +38,23 @@ flutter pub get
 flutter devices
 flutter run -d <device-id>
 ```
-On Android the app rewrites `localhost` / `127.0.0.1` to `10.0.2.2` automatically
-so the emulator can reach the host machine.
 
+On Android, the app changes `localhost` and `127.0.0.1` to `10.0.2.2`. The emulator uses this address to reach the host machine.
+
+For device setup and troubleshooting, see the [mobile app guide](cryptic_app/README.md). The guide covers iOS simulator setup, Android emulator setup, and QR scanner testing on emulators.
 
 ## Release builds (signed APKs)
 
-Pushing a `v*` tag triggers
-[.github/workflows/release-apk.yml](.github/workflows/release-apk.yml), which
-builds signed universal + per-ABI APKs and publishes a GitHub Release with
-SHA-256 checksums.
+A push of a `v*` tag starts [.github/workflows/release-apk.yml](.github/workflows/release-apk.yml). The workflow builds signed APKs, one universal and one per ABI, and publishes a GitHub release with SHA-256 checksums.
 
-**Required repository secrets** (Settings → Secrets and variables → Actions):
+The workflow needs two repository secrets. Set them under Settings, Secrets and variables, Actions:
 
 | Secret | Description |
 |--------|-------------|
-| `ANDROID_KEYSTORE_BASE64` | base64 of your release keystore (`.jks`) |
-| `ANDROID_KEYSTORE_PASSWORD` | keystore password (used for both store and key) |
+| `ANDROID_KEYSTORE_BASE64` | base64 text of your release keystore (`.jks`) |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password. The workflow uses it for the store and the key |
 
-The workflow expects the alias `cryptic` and the same password for the store and
-key entry. Generate a keystore, encode it, then tag a release:
+The workflow expects the alias `cryptic` and the same password for the store and the key entry. Generate a keystore, encode it, and then tag a release:
 
 ```bash
 keytool -genkey -v -keystore cryptic-release.jks \
@@ -67,11 +64,9 @@ base64 -i cryptic-release.jks | pbcopy      # paste into ANDROID_KEYSTORE_BASE64
 git tag v1.0.0 && git push origin v1.0.0
 ```
 
-Local `flutter build apk --release` still works without secrets — it falls back
-to debug signing when no `android/key.properties` is present.
+A local `flutter build apk --release` works without the secrets. The build uses debug signing when `android/key.properties` does not exist.
 
-> `applicationId` is still the Flutter template default
-> (`com.example.cryptic_app`); change it before any Play Store submission.
+Note: `applicationId` is still the Flutter template default (`com.example.cryptic_app`). Change it before any Play Store submission.
 
 ## Project layout
 
@@ -85,10 +80,11 @@ cryptic_app/lib/
 
 ## Documentation
 
+- [Mobile app guide](cryptic_app/README.md): device setup, emulator commands, and troubleshooting
 - [Architecture](docs/FLUTTER-ARCHITECTURE.md)
-- [Implementation Plan](docs/FLUTTER-IMPLEMENTATION-PLAN.md)
-- [Mobile Enrollment Plan](docs/MOBILE-ENROLLMENT-PLAN.md)
-- [Server Integration Guide](AGENTS.md)
+- [Implementation plan](docs/FLUTTER-IMPLEMENTATION-PLAN.md)
+- [Mobile enrollment plan](docs/MOBILE-ENROLLMENT-PLAN.md)
+- [Server integration guide](AGENTS.md)
 
 ## License
 
