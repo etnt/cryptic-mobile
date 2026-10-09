@@ -13,6 +13,7 @@ import 'package:open_filex/open_filex.dart';
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/message.dart';
 import 'image_viewer_screen.dart';
+import 'linkified_text.dart';
 
 /// A chat message bubble.
 class MessageBubble extends StatelessWidget {
@@ -26,6 +27,7 @@ class MessageBubble extends StatelessWidget {
     this.selectionMode = false,
     this.onTap,
     this.onLongPress,
+    this.onOpenLink,
   });
 
   /// The message to display.
@@ -48,6 +50,9 @@ class MessageBubble extends StatelessWidget {
 
   /// Called on long press.
   final VoidCallback? onLongPress;
+
+  /// Optional handler for opening links in text messages.
+  final Future<bool> Function(Uri uri)? onOpenLink;
 
   @override
   Widget build(BuildContext context) {
@@ -113,13 +118,22 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
             if (message.kind == MessageKind.text)
-              Text(
-                message.content,
+              LinkifiedText(
+                text: message.content,
                 style: TextStyle(
                   fontSize: 16,
                   color: textColor,
                   height: 1.3,
                 ),
+                linkStyle: TextStyle(
+                  fontSize: 16,
+                  color: isOutgoing && isDark
+                      ? Colors.lightBlueAccent
+                      : theme.colorScheme.primary,
+                  height: 1.3,
+                  decoration: TextDecoration.underline,
+                ),
+                onOpen: onOpenLink,
               )
             else
               _buildAttachment(context, textColor),
