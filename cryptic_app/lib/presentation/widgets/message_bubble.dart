@@ -185,11 +185,15 @@ class MessageBubble extends StatelessWidget {
     final path = message.localPath;
     if (message.kind == MessageKind.image && path != null) {
       return GestureDetector(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ImageViewerScreen(path: path),
-          ),
-        ),
+        onTap: () {
+          // Drop input focus first so the keyboard is not restored on pop.
+          FocusManager.instance.primaryFocus?.unfocus();
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ImageViewerScreen(path: path),
+            ),
+          );
+        },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: Image.file(
@@ -220,6 +224,7 @@ class MessageBubble extends StatelessWidget {
                 );
                 return;
               }
+              FocusManager.instance.primaryFocus?.unfocus();
               OpenFilex.open(path);
             },
       child: SizedBox(
