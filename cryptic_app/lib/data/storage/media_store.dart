@@ -29,6 +29,13 @@ class MediaStore {
     return '${root.path}/${_safeSegment(peer)}/${_safeSegment(fileId)}$extension';
   }
 
+  /// Delete a stored media file. Missing files are ignored.
+  Future<void> delete(String path) async {
+    final file = File(path);
+    // ignore: avoid_slow_async_io
+    if (await file.exists()) await file.delete();
+  }
+
   Future<String> save({
     required String peer,
     required String fileId,

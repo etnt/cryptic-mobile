@@ -83,6 +83,21 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
       );
   }
 
+  /// Replace the conversation's latest message after deletions.
+  ///
+  /// Pass `null` when no messages remain.
+  void setLastMessage(String peerUsername, ChatMessage? message) {
+    final index = state.indexWhere((c) => c.peerUsername == peerUsername);
+    if (index < 0) return;
+    final conversation = state[index];
+    state = [...state]..[index] = message == null
+        ? conversation.copyWith(clearLastMessage: true)
+        : conversation.copyWith(
+            lastMessage: message,
+            lastMessageAt: message.timestamp,
+          );
+  }
+
   /// Mark a conversation as read.
   void markAsRead(String peerUsername) {
     final index = state.indexWhere((c) => c.peerUsername == peerUsername);

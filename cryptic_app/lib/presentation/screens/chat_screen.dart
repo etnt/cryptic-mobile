@@ -14,7 +14,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/utils/external_activity_guard.dart';
 import '../../core/utils/logger.dart';
 import '../../data/engine/engine_state.dart';
 import '../../data/engine/payload_codec.dart';
@@ -50,6 +49,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final List<ChatMessage> _messages = [];
   final ImagePicker _imagePicker = ImagePicker();
   final MediaStore _mediaStore = MediaStore();
+  final Set<String> _selectedIds = {};
+
+  bool get _selecting => _selectedIds.isNotEmpty;
 
   @override
   void initState() {
@@ -202,6 +204,83 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  /// Remove a failed outgoing attachment from the chat, database and disk.
+  Future<void> _discardAttachment(String fileId) async {
+    final matching = _messages.where((m) => m.fileId == fileId).toList();
+    if (matching.isEmpty) return;
+    await _deleteMessages(matching);
+  }
+
+  /// Delete messages from the list, the database and local media storage.
+  Future<void> _deleteMessages(List<ChatMessage> targets) async {
+    if (targets.isEmpty) return;
+    final ids = targets.map((m) => m.id).toSet();
+    if (mounted) {
+      setState(() {
+        _messages.removeWhere((m) => ids.contains(m.id));
+        _selectedIds.removeAll(ids);
+      });
+    }
+    ref.read(conversationsProvider.notifier).setLastMessage(
+          widget.peerId,
+          _messages.isEmpty ? null : _messages.last,
+        );
+    try {
+      await ref.read(messageRepositoryProvider)?.deleteMessages(ids);
+    } catch (error) {
+      AppLogger.warning(
+        'Could not delete messages from database',
+        tag: 'ChatScreen',
+        error: error,
+      );
+    }
+    for (final path in targets.map((m) => m.localPath).whereType<String>()) {
+      try {
+        await _mediaStore.delete(path);
+      } catch (error) {
+        AppLogger.warning(
+          'Could not delete media file',
+          tag: 'ChatScreen',
+          error: error,
+        );
+      }
+    }
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (!_selectedIds.remove(id)) _selectedIds.add(id);
+    });
+  }
+
+  Future<void> _confirmDeleteSelected() async {
+    final targets =
+        _messages.where((m) => _selectedIds.contains(m.id)).toList();
+    if (targets.isEmpty) return;
+    final count = targets.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(count == 1 ? 'Delete message?' : 'Delete $count messages?'),
+        content: const Text(
+          'This removes them from this device only. '
+          'The other person keeps their copy.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) await _deleteMessages(targets);
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -294,9 +373,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       Uint8List? bytes;
       String fileName;
       if (source == AttachmentSource.file) {
-        final selection = await ExternalActivityGuard.run(
-          () => FilePicker.platform.pickFiles(),
-        );
+        final selection = await FilePicker.platform.pickFiles();
         if (selection == null || selection.files.isEmpty) return;
         final selectedFile = selection.files.single;
         if (selectedFile.size > AttachmentLimits.maxFileBytes) {
@@ -307,14 +384,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         bytes =
             path == null ? selectedFile.bytes : await File(path).readAsBytes();
       } else {
-        final picked = await ExternalActivityGuard.run(
-          () => _imagePicker.pickImage(
-            source: source == AttachmentSource.camera
-                ? ImageSource.camera
-                : ImageSource.gallery,
-            imageQuality: 80,
-            maxWidth: 2048,
-          ),
+        final picked = await _imagePicker.pickImage(
+          source: source == AttachmentSource.camera
+              ? ImageSource.camera
+              : ImageSource.gallery,
+          imageQuality: 80,
+          maxWidth: 2048,
         );
         if (picked == null) return;
         try {
@@ -391,11 +466,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     } catch (error) {
       if (createdFileId != null) {
-        _updateAttachmentProgress(
-          fileId: createdFileId,
-          progress: 0,
-          status: TransferStatus.failed,
-        );
+        // A failed outgoing attachment is not shown in the chat.
+        unawaited(_discardAttachment(createdFileId));
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -441,6 +513,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         } else if (event is FileReceiveProgress &&
             event.fromUser == widget.peerId) {
           _handleFileProgress(event);
+        } else if (event is FileSendProgress &&
+            event.toUser == widget.peerId &&
+            event.failed) {
+          unawaited(_discardAttachment(event.fileId));
         } else if (event is FileSendProgress && event.toUser == widget.peerId) {
           _updateAttachmentProgress(
             fileId: event.fileId,
@@ -455,86 +531,113 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       });
     });
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          children: [
-            Text(widget.peerId),
-            if (hasSession)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.lock,
-                    size: 12,
-                    color: Theme.of(context).colorScheme.primary,
+    return PopScope(
+      canPop: !_selecting,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _selecting) setState(_selectedIds.clear);
+      },
+      child: Scaffold(
+        appBar: _selecting
+            ? AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => setState(_selectedIds.clear),
+                ),
+                title: Text('${_selectedIds.length} selected'),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: 'Delete',
+                    onPressed: _confirmDeleteSelected,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Encrypted',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                ],
+              )
+            : AppBar(
+                title: Column(
+                  children: [
+                    Text(widget.peerId),
+                    if (hasSession)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.lock,
+                            size: 12,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Encrypted',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () {
+                      _showChatMenu(context);
+                    },
                   ),
                 ],
               ),
+        body: Column(
+          children: [
+            ConnectionStatusBanner(
+              status: connectionStatus,
+              onTap: () {
+                // TODO(M8): Attempt reconnect
+              },
+            ),
+            Expanded(
+              child: _messages.isEmpty
+                  ? EmptyState.noMessages()
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final message = _messages[index];
+                        final showTimestamp = _shouldShowTimestamp(
+                          _messages,
+                          index,
+                        );
+                        return Column(
+                          children: [
+                            if (showTimestamp)
+                              _buildTimestampDivider(
+                                context,
+                                message.timestamp,
+                              ),
+                            MessageBubble(
+                              message: message,
+                              selected: _selectedIds.contains(message.id),
+                              selectionMode: _selecting,
+                              onTap: () => _toggleSelection(message.id),
+                              onLongPress: () => _toggleSelection(message.id),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+            MessageInput(
+              enabled: connectionStatus == ConnectionStatus.connected,
+              onSubmit: _sendMessage,
+              onAttach: _openAttachmentSheet,
+              placeholder: connectionStatus == ConnectionStatus.connected
+                  ? 'Type a message...'
+                  : 'Connecting...',
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () {
-              _showChatMenu(context);
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          ConnectionStatusBanner(
-            status: connectionStatus,
-            onTap: () {
-              // TODO(M8): Attempt reconnect
-            },
-          ),
-          Expanded(
-            child: _messages.isEmpty
-                ? EmptyState.noMessages()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final message = _messages[index];
-                      final showTimestamp = _shouldShowTimestamp(
-                        _messages,
-                        index,
-                      );
-                      return Column(
-                        children: [
-                          if (showTimestamp)
-                            _buildTimestampDivider(
-                              context,
-                              message.timestamp,
-                            ),
-                          MessageBubble(
-                            message: message,
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-          MessageInput(
-            enabled: connectionStatus == ConnectionStatus.connected,
-            onSubmit: _sendMessage,
-            onAttach: _openAttachmentSheet,
-            placeholder: connectionStatus == ConnectionStatus.connected
-                ? 'Type a message...'
-                : 'Connecting...',
-          ),
-        ],
       ),
     );
   }

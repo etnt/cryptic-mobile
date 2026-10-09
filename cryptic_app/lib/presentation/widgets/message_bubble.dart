@@ -22,6 +22,10 @@ class MessageBubble extends StatelessWidget {
     super.key,
     this.showSender = false,
     this.showTimestamp = true,
+    this.selected = false,
+    this.selectionMode = false,
+    this.onTap,
+    this.onLongPress,
   });
 
   /// The message to display.
@@ -32,6 +36,18 @@ class MessageBubble extends StatelessWidget {
 
   /// Whether to show the timestamp.
   final bool showTimestamp;
+
+  /// Whether this message is currently selected.
+  final bool selected;
+
+  /// Whether the chat is in selection mode (taps toggle selection).
+  final bool selectionMode;
+
+  /// Called on tap while in selection mode.
+  final VoidCallback? onTap;
+
+  /// Called on long press.
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -51,7 +67,7 @@ class MessageBubble extends StatelessWidget {
         ? Colors.white
         : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
 
-    return Align(
+    final bubble = Align(
       alignment: isOutgoing ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
@@ -134,6 +150,19 @@ class MessageBubble extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: selectionMode ? onTap : null,
+      onLongPress: onLongPress,
+      child: ColoredBox(
+        color: selected
+            ? theme.colorScheme.primary.withValues(alpha: 0.18)
+            : Colors.transparent,
+        // In selection mode the bubble's own taps (open image/file) are off.
+        child: IgnorePointer(ignoring: selectionMode, child: bubble),
       ),
     );
   }

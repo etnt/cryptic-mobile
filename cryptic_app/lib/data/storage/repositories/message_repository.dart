@@ -50,6 +50,12 @@ class MessageRepository {
     await _db.clearLocalPaths(paths);
   }
 
+  /// Delete specific messages by ID.
+  Future<void> deleteMessages(Iterable<String> ids) async {
+    if (!_db.isOpen) return;
+    await _db.deleteMessages(ids);
+  }
+
   /// Mark a conversation as read.
   Future<void> markAsRead(String peerUsername) async {
     if (!_db.isOpen) return;

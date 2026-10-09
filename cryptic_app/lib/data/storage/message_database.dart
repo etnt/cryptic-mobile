@@ -199,6 +199,18 @@ class MessageDatabase {
     );
   }
 
+  /// Delete specific messages by ID.
+  Future<void> deleteMessages(Iterable<String> ids) async {
+    final values = ids.toList();
+    if (values.isEmpty) return;
+    final db = _requireDb();
+    await db.delete(
+      'messages',
+      where: 'id IN (${List.filled(values.length, '?').join(', ')})',
+      whereArgs: values,
+    );
+  }
+
   /// Delete all messages for a conversation.
   Future<void> deleteConversationMessages(String conversationId) async {
     final db = _requireDb();

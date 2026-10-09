@@ -77,12 +77,13 @@ class Conversation {
     bool? isMuted,
     bool? isArchived,
     DateTime? createdAt,
+    bool clearLastMessage = false,
   }) =>
       Conversation(
         id: id ?? this.id,
         peerUsername: peerUsername ?? this.peerUsername,
         peerDisplayName: peerDisplayName ?? this.peerDisplayName,
-        lastMessage: lastMessage ?? this.lastMessage,
+        lastMessage: clearLastMessage ? null : (lastMessage ?? this.lastMessage),
         lastMessageAt: lastMessageAt ?? this.lastMessageAt,
         unreadCount: unreadCount ?? this.unreadCount,
         hasActiveSession: hasActiveSession ?? this.hasActiveSession,
