@@ -14,7 +14,8 @@ import '../../domain/models/message.dart';
 /// In a real implementation, this would load from storage.
 final conversationsProvider =
     StateNotifierProvider<ConversationsNotifier, List<Conversation>>(
-        (ref) => ConversationsNotifier());
+  (ref) => ConversationsNotifier(),
+);
 
 /// Notifier for managing conversations.
 class ConversationsNotifier extends StateNotifier<List<Conversation>> {
@@ -56,6 +57,30 @@ class ConversationsNotifier extends StateNotifier<List<Conversation>> {
       );
       state = [...state, conversation];
     }
+  }
+
+  /// Update attachment transfer metadata on a conversation's latest message.
+  void updateAttachmentMessage(
+    String peerUsername,
+    String messageId, {
+    double? progress,
+    TransferStatus? transferStatus,
+    String? localPath,
+    MessageStatus? status,
+  }) {
+    final index = state.indexWhere((c) => c.peerUsername == peerUsername);
+    if (index < 0) return;
+    final conversation = state[index];
+    final latest = conversation.lastMessage;
+    if (latest == null || latest.id != messageId) return;
+    state = [...state]..[index] = conversation.copyWith(
+        lastMessage: latest.copyWith(
+          transferProgress: progress,
+          transferStatus: transferStatus,
+          localPath: localPath,
+          status: status,
+        ),
+      );
   }
 
   /// Mark a conversation as read.
@@ -111,14 +136,14 @@ final totalUnreadCountProvider = Provider<int>((ref) {
 /// Provider for sorted conversations (most recent first).
 final sortedConversationsProvider = Provider<List<Conversation>>((ref) {
   final conversations = ref.watch(conversationsProvider);
-  final sorted = List<Conversation>.from(conversations);
-  sorted.sort((a, b) {
-    final aTime = a.lastMessageAt;
-    final bTime = b.lastMessageAt;
-    if (aTime == null && bTime == null) return 0;
-    if (aTime == null) return 1;
-    if (bTime == null) return -1;
-    return bTime.compareTo(aTime);
-  });
+  final sorted = List<Conversation>.from(conversations)
+    ..sort((a, b) {
+      final aTime = a.lastMessageAt;
+      final bTime = b.lastMessageAt;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime);
+    });
   return sorted;
 });

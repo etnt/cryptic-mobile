@@ -11,6 +11,8 @@ A Flutter client for the Cryptic encrypted messaging system. The app talks to th
 - Passphrase-encrypted keys. The app encrypts all private key material at rest with AES-256-CBC. It derives the AES key from the user passphrase with Argon2id. This adds protection on top of the platform keychain
 - Encrypted local database with SQLCipher
 - Enrollment with a QR code. You scan a QR code and enter an admin passphrase. The app then creates a certificate and asks you for a personal passphrase. No GPG key is needed on the device
+- On startup and app resume, received media older than 30 days can be removed when the media cache exceeds its size limit. Media referenced by recent messages is kept
+- On iOS, media uses complete file protection. The app cannot save media while the device is locked, including attachments received in the background
 
 ## Prerequisites
 
@@ -220,6 +222,13 @@ The app encrypts all sensitive stored data with the personal passphrase. This in
 4. `EncryptedSecureStorage` wraps the platform secure storage. It encrypts on write and decrypts on read for the sensitive keys.
 
 This gives extra protection. Even if an attacker exports the platform keychain, the attacker cannot read the key material without the passphrase.
+
+## iOS media protection
+
+The app uses `FileProtectionType.complete` for media files. This choice provides
+protection while the device is locked, but it also means the app cannot create
+or save media files while locked. Background attachment receive therefore cannot
+save the received media until the device is unlocked.
 
 ## Troubleshooting
 

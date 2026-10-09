@@ -3,15 +3,27 @@
 /// Displays messages for a single conversation with input.
 library;
 
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:uuid/uuid.dart';
 
+import '../../core/utils/logger.dart';
 import '../../data/engine/engine_state.dart';
+import '../../data/engine/payload_codec.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/storage/media_store.dart';
 import '../../domain/models/message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/engine_provider.dart';
 import '../providers/messages_provider.dart';
+import '../widgets/attachment_sheet.dart';
 import '../widgets/connection_status_banner.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/message_bubble.dart';
@@ -35,6 +47,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
+  final ImagePicker _imagePicker = ImagePicker();
+  final MediaStore _mediaStore = MediaStore();
 
   @override
   void initState() {
@@ -91,6 +105,102 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  void _addIncomingFile(FileReceived event) {
+    final message = ChatMessage(
+      id: event.fileId,
+      fileId: event.fileId,
+      conversationId: widget.peerId,
+      senderId: event.fromUser,
+      content: event.fileName,
+      timestamp: event.timestamp,
+      direction: MessageDirection.incoming,
+      status: MessageStatus.delivered,
+      kind: event.mimeType.startsWith('image/')
+          ? MessageKind.image
+          : MessageKind.file,
+      fileName: event.fileName,
+      mimeType: event.mimeType,
+      sizeBytes: event.sizeBytes,
+      localPath: event.localPath,
+      transferProgress: 1,
+      transferStatus: TransferStatus.complete,
+    );
+    _upsertLocalMessage(message);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  void _handleFileProgress(FileReceiveProgress event) {
+    final matching = _messages.where((message) => message.id == event.fileId);
+    final message = matching.isEmpty
+        ? ChatMessage(
+            id: event.fileId,
+            fileId: event.fileId,
+            conversationId: widget.peerId,
+            senderId: event.fromUser,
+            content: event.fileName,
+            timestamp: DateTime.now(),
+            direction: MessageDirection.incoming,
+            kind: event.mimeType.startsWith('image/')
+                ? MessageKind.image
+                : MessageKind.file,
+            fileName: event.fileName,
+            mimeType: event.mimeType,
+            sizeBytes: event.sizeBytes,
+            transferProgress: event.progress,
+            transferStatus:
+                event.failed ? TransferStatus.failed : TransferStatus.receiving,
+            status: event.failed ? MessageStatus.failed : MessageStatus.sending,
+          )
+        : matching.first.copyWith(
+            transferProgress: event.progress,
+            transferStatus:
+                event.failed ? TransferStatus.failed : TransferStatus.receiving,
+            status: event.failed ? MessageStatus.failed : null,
+          );
+    _upsertLocalMessage(message);
+  }
+
+  void _upsertLocalMessage(ChatMessage message) {
+    if (!mounted) return;
+    setState(() {
+      final index = _messages.indexWhere((item) => item.id == message.id);
+      if (index < 0) {
+        _messages.add(message);
+      } else {
+        _messages[index] = message;
+      }
+    });
+  }
+
+  void _updateAttachmentProgress({
+    required String fileId,
+    required double progress,
+    required TransferStatus status,
+  }) {
+    final index = _messages.indexWhere((message) => message.fileId == fileId);
+    if (index < 0) return;
+    final updated = _messages[index].copyWith(
+      transferProgress: progress,
+      transferStatus: status,
+      status: status == TransferStatus.complete
+          ? MessageStatus.sent
+          : status == TransferStatus.failed
+              ? MessageStatus.failed
+              : _messages[index].status,
+    );
+    _upsertLocalMessage(updated);
+    ref.read(conversationsProvider.notifier).updateAttachmentMessage(
+          widget.peerId,
+          updated.id,
+          progress: progress,
+          transferStatus: status,
+          status: updated.status,
+        );
+    if (status == TransferStatus.complete || status == TransferStatus.failed) {
+      unawaited(ref.read(messageRepositoryProvider)?.saveMessage(updated));
+    }
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -119,7 +229,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     });
 
     // Persist to database
-    ref.read(messageRepositoryProvider)?.saveMessage(message);
+    unawaited(ref.read(messageRepositoryProvider)?.saveMessage(message));
 
     // Add to conversation (for last message display)
     ref.read(conversationsProvider.notifier).addMessage(widget.peerId, message);
@@ -130,7 +240,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // Send via engine
     final engine = ref.read(engineProvider);
     if (engine == null) {
-      print('[ChatScreen] ERROR: engine is null! Cannot send message.');
+      AppLogger.error(
+        'Cannot send message because the engine is unavailable',
+        tag: 'ChatScreen',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -141,18 +254,147 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
       return;
     }
-    print(
-        '[ChatScreen] Sending message to ${widget.peerId}: $text (engine.isConnected=${engine.isConnected})');
+    AppLogger.debug(
+      'Sending message to ${widget.peerId} '
+      '(connected=${engine.isConnected})',
+      tag: 'ChatScreen',
+    );
     try {
       await engine.sendMessage(widget.peerId, text);
-      print('[ChatScreen] Message sent successfully');
+      AppLogger.debug('Message sent successfully', tag: 'ChatScreen');
     } catch (e, stack) {
-      print('[ChatScreen] ERROR sending message: $e');
-      print('[ChatScreen] Stack: $stack');
+      AppLogger.error(
+        'Error sending message',
+        tag: 'ChatScreen',
+        error: e,
+        stackTrace: stack,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Send failed: $e'), backgroundColor: Colors.red),
+            content: Text('Send failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _openAttachmentSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (_) => AttachmentSheet(onSelected: _sendAttachment),
+    );
+  }
+
+  Future<void> _sendAttachment(AttachmentSource source) async {
+    String? createdFileId;
+    try {
+      Uint8List? bytes;
+      String fileName;
+      if (source == AttachmentSource.file) {
+        final selection = await FilePicker.platform.pickFiles();
+        if (selection == null || selection.files.isEmpty) return;
+        final selectedFile = selection.files.single;
+        if (selectedFile.size > AttachmentLimits.maxFileBytes) {
+          throw StateError('Files must be 10 MB or smaller');
+        }
+        fileName = selectedFile.name;
+        final path = selectedFile.path;
+        bytes =
+            path == null ? selectedFile.bytes : await File(path).readAsBytes();
+      } else {
+        final picked = await _imagePicker.pickImage(
+          source: source == AttachmentSource.camera
+              ? ImageSource.camera
+              : ImageSource.gallery,
+          imageQuality: 80,
+          maxWidth: 2048,
+        );
+        if (picked == null) return;
+        try {
+          if (await picked.length() > AttachmentLimits.maxFileBytes) {
+            throw StateError('Files must be 10 MB or smaller');
+          }
+          bytes = await picked.readAsBytes();
+          fileName = picked.name;
+        } finally {
+          try {
+            final tempFile = File(picked.path);
+            // Async on purpose: large attachments must not block the UI isolate.
+            // ignore: avoid_slow_async_io
+            if (await tempFile.exists()) await tempFile.delete();
+          } catch (error) {
+            AppLogger.warning(
+              'Could not delete image-picker temporary file',
+              tag: 'ChatScreen',
+              error: error,
+            );
+          }
+        }
+      }
+      if (bytes == null || bytes.isEmpty) {
+        throw StateError('Could not read the selected file');
+      }
+      if (bytes.length > AttachmentLimits.maxFileBytes) {
+        throw StateError('Files must be 10 MB or smaller');
+      }
+      if (!mounted) return;
+      final mimeType = lookupMimeType(fileName, headerBytes: bytes) ??
+          'application/octet-stream';
+      final fileId = const Uuid().v4().replaceAll('-', '');
+      createdFileId = fileId;
+      final localPath = await _mediaStore.save(
+        peer: widget.peerId,
+        fileId: fileId,
+        fileName: fileName,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      final message = ChatMessage(
+        id: fileId,
+        fileId: fileId,
+        conversationId: widget.peerId,
+        senderId: ref.read(authProvider).username ?? 'me',
+        content: fileName,
+        timestamp: DateTime.now(),
+        direction: MessageDirection.outgoing,
+        status: MessageStatus.sending,
+        kind: mimeType.startsWith('image/')
+            ? MessageKind.image
+            : MessageKind.file,
+        fileName: fileName,
+        mimeType: mimeType,
+        sizeBytes: bytes.length,
+        localPath: localPath,
+        transferProgress: 0,
+        transferStatus: TransferStatus.sending,
+      );
+      _upsertLocalMessage(message);
+      unawaited(ref.read(messageRepositoryProvider)?.saveMessage(message));
+      ref
+          .read(conversationsProvider.notifier)
+          .addMessage(widget.peerId, message);
+      final engine = ref.read(engineProvider);
+      if (engine == null) throw StateError('Messaging engine is unavailable');
+      await engine.sendFile(
+        widget.peerId,
+        bytes,
+        fileName,
+        mimeType,
+        fileId: fileId,
+      );
+    } catch (error) {
+      if (createdFileId != null) {
+        _updateAttachmentProgress(
+          fileId: createdFileId,
+          progress: 0,
+          status: TransferStatus.failed,
+        );
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not send attachment: $error')),
         );
       }
     }
@@ -162,7 +404,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final engine = ref.read(engineProvider);
     if (engine == null) return;
 
-    print('[ChatScreen] Resetting session with ${widget.peerId}');
+    AppLogger.info(
+      'Resetting session with ${widget.peerId}',
+      tag: 'ChatScreen',
+    );
     await engine.clearSession(widget.peerId);
 
     // Show confirmation
@@ -185,9 +430,22 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     ref.listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
       next.whenData((event) {
         if (event is MessageReceived && event.fromUser == widget.peerId) {
-          print(
-              '[ChatScreen] Received message from ${event.fromUser}: ${event.plaintext}');
           _addIncomingMessage(event);
+        } else if (event is FileReceived && event.fromUser == widget.peerId) {
+          _addIncomingFile(event);
+        } else if (event is FileReceiveProgress &&
+            event.fromUser == widget.peerId) {
+          _handleFileProgress(event);
+        } else if (event is FileSendProgress && event.toUser == widget.peerId) {
+          _updateAttachmentProgress(
+            fileId: event.fileId,
+            progress: event.progress,
+            status: event.failed
+                ? TransferStatus.failed
+                : event.progress >= 1
+                    ? TransferStatus.complete
+                    : TransferStatus.sending,
+          );
         }
       });
     });
@@ -266,6 +524,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           MessageInput(
             enabled: connectionStatus == ConnectionStatus.connected,
             onSubmit: _sendMessage,
+            onAttach: _openAttachmentSheet,
             placeholder: connectionStatus == ConnectionStatus.connected
                 ? 'Type a message...'
                 : 'Connecting...',

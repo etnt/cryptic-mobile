@@ -3,7 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>This app uses the camera to scan enrollment QR codes.</string>
+	<string>This app uses the camera to scan enrollment QR codes and take photos to send in encrypted chats.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app accesses selected photos so you can send them in encrypted chats.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

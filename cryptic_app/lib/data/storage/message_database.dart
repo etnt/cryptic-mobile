@@ -44,9 +44,10 @@ class MessageDatabase {
 
     _db = await openDatabase(
       dbPath,
-      version: 1,
+      version: 2,
       password: dbPassword,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -74,7 +75,15 @@ class MessageDatabase {
         delivered_at INTEGER,
         failure_reason TEXT,
         is_deleted INTEGER DEFAULT 0,
-        reply_to_id TEXT
+        reply_to_id TEXT,
+        kind TEXT DEFAULT 'text',
+        file_name TEXT,
+        mime_type TEXT,
+        size_bytes INTEGER,
+        local_path TEXT,
+        file_id TEXT,
+        transfer_progress REAL,
+        transfer_status TEXT DEFAULT 'none'
       )
     ''');
 
@@ -94,6 +103,23 @@ class MessageDatabase {
         created_at INTEGER NOT NULL
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db
+          .execute("ALTER TABLE messages ADD COLUMN kind TEXT DEFAULT 'text'");
+      await db.execute('ALTER TABLE messages ADD COLUMN file_name TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN mime_type TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN size_bytes INTEGER');
+      await db.execute('ALTER TABLE messages ADD COLUMN local_path TEXT');
+      await db.execute('ALTER TABLE messages ADD COLUMN file_id TEXT');
+      await db
+          .execute('ALTER TABLE messages ADD COLUMN transfer_progress REAL');
+      await db.execute(
+        "ALTER TABLE messages ADD COLUMN transfer_status TEXT DEFAULT 'none'",
+      );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -131,6 +157,35 @@ class MessageDatabase {
       [conversationId, limit],
     );
     return rows.map(_rowToMessage).toList();
+  }
+
+  /// Local media attached to messages received during [since].
+  Future<Set<String>> getRecentMediaPaths({required DateTime since}) async {
+    final rows = await _requireDb().rawQuery(
+      'SELECT DISTINCT local_path FROM messages '
+      'WHERE local_path IS NOT NULL AND timestamp >= ?',
+      [since.millisecondsSinceEpoch],
+    );
+    return rows.map((row) => row['local_path']! as String).toSet();
+  }
+
+  /// Clear database references to media files that were evicted.
+  Future<void> clearLocalPaths(Iterable<String> paths) async {
+    final values = paths.toList();
+    if (values.isEmpty) return;
+    final db = _requireDb();
+    await db.transaction((transaction) async {
+      const chunkSize = 500;
+      for (var offset = 0; offset < values.length; offset += chunkSize) {
+        final chunk = values.skip(offset).take(chunkSize).toList();
+        await transaction.update(
+          'messages',
+          {'local_path': null},
+          where: 'local_path IN (${List.filled(chunk.length, '?').join(', ')})',
+          whereArgs: chunk,
+        );
+      }
+    });
   }
 
   /// Update the status of a message.
@@ -220,10 +275,16 @@ class MessageDatabase {
   Future<void> deleteConversation(String peerUsername) async {
     final db = _requireDb();
     await db.transaction((txn) async {
-      await txn.delete('messages',
-          where: 'conversation_id = ?', whereArgs: [peerUsername]);
-      await txn.delete('conversations',
-          where: 'peer_username = ?', whereArgs: [peerUsername]);
+      await txn.delete(
+        'messages',
+        where: 'conversation_id = ?',
+        whereArgs: [peerUsername],
+      );
+      await txn.delete(
+        'conversations',
+        where: 'peer_username = ?',
+        whereArgs: [peerUsername],
+      );
     });
   }
 
@@ -265,27 +326,18 @@ class MessageDatabase {
         'failure_reason': m.failureReason,
         'is_deleted': m.isDeleted ? 1 : 0,
         'reply_to_id': m.replyToId,
+        'kind': m.kind.name,
+        'file_name': m.fileName,
+        'mime_type': m.mimeType,
+        'size_bytes': m.sizeBytes,
+        'local_path': m.localPath,
+        'file_id': m.fileId,
+        'transfer_progress': m.transferProgress,
+        'transfer_status': m.transferStatus.name,
       };
 
-  ChatMessage _rowToMessage(Map<String, Object?> row) => ChatMessage(
-        id: row['id']! as String,
-        conversationId: row['conversation_id']! as String,
-        senderId: row['sender_id']! as String,
-        content: row['content']! as String,
-        timestamp:
-            DateTime.fromMillisecondsSinceEpoch(row['timestamp']! as int),
-        direction: MessageDirection.values.byName(row['direction']! as String),
-        status: MessageStatus.values.byName(row['status']! as String),
-        readAt: row['read_at'] != null
-            ? DateTime.fromMillisecondsSinceEpoch(row['read_at']! as int)
-            : null,
-        deliveredAt: row['delivered_at'] != null
-            ? DateTime.fromMillisecondsSinceEpoch(row['delivered_at']! as int)
-            : null,
-        failureReason: row['failure_reason'] as String?,
-        isDeleted: (row['is_deleted'] as int?) == 1,
-        replyToId: row['reply_to_id'] as String?,
-      );
+  ChatMessage _rowToMessage(Map<String, Object?> row) =>
+      ChatMessage.fromMap(row);
 }
 
 /// Lightweight row returned by [MessageDatabase.loadConversations].
@@ -309,7 +361,8 @@ class ConversationRow {
         peerUsername: row['peer_username']! as String,
         unreadCount: (row['unread_count'] as int?) ?? 0,
         createdAt: DateTime.fromMillisecondsSinceEpoch(
-            (row['created_at'] as int?) ?? 0),
+          (row['created_at'] as int?) ?? 0,
+        ),
         lastMessageId: row['last_msg_id'] as String?,
         lastMessageSender: row['last_msg_sender'] as String?,
         lastMessageContent: row['last_msg_content'] as String?,

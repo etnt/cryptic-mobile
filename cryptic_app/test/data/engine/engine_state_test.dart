@@ -386,7 +386,7 @@ void main() {
     });
 
     test('UserStatusChanged should carry username and status', () {
-      final event = UserStatusChanged('bob', true);
+      final event = UserStatusChanged(username: 'bob', isOnline: true);
       expect(event.username, 'bob');
       expect(event.isOnline, isTrue);
     });

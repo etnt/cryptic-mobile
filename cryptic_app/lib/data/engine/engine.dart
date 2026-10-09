@@ -26,5 +26,7 @@ library;
 
 export 'cryptic_engine.dart';
 export 'engine_state.dart';
+export 'file_reassembler.dart';
 export 'message_processor.dart';
+export 'payload_codec.dart';
 export 'session_manager.dart';

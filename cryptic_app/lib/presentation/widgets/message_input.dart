@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 /// Callback when a message is submitted.
 typedef OnMessageSubmit = void Function(String message);
+typedef OnAttach = void Function();
 
 /// A text input with send button for composing messages.
 class MessageInput extends StatefulWidget {
@@ -17,6 +18,7 @@ class MessageInput extends StatefulWidget {
     this.enabled = true,
     this.placeholder = 'Type a message...',
     this.autofocus = false,
+    this.onAttach,
   });
 
   /// Callback when message is submitted.
@@ -30,6 +32,9 @@ class MessageInput extends StatefulWidget {
 
   /// Whether to autofocus the input.
   final bool autofocus;
+
+  /// Callback for opening attachment options.
+  final OnAttach? onAttach;
 
   @override
   State<MessageInput> createState() => _MessageInputState();
@@ -48,8 +53,9 @@ class _MessageInputState extends State<MessageInput> {
 
   @override
   void dispose() {
-    _controller.removeListener(_onTextChanged);
-    _controller.dispose();
+    _controller
+      ..removeListener(_onTextChanged)
+      ..dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -92,6 +98,11 @@ class _MessageInputState extends State<MessageInput> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            IconButton(
+              tooltip: 'Attach photo or file',
+              onPressed: widget.enabled ? widget.onAttach : null,
+              icon: const Icon(Icons.attach_file),
+            ),
             Expanded(
               child: Container(
                 constraints: const BoxConstraints(maxHeight: 120),

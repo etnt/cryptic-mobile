@@ -1,44 +1,20 @@
-/// Chat Message domain model.
-///
-/// Represents a message in the chat system.
+/// Chat message domain model and attachment metadata.
 library;
 
-/// Message status enum.
-enum MessageStatus {
-  /// Message is pending to be sent.
-  pending,
+// ignore: depend_on_referenced_packages
+import 'package:meta/meta.dart';
 
-  /// Message is being sent.
-  sending,
+enum MessageStatus { pending, sending, sent, delivered, read, failed }
 
-  /// Message has been sent to server.
-  sent,
+enum MessageDirection { outgoing, incoming }
 
-  /// Message has been delivered to recipient.
-  delivered,
+enum MessageKind { text, image, file }
 
-  /// Message has been read by recipient.
-  read,
+enum TransferStatus { none, pending, sending, receiving, complete, failed }
 
-  /// Message failed to send.
-  failed,
-}
-
-/// Message direction enum.
-enum MessageDirection {
-  /// Message sent by current user.
-  outgoing,
-
-  /// Message received from another user.
-  incoming,
-}
-
-/// Chat message entity.
-///
-/// Represents a single message in a conversation. Contains both
-/// the decrypted content and metadata about the message state.
+/// A chat message with optional attachment metadata.
+@immutable
 class ChatMessage {
-  /// Creates a chat message.
   const ChatMessage({
     required this.id,
     required this.conversationId,
@@ -52,45 +28,71 @@ class ChatMessage {
     this.failureReason,
     this.isDeleted = false,
     this.replyToId,
+    this.kind = MessageKind.text,
+    this.fileName,
+    this.mimeType,
+    this.sizeBytes,
+    this.localPath,
+    this.fileId,
+    this.transferProgress,
+    this.transferStatus = TransferStatus.none,
   });
 
-  /// Unique message identifier.
+  factory ChatMessage.fromMap(Map<String, Object?> map) => ChatMessage(
+        id: map['id']! as String,
+        conversationId: map['conversation_id']! as String,
+        senderId: map['sender_id']! as String,
+        content: map['content']! as String,
+        timestamp:
+            DateTime.fromMillisecondsSinceEpoch(map['timestamp']! as int),
+        direction: MessageDirection.values.byName(map['direction']! as String),
+        status: MessageStatus.values.byName(map['status']! as String),
+        readAt: map['read_at'] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(map['read_at']! as int),
+        deliveredAt: map['delivered_at'] == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(map['delivered_at']! as int),
+        failureReason: map['failure_reason'] as String?,
+        isDeleted: map['is_deleted'] == true || map['is_deleted'] == 1,
+        replyToId: map['reply_to_id'] as String?,
+        kind: MessageKind.values.firstWhere(
+          (value) => value.name == map['kind'],
+          orElse: () => MessageKind.text,
+        ),
+        fileName: map['file_name'] as String?,
+        mimeType: map['mime_type'] as String?,
+        sizeBytes: map['size_bytes'] as int?,
+        localPath: map['local_path'] as String?,
+        fileId: map['file_id'] as String?,
+        transferProgress: (map['transfer_progress'] as num?)?.toDouble(),
+        transferStatus: TransferStatus.values.firstWhere(
+          (value) => value.name == map['transfer_status'],
+          orElse: () => TransferStatus.none,
+        ),
+      );
+
   final String id;
-
-  /// The conversation this message belongs to.
   final String conversationId;
-
-  /// Username of the sender.
   final String senderId;
-
-  /// Decrypted message content.
   final String content;
-
-  /// When the message was created/sent.
   final DateTime timestamp;
-
-  /// Whether this is an outgoing or incoming message.
   final MessageDirection direction;
-
-  /// Current message status.
   final MessageStatus status;
-
-  /// When the message was read (if applicable).
   final DateTime? readAt;
-
-  /// When the message was delivered (if applicable).
   final DateTime? deliveredAt;
-
-  /// Reason for failure (if status is failed).
   final String? failureReason;
-
-  /// Whether the message has been deleted.
   final bool isDeleted;
-
-  /// ID of message this is replying to (if any).
   final String? replyToId;
+  final MessageKind kind;
+  final String? fileName;
+  final String? mimeType;
+  final int? sizeBytes;
+  final String? localPath;
+  final String? fileId;
+  final double? transferProgress;
+  final TransferStatus transferStatus;
 
-  /// Create a copy with updated fields.
   ChatMessage copyWith({
     String? id,
     String? conversationId,
@@ -104,6 +106,16 @@ class ChatMessage {
     String? failureReason,
     bool? isDeleted,
     String? replyToId,
+    MessageKind? kind,
+    String? fileName,
+    String? mimeType,
+    int? sizeBytes,
+    String? localPath,
+    String? fileId,
+    double? transferProgress,
+    TransferStatus? transferStatus,
+    bool clearLocalPath = false,
+    bool clearFailureReason = false,
   }) =>
       ChatMessage(
         id: id ?? this.id,
@@ -115,18 +127,45 @@ class ChatMessage {
         status: status ?? this.status,
         readAt: readAt ?? this.readAt,
         deliveredAt: deliveredAt ?? this.deliveredAt,
-        failureReason: failureReason ?? this.failureReason,
+        failureReason:
+            clearFailureReason ? null : (failureReason ?? this.failureReason),
         isDeleted: isDeleted ?? this.isDeleted,
         replyToId: replyToId ?? this.replyToId,
+        kind: kind ?? this.kind,
+        fileName: fileName ?? this.fileName,
+        mimeType: mimeType ?? this.mimeType,
+        sizeBytes: sizeBytes ?? this.sizeBytes,
+        localPath: clearLocalPath ? null : (localPath ?? this.localPath),
+        fileId: fileId ?? this.fileId,
+        transferProgress: transferProgress ?? this.transferProgress,
+        transferStatus: transferStatus ?? this.transferStatus,
       );
 
-  /// Whether this message is from the current user.
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'conversation_id': conversationId,
+        'sender_id': senderId,
+        'content': content,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+        'direction': direction.name,
+        'status': status.name,
+        'read_at': readAt?.millisecondsSinceEpoch,
+        'delivered_at': deliveredAt?.millisecondsSinceEpoch,
+        'failure_reason': failureReason,
+        'is_deleted': isDeleted,
+        'reply_to_id': replyToId,
+        'kind': kind.name,
+        'file_name': fileName,
+        'mime_type': mimeType,
+        'size_bytes': sizeBytes,
+        'local_path': localPath,
+        'file_id': fileId,
+        'transfer_progress': transferProgress,
+        'transfer_status': transferStatus.name,
+      };
+
   bool get isOutgoing => direction == MessageDirection.outgoing;
-
-  /// Whether this message failed to send.
   bool get isFailed => status == MessageStatus.failed;
-
-  /// Whether this message is pending.
   bool get isPending =>
       status == MessageStatus.pending || status == MessageStatus.sending;
 

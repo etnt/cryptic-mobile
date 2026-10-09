@@ -1,0 +1,8 @@
+# Local signing credentials
+*.jks
+*.keystore
+cryptic-release.jks
+cryptic/
+.cursor
+.vscode
+cryptic

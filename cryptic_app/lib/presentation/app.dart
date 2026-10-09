@@ -13,6 +13,7 @@ import '../core/update/update_prompt.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
 import '../data/services/notification_service.dart';
+import '../data/storage/media_store.dart';
 import '../domain/models/message.dart';
 import 'providers/auth_provider.dart';
 import 'providers/engine_provider.dart';
@@ -91,6 +92,7 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
           _wasBackgrounded = false;
           final engine = ref.read(authenticatedEngineProvider);
           if (engine != null) {
+            unawaited(_evictMediaCache());
             unawaited(engine.reconnectAfterAppResume());
           }
         }
@@ -108,56 +110,90 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
     // Globally persist incoming messages regardless of which screen is open.
     // Without this, messages arriving while the ChatScreen is not mounted
     // (e.g. pending messages delivered on connect) would be lost.
-    ref.listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
-      next.whenData((event) {
-        if (event is MessageReceived) {
+    ref
+      ..listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
+        next.whenData((event) {
+          if (event is MessageReceived) {
+            final repo = ref.read(messageRepositoryProvider);
+            if (repo != null) {
+              final msg = ChatMessage(
+                id: event.messageId.isNotEmpty
+                    ? event.messageId
+                    : DateTime.now().microsecondsSinceEpoch.toString(),
+                conversationId: event.fromUser,
+                senderId: event.fromUser,
+                content: event.plaintext,
+                timestamp: event.timestamp,
+                direction: MessageDirection.incoming,
+                status: MessageStatus.delivered,
+              );
+              repo.saveIncomingMessage(msg);
+              ref.read(conversationsProvider.notifier).addMessage(
+                    event.fromUser,
+                    msg,
+                  );
+
+              // Show local notification (suppressed if that chat is open)
+              NotificationService.instance.showMessageNotification(
+                fromUser: event.fromUser,
+                messageBody: event.plaintext,
+              );
+            }
+          } else if (event is FileReceived) {
+            final repo = ref.read(messageRepositoryProvider);
+            if (repo != null) {
+              final message = ChatMessage(
+                id: event.fileId,
+                fileId: event.fileId,
+                conversationId: event.fromUser,
+                senderId: event.fromUser,
+                content: event.fileName,
+                timestamp: event.timestamp,
+                direction: MessageDirection.incoming,
+                status: MessageStatus.delivered,
+                kind: event.mimeType.startsWith('image/')
+                    ? MessageKind.image
+                    : MessageKind.file,
+                fileName: event.fileName,
+                mimeType: event.mimeType,
+                sizeBytes: event.sizeBytes,
+                localPath: event.localPath,
+                transferProgress: 1,
+                transferStatus: TransferStatus.complete,
+              );
+              repo.saveIncomingMessage(message);
+              ref.read(conversationsProvider.notifier).addMessage(
+                    event.fromUser,
+                    message,
+                  );
+              NotificationService.instance.showMessageNotification(
+                fromUser: event.fromUser,
+                messageBody: 'Attachment: ${event.fileName}',
+              );
+            }
+          }
+        });
+      })
+      // Listen to auth state changes
+      ..listen<AuthStatus>(authProvider, (previous, next) {
+        if (next.isAuthenticated && _currentScreen != AppScreen.home) {
+          // Evict stale media once authenticated at startup/login.
+          unawaited(_evictMediaCache());
+          // Load persisted conversations from the message database
           final repo = ref.read(messageRepositoryProvider);
           if (repo != null) {
-            final msg = ChatMessage(
-              id: event.messageId.isNotEmpty
-                  ? event.messageId
-                  : DateTime.now().microsecondsSinceEpoch.toString(),
-              conversationId: event.fromUser,
-              senderId: event.fromUser,
-              content: event.plaintext,
-              timestamp: event.timestamp,
-              direction: MessageDirection.incoming,
-              status: MessageStatus.delivered,
-            );
-            repo.saveIncomingMessage(msg);
-            ref.read(conversationsProvider.notifier).addMessage(
-                  event.fromUser,
-                  msg,
-                );
-
-            // Show local notification (suppressed if that chat is open)
-            NotificationService.instance.showMessageNotification(
-              fromUser: event.fromUser,
-              messageBody: event.plaintext,
-            );
+            ref.read(conversationsProvider.notifier).loadConversations(repo);
           }
+          setState(() {
+            _currentScreen = AppScreen.home;
+          });
+        } else if (!next.isAuthenticated && _currentScreen == AppScreen.home) {
+          ref.read(conversationsProvider.notifier).clear();
+          setState(() {
+            _currentScreen = AppScreen.login;
+          });
         }
       });
-    });
-
-    // Listen to auth state changes
-    ref.listen<AuthStatus>(authProvider, (previous, next) {
-      if (next.isAuthenticated && _currentScreen != AppScreen.home) {
-        // Load persisted conversations from the message database
-        final repo = ref.read(messageRepositoryProvider);
-        if (repo != null) {
-          ref.read(conversationsProvider.notifier).loadConversations(repo);
-        }
-        setState(() {
-          _currentScreen = AppScreen.home;
-        });
-      } else if (!next.isAuthenticated && _currentScreen == AppScreen.home) {
-        ref.read(conversationsProvider.notifier).clear();
-        setState(() {
-          _currentScreen = AppScreen.login;
-        });
-      }
-    });
 
     return MaterialApp(
       title: 'Cryptic',
@@ -167,6 +203,22 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       darkTheme: AppTheme.dark,
       home: _buildCurrentScreen(),
     );
+  }
+
+  Future<void> _evictMediaCache() async {
+    try {
+      final repository = ref.read(messageRepositoryProvider);
+      final protectedPaths = await repository?.getRecentMediaPaths() ?? {};
+      final removed = await MediaStore().evict(protectedPaths: protectedPaths);
+      if (removed.isNotEmpty) await repository?.clearLocalPaths(removed);
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'Media cache eviction failed',
+        tag: 'App',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Widget _buildCurrentScreen() => switch (_currentScreen) {

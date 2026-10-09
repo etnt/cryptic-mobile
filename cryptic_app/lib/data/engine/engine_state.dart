@@ -6,6 +6,9 @@ library;
 
 import 'dart:typed_data';
 
+// ignore: depend_on_referenced_packages
+import 'package:meta/meta.dart';
+
 /// Connection status of the engine.
 enum ConnectionStatus {
   /// Not connected to server.
@@ -43,6 +46,7 @@ enum EngineStatus {
 }
 
 /// User identity information.
+@immutable
 class UserIdentity {
   /// Creates a user identity.
   const UserIdentity({
@@ -84,6 +88,7 @@ class UserIdentity {
 }
 
 /// Server configuration.
+@immutable
 class ServerConfig {
   /// Creates server configuration.
   const ServerConfig({
@@ -285,8 +290,8 @@ class EngineState {
 
   /// Copy with a session removed.
   EngineState withoutSession(String peerUsername) {
-    final newSessions = Map<String, PeerSession>.from(sessions);
-    newSessions.remove(peerUsername);
+    final newSessions = Map<String, PeerSession>.from(sessions)
+      ..remove(peerUsername);
     return copyWith(sessions: newSessions);
   }
 
@@ -386,6 +391,75 @@ class MessageSent extends EngineEvent {
   final DateTime timestamp;
 }
 
+/// A completed attachment was received and saved locally.
+class FileReceived extends EngineEvent {
+  FileReceived({
+    required this.messageId,
+    required this.fromUser,
+    required this.fileId,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.localPath,
+    required this.timestamp,
+  });
+
+  final String messageId;
+  final String fromUser;
+  final String fileId;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+  final String localPath;
+  final DateTime timestamp;
+}
+
+/// Attachment sending progress.
+class FileSendProgress extends EngineEvent {
+  FileSendProgress({
+    required this.toUser,
+    required this.fileId,
+    required this.fileName,
+    required this.sentChunks,
+    required this.totalChunks,
+    required this.progress,
+    this.failed = false,
+  });
+
+  final String toUser;
+  final String fileId;
+  final String fileName;
+  final int sentChunks;
+  final int totalChunks;
+  final double progress;
+  final bool failed;
+}
+
+/// Attachment receiving progress.
+class FileReceiveProgress extends EngineEvent {
+  FileReceiveProgress({
+    required this.fromUser,
+    required this.fileId,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.receivedChunks,
+    required this.totalChunks,
+    required this.progress,
+    this.failed = false,
+  });
+
+  final String fromUser;
+  final String fileId;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+  final int receivedChunks;
+  final int totalChunks;
+  final double progress;
+  final bool failed;
+}
+
 /// Users list received.
 class UsersListReceived extends EngineEvent {
   /// Creates a users list event.
@@ -398,7 +472,7 @@ class UsersListReceived extends EngineEvent {
 /// User status changed (online/offline).
 class UserStatusChanged extends EngineEvent {
   /// Creates a user status event.
-  UserStatusChanged(this.username, this.isOnline);
+  UserStatusChanged({required this.username, required this.isOnline});
 
   /// The username.
   final String username;

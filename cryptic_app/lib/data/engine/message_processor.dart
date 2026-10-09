@@ -8,12 +8,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../core/utils/logger.dart';
 import '../crypto/ratchet/ratchet_message.dart';
 import '../crypto/x3dh/x3dh_engine.dart';
 import '../network/protocol/protocol_codec.dart';
 import '../network/protocol/server_messages.dart';
 import '../storage/repositories/key_repository.dart';
 import 'engine_state.dart';
+import 'file_reassembler.dart';
+import 'payload_codec.dart';
 import 'session_manager.dart';
 
 /// Result of processing an incoming message.
@@ -65,14 +68,20 @@ class MessageProcessor {
   MessageProcessor({
     required SessionManager sessionManager,
     required KeyRepository keyRepository,
+    required FileReassembler fileReassembler,
     X3dhEngine? x3dhEngine,
   })  : _sessionManager = sessionManager,
         _keyRepository = keyRepository,
-        _x3dhEngine = x3dhEngine ?? X3dhEngine();
+        _fileReassembler = fileReassembler,
+        _x3dhEngine = x3dhEngine ?? X3dhEngine() {
+    _fileSubscription = _fileReassembler.events.listen(_eventController.add);
+  }
 
   final SessionManager _sessionManager;
   final KeyRepository _keyRepository;
   final X3dhEngine _x3dhEngine;
+  final FileReassembler _fileReassembler;
+  StreamSubscription<EngineEvent>? _fileSubscription;
 
   final _eventController = StreamController<EngineEvent>.broadcast();
 
@@ -81,6 +90,8 @@ class MessageProcessor {
 
   /// Dispose the processor.
   void dispose() {
+    _fileSubscription?.cancel();
+    _fileReassembler.dispose();
     _eventController.close();
   }
 
@@ -120,7 +131,10 @@ class MessageProcessor {
       ProcessingSuccess();
 
   Future<ProcessingResult> _handleError(ErrorMessage message) async {
-    print('[MessageProcessor] ERROR from server: ${message.message}');
+    AppLogger.error(
+      '[MessageProcessor] ERROR from server: ${message.message}',
+      tag: 'MessageProcessor',
+    );
     final event = EngineError(message.message);
     _eventController.add(event);
     return ProcessingSuccess(event: event);
@@ -135,14 +149,16 @@ class MessageProcessor {
   Future<ProcessingResult> _handleOnlineUsers(
     OnlineUsersResponseMessage message,
   ) async {
-    print('[MessageProcessor] Handling online_users: ${message.users}');
     final event = UsersListReceived(message.users);
     _eventController.add(event);
     return ProcessingSuccess(event: event);
   }
 
   Future<ProcessingResult> _handleUserStatus(UserStatusMessage message) async {
-    final event = UserStatusChanged(message.username, message.isOnline);
+    final event = UserStatusChanged(
+      username: message.username,
+      isOnline: message.isOnline,
+    );
     _eventController.add(event);
     return ProcessingSuccess(event: event);
   }
@@ -153,8 +169,6 @@ class MessageProcessor {
   Future<ProcessingResult> _handleMessageSent(
     MessageSentMessage message,
   ) async {
-    print(
-        '[MessageProcessor] message_sent received: messageId=${message.messageId}, toUser=${message.toUser}');
     final event = MessageSent(
       messageId: message.messageId,
       toUser: message.toUser,
@@ -172,8 +186,6 @@ class MessageProcessor {
   Future<ProcessingResult> _handleIncomingMessage(
     IncomingMessage message,
   ) async {
-    print(
-        '[MessageProcessor] Handling incoming message: type=${message.messageType}, from=${message.fromUser}, isX3dh=${message.isX3dh}');
     final messageId = message.messageId;
     if (messageId.isNotEmpty &&
         await _sessionManager.hasProcessedMessage(messageId)) {
@@ -188,6 +200,34 @@ class MessageProcessor {
       await _sessionManager.markMessageProcessed(messageId);
     }
     return result;
+  }
+
+  Future<EngineEvent?> _handlePlaintext({
+    required Uint8List plaintext,
+    required String messageId,
+    required String fromUser,
+    required DateTime timestamp,
+  }) async {
+    final payload = PayloadCodec.decode(plaintext);
+    if (payload.kind == PayloadKind.invalid) return null;
+    if (payload.kind == PayloadKind.text) {
+      final event = MessageReceived(
+        messageId: messageId,
+        fromUser: fromUser,
+        plaintext: payload.text ?? '',
+        timestamp: timestamp,
+      );
+      _eventController.add(event);
+      return event;
+    }
+
+    final event = await _fileReassembler.addChunk(
+      fromUser: fromUser,
+      payload: payload,
+      timestamp: timestamp,
+    );
+    if (event != null) _eventController.add(event);
+    return event;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -238,15 +278,12 @@ class MessageProcessor {
         theirDhPublic: x3dhResult.senderEphemeralPublic,
       );
 
-      // Emit message received event (plaintext was decrypted by X3DH)
-      final event = MessageReceived(
+      final event = await _handlePlaintext(
+        plaintext: x3dhResult.plaintext,
         messageId: message.messageId,
         fromUser: x3dh.fromUser,
-        plaintext: utf8.decode(x3dhResult.plaintext),
         timestamp: DateTime.now(),
       );
-      _eventController.add(event);
-
       return ProcessingSuccess(event: event);
     } catch (e) {
       return ProcessingFailure('Failed to process X3DH message', e);
@@ -326,26 +363,22 @@ class MessageProcessor {
   Future<ProcessingResult> _handleRatchetMessage(
     IncomingMessage message,
   ) async {
-    print('[MessageProcessor] _handleRatchetMessage: from=${message.fromUser}');
     final ratchet = message.asRatchet();
     if (ratchet == null) {
-      print('[MessageProcessor] Failed to parse ratchet message');
+      AppLogger.error(
+        '[MessageProcessor] Failed to parse ratchet message',
+        tag: 'MessageProcessor',
+      );
       return ProcessingFailure('Failed to parse ratchet message');
     }
-
-    print(
-        '[MessageProcessor] Parsed ratchet: from=${ratchet.fromUser}, dh_public=${ratchet.dhPublic.substring(0, 20)}..., dh_step=${ratchet.dhStep}, prev_chain=${ratchet.previousChainLength}, msg_num=${ratchet.messageNumber}');
 
     try {
       // Check if we have a session for this peer
       if (!_sessionManager.hasSession(ratchet.fromUser)) {
-        print('[MessageProcessor] No session for ${ratchet.fromUser}');
         return ProcessingFailure(
           'No session for ${ratchet.fromUser}',
         );
       }
-
-      print('[MessageProcessor] Found session for ${ratchet.fromUser}');
 
       // Parse the ratchet message
       final ratchetMessage = RatchetMessage(
@@ -357,29 +390,24 @@ class MessageProcessor {
         nonce: ratchet.nonceBytes,
       );
 
-      print('[MessageProcessor] RatchetMessage created, decrypting...');
-
       // Decrypt the message
       final plaintext = await _sessionManager.decryptMessage(
         peerUsername: ratchet.fromUser,
         message: ratchetMessage,
       );
 
-      print('[MessageProcessor] Decrypted message: ${utf8.decode(plaintext)}');
-
-      // Emit message received event
-      final event = MessageReceived(
+      final event = await _handlePlaintext(
+        plaintext: plaintext,
         messageId: message.messageId,
         fromUser: ratchet.fromUser,
-        plaintext: utf8.decode(plaintext),
         timestamp: DateTime.now(),
       );
-      _eventController.add(event);
-
       return ProcessingSuccess(event: event);
-    } catch (e, stack) {
-      print('[MessageProcessor] Failed to decrypt ratchet message: $e');
-      print('[MessageProcessor] Stack: $stack');
+    } catch (e) {
+      AppLogger.error(
+        '[MessageProcessor] Failed to decrypt ratchet message: $e',
+        tag: 'MessageProcessor',
+      );
       return ProcessingFailure('Failed to decrypt ratchet message', e);
     }
   }

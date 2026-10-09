@@ -9,6 +9,8 @@ import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:uuid/uuid.dart';
+
 import '../../core/utils/logger.dart';
 import '../crypto/keys/key_bundle.dart';
 import '../crypto/keys/key_generator.dart';
@@ -18,10 +20,13 @@ import '../network/protocol/client_messages.dart' as protocol;
 import '../network/protocol/protocol_codec.dart';
 import '../network/protocol/server_messages.dart';
 import '../network/websocket/websocket_client.dart';
+import '../storage/media_store.dart';
 import '../storage/repositories/key_repository.dart';
 import '../storage/repositories/session_repository.dart';
 import 'engine_state.dart';
+import 'file_reassembler.dart';
 import 'message_processor.dart';
+import 'payload_codec.dart';
 import 'session_manager.dart';
 
 /// CrypticEngine - Central orchestrator for the cryptic messaging system.
@@ -77,10 +82,12 @@ class CrypticEngine {
       doubleRatchet: doubleRatchet,
     );
 
-    // Initialize message processor
+    // Initialize incoming attachment reassembly and message processing.
+    _fileReassembler = FileReassembler(mediaStore: MediaStore());
     _messageProcessor = MessageProcessor(
       sessionManager: _sessionManager,
       keyRepository: _keyRepository,
+      fileReassembler: _fileReassembler,
       x3dhEngine: _x3dhEngine,
     );
 
@@ -96,6 +103,7 @@ class CrypticEngine {
 
   late final SessionManager _sessionManager;
   late final MessageProcessor _messageProcessor;
+  late final FileReassembler _fileReassembler;
 
   EngineState _state;
   bool _isInitialized = false;
@@ -105,7 +113,9 @@ class CrypticEngine {
   final Map<String, KeyBundle> _pendingKeyBundles = {};
 
   // Pending messages waiting for X3DH completion
-  final Map<String, List<String>> _pendingMessages = {};
+  final Map<String, List<_QueuedOutbound>> _pendingMessages = {};
+  final Map<String, Timer> _pendingBundleTimeouts = {};
+  static const Duration _keyBundleTimeout = Duration(seconds: 30);
 
   // Reconnection state
   bool _intentionalDisconnect = false;
@@ -240,6 +250,11 @@ class CrypticEngine {
     _isDisposed = true;
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
+    for (final timer in _pendingBundleTimeouts.values) {
+      timer.cancel();
+    }
+    _pendingBundleTimeouts.clear();
+    _pendingMessages.clear();
 
     await _messageSubscription?.cancel();
     await _connectionSubscription?.cancel();
@@ -286,42 +301,67 @@ class CrypticEngine {
   ///
   /// If no session exists, initiates X3DH key agreement first.
   Future<void> sendMessage(String toUser, String plaintext) async {
-    print('[Engine] sendMessage called: to=$toUser, plaintext=$plaintext');
+    _checkCanSend();
+    await _sendPayload(
+      toUser,
+      _QueuedOutbound(PayloadCodec.encodeText(plaintext)),
+    );
+  }
 
-    if (!_isInitialized) {
-      print('[Engine] sendMessage: Not initialized!');
-      throw StateError('CrypticEngine not initialized');
+  /// Encrypts and sends a file in bounded independent ratchet chunks.
+  Future<String> sendFile(
+    String toUser,
+    Uint8List bytes,
+    String fileName,
+    String mimeType, {
+    String? fileId,
+  }) async {
+    _checkCanSend();
+    if (bytes.isEmpty || bytes.length > AttachmentLimits.maxFileBytes) {
+      throw ArgumentError('File must be between 1 byte and 10 MB');
     }
+    final actualFileId = fileId ?? const Uuid().v4().replaceAll('-', '');
+    final chunks = PayloadCodec.splitFile(bytes);
+    final total = chunks.length;
+    final messages = <_QueuedOutbound>[];
+    for (var index = 0; index < total; index++) {
+      final payload = PayloadCodec.encodeFileChunk(
+        fileId: actualFileId,
+        fileName: fileName,
+        mimeType: mimeType,
+        sizeBytes: bytes.length,
+        index: index,
+        totalChunks: total,
+        bytes: chunks[index],
+      );
+      messages.add(
+        _QueuedOutbound(
+          payload,
+          fileId: actualFileId,
+          fileName: fileName,
+          chunkIndex: index,
+          totalChunks: total,
+          toUser: toUser,
+        ),
+      );
+    }
+    await _sendPayloads(toUser, messages);
+    return actualFileId;
+  }
 
-    if (!isConnected) {
-      print('[Engine] sendMessage: Not connected!');
-      throw StateError('Not connected to server');
-    }
-
-    if (_sessionManager.hasSession(toUser)) {
-      final diag = _sessionManager.getSessionDiagnostics(toUser);
-      print('[Engine] sendMessage: Have session for $toUser $diag');
-      // Have session - encrypt and send with Double Ratchet
-      await _sendRatchetMessage(toUser, plaintext);
-    } else {
-      print('[Engine] sendMessage: No session for $toUser '
-          '(loaded peers: ${_sessionManager.peerUsernames}), initiating X3DH');
-      // No session - need to initiate X3DH
-      await _initiateX3dh(toUser, plaintext);
-    }
+  void _checkCanSend() {
+    if (!_isInitialized) throw StateError('CrypticEngine not initialized');
+    if (!isConnected) throw StateError('Not connected to server');
   }
 
   /// Request the list of online users.
   Future<void> requestUserList() async {
-    print('[Engine] requestUserList called, isConnected=$isConnected');
     if (!isConnected) {
-      print('[Engine] requestUserList: Not connected, skipping');
       return;
     }
 
     final message = protocol.OnlineUsersMessage();
     _webSocketClient.send(message);
-    print('[Engine] requestUserList: Sent online_users message');
   }
 
   /// Request the list of all registered users (admin only).
@@ -334,15 +374,11 @@ class CrypticEngine {
 
   /// Request a key bundle for a user.
   Future<void> requestKeyBundle(String username) async {
-    print(
-        '[Engine] requestKeyBundle: username=$username, isConnected=$isConnected');
     if (!isConnected) {
-      print('[Engine] requestKeyBundle: Not connected, skipping');
       return;
     }
 
     final message = protocol.GetKeyBundleMessage(username: username);
-    print('[Engine] requestKeyBundle: Sending get_key_bundle message');
     _webSocketClient.send(message);
   }
 
@@ -355,12 +391,7 @@ class CrypticEngine {
   /// This forces a new X3DH exchange on the next message.
   /// Useful for debugging or recovering from stale session state.
   Future<void> clearSession(String peerUsername) async {
-    final hadSession = _sessionManager.hasSession(peerUsername);
-    print(
-        '[Engine] clearSession: Clearing session with $peerUsername (had session: $hadSession)');
     await _sessionManager.deleteSession(peerUsername);
-    final stillHasSession = _sessionManager.hasSession(peerUsername);
-    print('[Engine] clearSession: After delete, hasSession=$stillHasSession');
     _emitEvent(EngineInfo('Session with $peerUsername cleared'));
   }
 
@@ -370,7 +401,6 @@ class CrypticEngine {
   /// Useful for debugging or recovering from corrupted state.
   Future<void> clearAllSessions() async {
     final peers = _sessionManager.peerUsernames;
-    print('[Engine] clearAllSessions: Clearing ${peers.length} sessions');
     await _sessionManager.deleteAllSessions();
     _emitEvent(EngineInfo('All sessions cleared (${peers.length} peers)'));
   }
@@ -416,10 +446,8 @@ class CrypticEngine {
 
   void _handleProcessorEvent(EngineEvent event) {
     if (event is UsersListReceived) {
-      print('[Engine] Updating state with users: ${event.users}');
       _updateState(_state.copyWith(users: event.users));
     } else if (event is UserStatusChanged) {
-      print('[Engine] User status: ${event.username} online=${event.isOnline}');
       final users = List<String>.from(_state.users);
       if (event.isOnline && !users.contains(event.username)) {
         users.add(event.username);
@@ -439,9 +467,10 @@ class CrypticEngine {
         ConnectionState.error => ConnectionStatus.error,
       };
 
-      print('[Engine] Connection status changed: $status');
-      AppLogger.info('Engine: Connection status changed to $status',
-          tag: 'Engine');
+      AppLogger.info(
+        'Engine: Connection status changed to $status',
+        tag: 'Engine',
+      );
       _updateState(_state.copyWith(connectionStatus: status));
       _emitEvent(ConnectionStatusChanged(status));
 
@@ -465,26 +494,36 @@ class CrypticEngine {
     if (_reconnectTimer?.isActive ?? false) return;
 
     if (_reconnectAttempts >= _maxReconnectAttempts) {
-      print(
-          '[Engine] Max reconnect attempts ($_maxReconnectAttempts) reached, giving up');
-      _emitEvent(EngineError(
-          'Connection lost after $_maxReconnectAttempts reconnect attempts'));
+      AppLogger.warning(
+        'Engine: Max reconnect attempts ($_maxReconnectAttempts) reached, giving up',
+        tag: 'Engine',
+      );
+      _emitEvent(
+        EngineError(
+          'Connection lost after $_maxReconnectAttempts reconnect attempts',
+        ),
+      );
       return;
     }
 
     _reconnectAttempts++;
     final delay = _calculateBackoff();
-    print(
-        '[Engine] Scheduling reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s');
+    AppLogger.info(
+      'Engine: Scheduling reconnect attempt $_reconnectAttempts/$_maxReconnectAttempts in ${delay.inSeconds}s',
+      tag: 'Engine',
+    );
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(delay, () async {
       if (_isDisposed || _intentionalDisconnect) return;
-      print('[Engine] Attempting reconnect #$_reconnectAttempts');
       try {
         await connect(resetReconnectAttempts: false);
       } catch (e) {
-        print('[Engine] Reconnect attempt $_reconnectAttempts failed: $e');
+        AppLogger.warning(
+          'Engine: Reconnect attempt $_reconnectAttempts failed',
+          tag: 'Engine',
+          error: e,
+        );
         // The connection error event schedules the next attempt.
       }
     });
@@ -514,7 +553,12 @@ class CrypticEngine {
       try {
         await _handleServerMessage(message);
       } catch (e, st) {
-        print('[Engine] Error processing server message: $e\n$st');
+        AppLogger.error(
+          'Error processing server message',
+          tag: 'Engine',
+          error: e,
+          stackTrace: st,
+        );
       }
     });
   }
@@ -537,24 +581,23 @@ class CrypticEngine {
       );
     }
 
-    // Handle session updates from X3DH messages
+    // A successful X3DH decryption creates a session even when its plaintext
+    // is an intermediate file chunk and therefore emits no message event.
     if (result is ProcessingSuccess &&
-        result.event is MessageReceived &&
-        message is IncomingMessage) {
-      if (message.isX3dh) {
-        final x3dh = message.asX3dh();
-        if (x3dh != null) {
-          _updateState(
-            _state.withSession(
-              PeerSession(
-                peerUsername: x3dh.fromUser,
-                hasSession: true,
-                messageCount: 1,
-                lastMessageAt: DateTime.now(),
-              ),
+        message is IncomingMessage &&
+        message.isX3dh) {
+      final x3dh = message.asX3dh();
+      if (x3dh != null) {
+        _updateState(
+          _state.withSession(
+            PeerSession(
+              peerUsername: x3dh.fromUser,
+              hasSession: true,
+              messageCount: 1,
+              lastMessageAt: DateTime.now(),
             ),
-          );
-        }
+          ),
+        );
       }
     }
   }
@@ -626,37 +669,114 @@ class CrypticEngine {
   // X3DH Key Agreement
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<void> _initiateX3dh(String toUser, String plaintext) async {
-    print('[Engine] _initiateX3dh: toUser=$toUser');
+  Future<void> _sendPayload(String toUser, _QueuedOutbound outbound) =>
+      _sendPayloads(toUser, [outbound]);
 
-    // Check if we already have a pending key bundle
-    if (_pendingKeyBundles.containsKey(toUser)) {
-      print('[Engine] _initiateX3dh: Have pending bundle, performing X3DH');
-      await _performX3dhWithBundle(toUser, plaintext);
+  Future<void> _sendPayloads(
+    String toUser,
+    List<_QueuedOutbound> outbound,
+  ) async {
+    if (_sessionManager.hasSession(toUser)) {
+      try {
+        for (final item in outbound) {
+          await _sendRatchetBytes(toUser, item.bytes);
+          _reportFileProgress(item);
+        }
+      } catch (_) {
+        // A failed chunk can consume ratchet state, so stop this transfer and
+        // do not retry its remaining chunks with the same file ID. The user
+        // must restart it as a new transfer.
+        _reportFileFailures(outbound);
+        rethrow;
+      }
       return;
     }
-
-    // Queue the message and request key bundle
-    print(
-        '[Engine] _initiateX3dh: No bundle, queuing message and requesting key bundle');
-    _pendingMessages.putIfAbsent(toUser, () => []);
-    _pendingMessages[toUser]!.add(plaintext);
-
+    final bundle = _pendingKeyBundles.remove(toUser);
+    if (bundle != null) {
+      try {
+        await _performX3dhWithBundle(toUser, outbound.first.bytes, bundle);
+        _reportFileProgress(outbound.first);
+        for (final item in outbound.skip(1)) {
+          await _sendRatchetBytes(toUser, item.bytes);
+          _reportFileProgress(item);
+        }
+      } catch (_) {
+        // Never resume a partially sent transfer; retrying must create a new
+        // transfer ID because the ratchet may already have advanced.
+        _reportFileFailures(outbound);
+        rethrow;
+      }
+      return;
+    }
+    _pendingMessages.putIfAbsent(toUser, () => []).addAll(outbound);
+    if (outbound.any((item) => item.fileId != null)) {
+      _pendingBundleTimeouts.putIfAbsent(
+        toUser,
+        () => Timer(
+          _keyBundleTimeout,
+          () => _failPendingKeyBundle(toUser),
+        ),
+      );
+    }
     await requestKeyBundle(toUser);
   }
 
-  Future<void> _handleKeyBundleReceived(KeyBundleMessage message) async {
-    print(
-        '[Engine] _handleKeyBundleReceived: Got bundle for ${message.username}');
-    print(
-        '[Engine] _handleKeyBundleReceived: identitySignKey=${message.identitySignKey.substring(0, 20)}...');
-    print(
-        '[Engine] _handleKeyBundleReceived: identityDhKey=${message.identityDhKey.substring(0, 20)}...');
-    print(
-        '[Engine] _handleKeyBundleReceived: signedPrekey.keyId=${message.signedPrekey.keyId}');
-    print(
-        '[Engine] _handleKeyBundleReceived: oneTimePrekey=${message.oneTimePrekey != null ? "present, keyId=${message.oneTimePrekey!.keyId}" : "null"}');
+  void _reportFileProgress(_QueuedOutbound outbound) {
+    if (outbound.fileId == null || outbound.toUser == null) return;
+    final sent = outbound.chunkIndex! + 1;
+    _emitEvent(
+      FileSendProgress(
+        toUser: outbound.toUser!,
+        fileId: outbound.fileId!,
+        fileName: outbound.fileName!,
+        sentChunks: sent,
+        totalChunks: outbound.totalChunks!,
+        progress: sent / outbound.totalChunks!,
+      ),
+    );
+  }
 
+  void _failPendingKeyBundle(String toUser) {
+    _pendingBundleTimeouts.remove(toUser)?.cancel();
+    final pending = _pendingMessages[toUser];
+    if (pending == null) return;
+    final files = pending.where((item) => item.fileId != null).toList();
+    final retained = pending.where((item) => item.fileId == null).toList();
+    if (retained.isEmpty) {
+      _pendingMessages.remove(toUser);
+    } else {
+      _pendingMessages[toUser] = retained;
+    }
+    if (files.isEmpty) return;
+    _reportFileFailures(files);
+    _emitEvent(
+      EngineError(
+        'File transfer failed: no key bundle received from $toUser',
+      ),
+    );
+  }
+
+  void _reportFileFailures(Iterable<_QueuedOutbound> outbound) {
+    final files = <String, _QueuedOutbound>{};
+    for (final item in outbound) {
+      if (item.fileId != null) files.putIfAbsent(item.fileId!, () => item);
+    }
+    for (final item in files.values) {
+      _emitEvent(
+        FileSendProgress(
+          toUser: item.toUser!,
+          fileId: item.fileId!,
+          fileName: item.fileName!,
+          sentChunks: 0,
+          totalChunks: item.totalChunks!,
+          progress: 0,
+          failed: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleKeyBundleReceived(KeyBundleMessage message) async {
     // Convert KeyBundleMessage to the Map format expected by KeyBundle
     final bundleMap = <String, dynamic>{
       'username': message.username,
@@ -674,42 +794,50 @@ class CrypticEngine {
         },
     };
 
+    List<_QueuedOutbound>? pendingForPeer;
+    var fileChunksSent = 0;
     try {
       final bundle = KeyBundle.fromServerResponse(bundleMap);
-      print(
-          '[Engine] _handleKeyBundleReceived: KeyBundle created successfully');
-      _pendingKeyBundles[message.username] = bundle;
 
-      // Check for pending messages
-      print(
-          '[Engine] _handleKeyBundleReceived: Pending messages for ${message.username}: ${_pendingMessages[message.username]}');
       final pendingMsgs = _pendingMessages.remove(message.username);
+      pendingForPeer = pendingMsgs;
+      _pendingBundleTimeouts.remove(message.username)?.cancel();
       if (pendingMsgs != null && pendingMsgs.isNotEmpty) {
-        print(
-            '[Engine] _handleKeyBundleReceived: Have ${pendingMsgs.length} pending messages, performing X3DH');
-        // Send first pending message with X3DH
-        await _performX3dhWithBundle(message.username, pendingMsgs.first);
-
-        // Send remaining messages with ratchet
-        for (var i = 1; i < pendingMsgs.length; i++) {
-          await _sendRatchetMessage(message.username, pendingMsgs[i]);
+        await _performX3dhWithBundle(
+          message.username,
+          pendingMsgs.first.bytes,
+          bundle,
+        );
+        _reportFileProgress(pendingMsgs.first);
+        if (pendingMsgs.first.fileId != null) fileChunksSent++;
+        for (final outbound in pendingMsgs.skip(1)) {
+          await _sendRatchetBytes(message.username, outbound.bytes);
+          _reportFileProgress(outbound);
+          if (outbound.fileId != null) fileChunksSent++;
         }
       } else {
-        print(
-            '[Engine] _handleKeyBundleReceived: No pending messages for ${message.username}');
+        _pendingKeyBundles[message.username] = bundle;
       }
     } catch (e, stack) {
-      print('[Engine] _handleKeyBundleReceived: ERROR: $e');
-      print('[Engine] _handleKeyBundleReceived: Stack: $stack');
+      _reportFileFailures(
+        pendingForPeer ?? _pendingMessages.remove(message.username) ?? const [],
+      );
+      _pendingBundleTimeouts.remove(message.username)?.cancel();
+      AppLogger.error(
+        '[Engine] _handleKeyBundleReceived: Failed queued transfers after '
+        '$fileChunksSent file chunks were sent',
+        tag: 'Engine',
+        error: e,
+        stackTrace: stack,
+      );
     }
   }
 
-  Future<void> _performX3dhWithBundle(String toUser, String plaintext) async {
-    final bundle = _pendingKeyBundles.remove(toUser);
-    if (bundle == null) {
-      throw StateError('No key bundle for $toUser');
-    }
-
+  Future<void> _performX3dhWithBundle(
+    String toUser,
+    Uint8List plaintext,
+    KeyBundle bundle,
+  ) async {
     // Load our key bundle
     final ourKeys = await _keyRepository.loadOwnKeyBundle();
     if (ourKeys == null) {
@@ -720,7 +848,7 @@ class CrypticEngine {
     final x3dhResult = await _x3dhEngine.senderInit(
       senderKeys: ourKeys,
       recipientBundle: bundle,
-      plaintext: Uint8List.fromList(utf8.encode(plaintext)),
+      plaintext: plaintext,
     );
 
     // Create Double Ratchet session
@@ -738,24 +866,6 @@ class CrypticEngine {
     final metadata = messageBlob.metadata;
     final metadataJson = jsonEncode(metadata.toMap());
 
-    print('[Engine] _performX3dhWithBundle: Building X3DH message');
-    print(
-        '[Engine] _performX3dhWithBundle: messageId=${base64Encode(x3dhResult.messageId)}');
-    print(
-        '[Engine] _performX3dhWithBundle: fromUser=$_username, toUser=$toUser');
-    print(
-        '[Engine] _performX3dhWithBundle: ephemeralPublic len=${metadata.ephemeralPublic.length}');
-    print(
-        '[Engine] _performX3dhWithBundle: otpkId=${metadata.otpkId != null ? "present" : "null"}');
-    print(
-        '[Engine] _performX3dhWithBundle: ciphertext len=${messageBlob.ciphertext.length}');
-    print(
-        '[Engine] _performX3dhWithBundle: nonce len=${messageBlob.nonce.length}');
-    print(
-        '[Engine] _performX3dhWithBundle: signature len=${messageBlob.signature.length}');
-    print(
-        '[Engine] _performX3dhWithBundle: metadata=${metadataJson.substring(0, metadataJson.length.clamp(0, 100))}...');
-
     final x3dhMessage = protocol.X3dhMessage.fromMessageBlob(
       messageId: base64Encode(x3dhResult.messageId),
       fromUser: _username,
@@ -768,8 +878,6 @@ class CrypticEngine {
       metadataJson: metadataJson,
     );
 
-    print(
-        '[Engine] _performX3dhWithBundle: Final JSON=${jsonEncode(x3dhMessage.toJson())}');
     _webSocketClient.send(x3dhMessage);
 
     // Update state with new session
@@ -789,15 +897,11 @@ class CrypticEngine {
   // Double Ratchet Messaging
   // ─────────────────────────────────────────────────────────────────────────
 
-  Future<void> _sendRatchetMessage(String toUser, String plaintext) async {
-    final diag = _sessionManager.getSessionDiagnostics(toUser);
-    print(
-        '[Engine] _sendRatchetMessage: toUser=$toUser, from=$_username, sessionDiag=$diag');
-
+  Future<void> _sendRatchetBytes(String toUser, Uint8List plaintext) async {
     // Encrypt with Double Ratchet
     final ratchetMsg = await _sessionManager.encryptMessage(
       peerUsername: toUser,
-      plaintext: Uint8List.fromList(utf8.encode(plaintext)),
+      plaintext: plaintext,
     );
 
     // Build and send ratchet message using protocol message class
@@ -814,8 +918,6 @@ class CrypticEngine {
       nonce: ratchetMsg.nonce,
     );
 
-    print(
-        '[Engine] _sendRatchetMessage: Sending ratchet to $toUser (dhStep=${ratchetMsg.dhStep}, msgNum=${ratchetMsg.messageNumber}, from=$_username)');
     _webSocketClient.send(message);
 
     // Update session state
@@ -839,7 +941,6 @@ class CrypticEngine {
   }
 
   void _emitEvent(EngineEvent event) {
-    print('[Engine] Emitting event: ${event.runtimeType}');
     _eventController.add(event);
   }
 
@@ -848,4 +949,22 @@ class CrypticEngine {
     final random = DateTime.now().hashCode;
     return '$_username-$timestamp-$random';
   }
+}
+
+class _QueuedOutbound {
+  const _QueuedOutbound(
+    this.bytes, {
+    this.fileId,
+    this.fileName,
+    this.chunkIndex,
+    this.totalChunks,
+    this.toUser,
+  });
+
+  final Uint8List bytes;
+  final String? fileId;
+  final String? fileName;
+  final int? chunkIndex;
+  final int? totalChunks;
+  final String? toUser;
 }

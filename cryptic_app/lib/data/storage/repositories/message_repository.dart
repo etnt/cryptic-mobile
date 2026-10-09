@@ -36,6 +36,20 @@ class MessageRepository {
     return _db.getMessages(conversationId, limit: limit);
   }
 
+  /// Paths referenced by recent messages, retained during media eviction.
+  Future<Set<String>> getRecentMediaPaths({
+    Duration age = const Duration(days: 30),
+  }) async {
+    if (!_db.isOpen) return {};
+    return _db.getRecentMediaPaths(since: DateTime.now().subtract(age));
+  }
+
+  /// Clear stale database paths after their files have been evicted.
+  Future<void> clearLocalPaths(Iterable<String> paths) async {
+    if (!_db.isOpen) return;
+    await _db.clearLocalPaths(paths);
+  }
+
   /// Mark a conversation as read.
   Future<void> markAsRead(String peerUsername) async {
     if (!_db.isOpen) return;

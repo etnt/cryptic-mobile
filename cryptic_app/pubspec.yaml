@@ -33,6 +33,10 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   sqflite_sqlcipher: ^3.0.0
   path_provider: ^2.1.0
+  image_picker: ^1.1.2
+  file_picker: ^8.1.7
+  open_filex: ^4.6.0
+  mime: ^2.0.0
 
   # Utilities
   uuid: ^4.2.0
@@ -68,6 +72,7 @@ dev_dependencies:
   # Linting
   flutter_lints: ^3.0.0
 
+  fake_async: any
 flutter:
   uses-material-design: true
 

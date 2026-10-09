@@ -4,11 +4,15 @@
 /// incoming and outgoing messages.
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../domain/models/message.dart';
+import 'image_viewer_screen.dart';
 
 /// A chat message bubble.
 class MessageBubble extends StatelessWidget {
@@ -92,14 +96,17 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            Text(
-              message.content,
-              style: TextStyle(
-                fontSize: 16,
-                color: textColor,
-                height: 1.3,
-              ),
-            ),
+            if (message.kind == MessageKind.text)
+              Text(
+                message.content,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: textColor,
+                  height: 1.3,
+                ),
+              )
+            else
+              _buildAttachment(context, textColor),
             if (showTimestamp) ...[
               const SizedBox(height: 4),
               Row(
@@ -130,6 +137,112 @@ class MessageBubble extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildAttachment(BuildContext context, Color textColor) {
+    final path = message.localPath;
+    if (message.kind == MessageKind.image && path != null) {
+      return GestureDetector(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ImageViewerScreen(path: path),
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.file(
+            File(path),
+            width: 220,
+            height: 180,
+            cacheWidth: 660,
+            cacheHeight: 540,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const SizedBox(
+              width: 220,
+              height: 100,
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          ),
+        ),
+      );
+    }
+    return InkWell(
+      onTap: path == null
+          ? null
+          : () {
+              if (!_isAllowedToOpen(path, message.mimeType)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Opening this file type is not supported.'),
+                  ),
+                );
+                return;
+              }
+              OpenFilex.open(path);
+            },
+      child: SizedBox(
+        width: 220,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              message.kind == MessageKind.image
+                  ? Icons.image_outlined
+                  : Icons.insert_drive_file_outlined,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.fileName ?? 'Attachment',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    _formatSize(message.sizeBytes ?? 0),
+                    style: TextStyle(color: textColor.withValues(alpha: .7)),
+                  ),
+                  if (message.transferStatus == TransferStatus.sending ||
+                      message.transferStatus == TransferStatus.receiving)
+                    LinearProgressIndicator(value: message.transferProgress),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _isAllowedToOpen(String path, String? mimeType) {
+    // The extension allowlist is the type gate; MIME is sender-supplied metadata
+    // and is only checked for consistency with that trusted extension.
+    const mimeTypesByExtension = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.heic': 'image/heic',
+      '.heif': 'image/heif',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+    };
+    final fileName = File(path).uri.pathSegments.last;
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0) return false;
+    final expectedMimeType =
+        mimeTypesByExtension[fileName.substring(dot).toLowerCase()];
+    return expectedMimeType != null &&
+        mimeType?.toLowerCase().trim() == expectedMimeType;
+  }
+
+  String _formatSize(int bytes) => bytes < 1024
+      ? '$bytes B'
+      : bytes < 1024 * 1024
+          ? '${(bytes / 1024).toStringAsFixed(1)} KB'
+          : '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 
   Widget _buildStatusIcon(MessageStatus status, Color color) =>
       switch (status) {
