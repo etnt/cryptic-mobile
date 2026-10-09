@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/utils/external_activity_guard.dart';
 import '../../core/utils/logger.dart';
 import '../../data/engine/engine_state.dart';
 import '../../data/engine/payload_codec.dart';
@@ -293,7 +294,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       Uint8List? bytes;
       String fileName;
       if (source == AttachmentSource.file) {
-        final selection = await FilePicker.platform.pickFiles();
+        final selection = await ExternalActivityGuard.run(
+          () => FilePicker.platform.pickFiles(),
+        );
         if (selection == null || selection.files.isEmpty) return;
         final selectedFile = selection.files.single;
         if (selectedFile.size > AttachmentLimits.maxFileBytes) {
@@ -304,12 +307,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         bytes =
             path == null ? selectedFile.bytes : await File(path).readAsBytes();
       } else {
-        final picked = await _imagePicker.pickImage(
-          source: source == AttachmentSource.camera
-              ? ImageSource.camera
-              : ImageSource.gallery,
-          imageQuality: 80,
-          maxWidth: 2048,
+        final picked = await ExternalActivityGuard.run(
+          () => _imagePicker.pickImage(
+            source: source == AttachmentSource.camera
+                ? ImageSource.camera
+                : ImageSource.gallery,
+            imageQuality: 80,
+            maxWidth: 2048,
+          ),
         );
         if (picked == null) return;
         try {

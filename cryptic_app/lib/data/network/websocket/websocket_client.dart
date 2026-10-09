@@ -201,6 +201,33 @@ class WebSocketClient {
     _socket!.add(json);
   }
 
+  /// Checks that the connection is really alive.
+  ///
+  /// Sends [probe] and waits up to [timeout] for any inbound data. A socket
+  /// that looks open but was silently dropped while the app was suspended
+  /// never answers. Returns `false` in that case, or if the send fails.
+  Future<bool> checkAlive(
+    ProtocolMessage probe, {
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    if (!isConnected || _socket == null) return false;
+    final reply = events
+        .firstWhere(
+          (e) =>
+              e is MessageReceivedEvent ||
+              e is RawMessageEvent ||
+              (e is ConnectionStateEvent &&
+                  e.state != ConnectionState.connected),
+        )
+        .then((e) => e is! ConnectionStateEvent);
+    try {
+      send(probe);
+      return await reply.timeout(timeout, onTimeout: () => false);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Send raw JSON string to the server.
   ///
   /// Throws [StateError] if not connected.

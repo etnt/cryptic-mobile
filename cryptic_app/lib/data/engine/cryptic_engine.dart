@@ -278,6 +278,19 @@ class CrypticEngine {
     if (_isDisposed || !_isInitialized || _resumeReconnectInProgress) return;
 
     _resumeReconnectInProgress = true;
+
+    // Keep a socket that still answers. Dropping it would disrupt transfers
+    // and force a needless re-upload of keys.
+    if (isConnected &&
+        await _webSocketClient.checkAlive(protocol.OnlineUsersMessage())) {
+      AppLogger.info(
+        'Engine: Connection still alive after resume, keeping it',
+        tag: 'Engine',
+      );
+      _resumeReconnectInProgress = false;
+      return;
+    }
+
     _reconnectTimer?.cancel();
     _intentionalDisconnect = true;
 
@@ -316,6 +329,8 @@ class CrypticEngine {
     String mimeType, {
     String? fileId,
   }) async {
+    // A reconnect (e.g. after the app resumed) may be in progress; wait for it.
+    await waitUntilConnected();
     _checkCanSend();
     if (bytes.isEmpty || bytes.length > AttachmentLimits.maxFileBytes) {
       throw ArgumentError('File must be between 1 byte and 10 MB');
@@ -347,6 +362,19 @@ class CrypticEngine {
     }
     await _sendPayloads(toUser, messages);
     return actualFileId;
+  }
+
+  /// Waits until the engine is connected, or [timeout] passes.
+  Future<void> waitUntilConnected({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (!isConnected &&
+        !_isDisposed &&
+        _isInitialized &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
   }
 
   void _checkCanSend() {
