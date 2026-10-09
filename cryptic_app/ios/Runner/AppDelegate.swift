@@ -12,6 +12,39 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    // Lets Dart find the app-group folder where the share extension writes
+    // shared files, so leftover copies can be swept at startup.
+    let shareChannel = FlutterMethodChannel(
+      name: "cryptic/share_cache",
+      binaryMessenger: engineBridge.applicationRegistrar.messenger()
+    )
+    shareChannel.setMethodCallHandler { call, result in
+      guard call.method == "shareCacheDirectory" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      // Same group id the share plugin uses. AppGroupId is expanded from the
+      // CUSTOM_GROUP_ID build setting (see project.pbxproj).
+      guard let groupId = Bundle.main.object(forInfoDictionaryKey: "AppGroupId") as? String else {
+        result(FlutterError(
+          code: "SHARE_CACHE_PATH",
+          message: "AppGroupId is missing from Info.plist",
+          details: nil
+        ))
+        return
+      }
+      guard let url = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: groupId
+      ) else {
+        result(FlutterError(
+          code: "SHARE_CACHE_PATH",
+          message: "App group container is unavailable",
+          details: nil
+        ))
+        return
+      }
+      result(url.path)
+    }
     let channel = FlutterMethodChannel(
       name: "cryptic/media_storage",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()

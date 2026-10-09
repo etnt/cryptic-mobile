@@ -5,23 +5,25 @@ library;
 
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/utils/logger.dart';
 import '../../data/engine/engine_state.dart';
 import '../../data/engine/payload_codec.dart';
+import '../../data/services/incoming_share_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/storage/media_store.dart';
 import '../../domain/models/message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/engine_provider.dart';
+import '../providers/incoming_share_provider.dart';
 import '../providers/messages_provider.dart';
 import '../widgets/attachment_sheet.dart';
 import '../widgets/connection_status_banner.dart';
@@ -34,11 +36,16 @@ class ChatScreen extends ConsumerStatefulWidget {
   /// Creates a chat screen.
   const ChatScreen({
     required this.peerId,
+    this.takeSharedFiles = false,
     super.key,
   });
 
   /// The peer's ID (username).
   final String peerId;
+
+  /// When true, this screen takes the pending shares and sends them to
+  /// [peerId] when it opens.
+  final bool takeSharedFiles;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -50,6 +57,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   final MediaStore _mediaStore = MediaStore();
   final Set<String> _selectedIds = {};
+  // Shares taken from the provider. This screen owns and deletes them.
+  List<IncomingShare> _pendingShares = const [];
 
   bool get _selecting => _selectedIds.isNotEmpty;
 
@@ -58,6 +67,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     super.initState();
     NotificationService.instance.activeChatPeer = widget.peerId;
     _loadHistory();
+    if (widget.takeSharedFiles) {
+      // Taken once this screen is mounted, not when the peer is picked, so
+      // the provider keeps the shares until then. Riverpod does not allow
+      // changing a provider during initState, hence the post-frame callback.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _takeShares());
+    }
+  }
+
+  /// Takes ownership of the pending shares and sends them. If this screen was
+  /// closed first, the shares stay in the provider.
+  void _takeShares() {
+    if (!mounted) return;
+    _pendingShares = ref.read(incomingShareProvider.notifier).consume();
+    unawaited(_sendInitialShares());
   }
 
   @override
@@ -368,56 +391,64 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _sendAttachment(AttachmentSource source) async {
-    String? createdFileId;
-    try {
-      Uint8List? bytes;
-      String fileName;
-      if (source == AttachmentSource.file) {
-        final selection = await FilePicker.platform.pickFiles();
-        if (selection == null || selection.files.isEmpty) return;
-        final selectedFile = selection.files.single;
-        if (selectedFile.size > AttachmentLimits.maxFileBytes) {
-          throw StateError('Files must be 10 MB or smaller');
-        }
-        fileName = selectedFile.name;
-        final path = selectedFile.path;
-        bytes =
-            path == null ? selectedFile.bytes : await File(path).readAsBytes();
-      } else {
-        final picked = await _imagePicker.pickImage(
-          source: source == AttachmentSource.camera
-              ? ImageSource.camera
-              : ImageSource.gallery,
-          imageQuality: 80,
-          maxWidth: 2048,
-        );
-        if (picked == null) return;
-        try {
-          if (await picked.length() > AttachmentLimits.maxFileBytes) {
-            throw StateError('Files must be 10 MB or smaller');
-          }
-          bytes = await picked.readAsBytes();
-          fileName = picked.name;
-        } finally {
-          try {
-            final tempFile = File(picked.path);
-            // Async on purpose: large attachments must not block the UI isolate.
-            // ignore: avoid_slow_async_io
-            if (await tempFile.exists()) await tempFile.delete();
-          } catch (error) {
-            AppLogger.warning(
-              'Could not delete image-picker temporary file',
-              tag: 'ChatScreen',
-              error: error,
-            );
-          }
+    if (source == AttachmentSource.file) {
+      final selection = await FilePicker.platform.pickFiles();
+      if (selection == null || selection.files.isEmpty) return;
+      final selectedFile = selection.files.single;
+      final path = selectedFile.path;
+      if (path == null) {
+        _showAttachmentError('Could not read the selected file');
+        return;
+      }
+      try {
+        await _sendAttachmentFromFile(path, name: selectedFile.name);
+      } finally {
+        // file_picker usually returns a copy in the app cache, so the copy
+        // is deleted after the send attempt, as the image picker's copy is.
+        // A path outside the cache is the user's original file, which is
+        // never deleted.
+        if (await _isInAppCache(path)) {
+          await _deleteTempFile(path);
         }
       }
-      if (bytes == null || bytes.isEmpty) {
+      return;
+    }
+
+    final picked = await _imagePicker.pickImage(
+      source: source == AttachmentSource.camera
+          ? ImageSource.camera
+          : ImageSource.gallery,
+      imageQuality: 80,
+      maxWidth: 2048,
+    );
+    if (picked == null) return;
+    try {
+      await _sendAttachmentFromFile(picked.path, name: picked.name);
+    } finally {
+      await _deleteTempFile(picked.path);
+    }
+  }
+
+  /// Reads, encrypts and sends the file at [path].
+  ///
+  /// Errors are shown to the user and do not propagate. The caller decides
+  /// what to do with [path] afterwards.
+  Future<void> _sendAttachmentFromFile(String path, {String? name}) async {
+    final fileName = name ?? path.split(RegExp(r'[\\/]')).last;
+    String? createdFileId;
+    try {
+      final file = File(path);
+      // Check the size before reading, so large files are never loaded.
+      final size = await file.length();
+      if (size > AttachmentLimits.maxFileBytes) {
+        throw _TooLargeFile(fileName, size);
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
         throw StateError('Could not read the selected file');
       }
       if (bytes.length > AttachmentLimits.maxFileBytes) {
-        throw StateError('Files must be 10 MB or smaller');
+        throw _TooLargeFile(fileName, bytes.length);
       }
       if (!mounted) return;
       final mimeType = lookupMimeType(fileName, headerBytes: bytes) ??
@@ -469,12 +500,125 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         // A failed outgoing attachment is not shown in the chat.
         unawaited(_discardAttachment(createdFileId));
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not send attachment: $error')),
+      _showAttachmentError(
+        error is _TooLargeFile
+            ? _notSentTooLarge([_describeSize(error.name, error.bytes)])
+            : 'Could not send attachment: $error',
+      );
+    }
+  }
+
+  /// Sends the shares taken by this screen, one after another.
+  ///
+  /// Each copy is deleted after its attempt, including a failed attempt or
+  /// an attempt after this screen has closed. Files over the size limit are
+  /// skipped; all skipped files are reported together, by name and size.
+  /// Shares that are left over because the user closed the screen mid-loop
+  /// are reported through a notice that survives the screen.
+  Future<void> _sendInitialShares() async {
+    final skipped = <String>[];
+    var leftOver = 0;
+    // The app-level messenger outlives this screen, so a notice can still
+    // be shown after the user leaves mid-loop.
+    final messenger = mounted ? ScaffoldMessenger.maybeOf(context) : null;
+    for (final share in _pendingShares) {
+      try {
+        if (!mounted) {
+          leftOver++;
+          continue;
+        }
+        final size = await _fileSize(share.path);
+        if (size != null && size > AttachmentLimits.maxFileBytes) {
+          skipped.add(_describeSize(share.fileName, size));
+        } else {
+          await _sendAttachmentFromFile(share.path, name: share.fileName);
+        }
+      } finally {
+        // Plaintext copies must not stay in the cache.
+        await share.deleteCopies();
+      }
+    }
+    if (skipped.isNotEmpty) _showAttachmentError(_notSentTooLarge(skipped));
+    if (leftOver > 0) {
+      try {
+        messenger?.showSnackBar(
+          const SnackBar(content: Text('Some files were not sent')),
+        );
+      } catch (error) {
+        // No scaffold can present the notice (e.g. the app is shutting
+        // down); at least the fact is logged.
+        AppLogger.warning(
+          'Some shared files were not sent',
+          tag: 'ChatScreen',
+          error: error,
         );
       }
     }
+  }
+
+  Future<int?> _fileSize(String path) async {
+    try {
+      return await File(path).length();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when [path] lies inside the app's cache or temporary directory,
+  /// i.e. it is a copy a picker made, not the user's original file.
+  Future<bool> _isInAppCache(String path) async {
+    try {
+      final temporaryDir = await getTemporaryDirectory();
+      if (_isInside(path, temporaryDir.path)) return true;
+      final cacheDir = await getApplicationCacheDirectory();
+      return _isInside(path, cacheDir.path);
+    } catch (error) {
+      AppLogger.warning(
+        'Could not resolve the app cache directory',
+        tag: 'ChatScreen',
+        error: error,
+      );
+      return false;
+    }
+  }
+
+  bool _isInside(String path, String directory) => path.startsWith(
+        directory.endsWith(Platform.pathSeparator)
+            ? directory
+            : '$directory${Platform.pathSeparator}',
+      );
+
+  Future<void> _deleteTempFile(String path) async {
+    try {
+      final tempFile = File(path);
+      // Async on purpose: large attachments must not block the UI isolate.
+      // ignore: avoid_slow_async_io
+      if (await tempFile.exists()) await tempFile.delete();
+    } catch (error) {
+      AppLogger.warning(
+        'Could not delete temporary attachment file',
+        tag: 'ChatScreen',
+        error: error,
+      );
+    }
+  }
+
+  /// Text for a file that is too large to send, e.g. `video.mp4 (25.3 MB)`.
+  String _describeSize(String name, int bytes) {
+    return '$name (${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB)';
+  }
+
+  /// The message for one or more files that were not sent because of size.
+  String _notSentTooLarge(List<String> entries) {
+    final limit = AttachmentLimits.maxFileBytes ~/ (1024 * 1024);
+    return 'Not sent, over the $limit MB limit: ${entries.join(', ')}';
+  }
+
+  void _showAttachmentError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 
   Future<void> _resetSession() async {
@@ -758,4 +902,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
     );
   }
+}
+
+/// Thrown when a file is over [AttachmentLimits.maxFileBytes].
+class _TooLargeFile implements Exception {
+  const _TooLargeFile(this.name, this.bytes);
+
+  final String name;
+  final int bytes;
+
+  @override
+  String toString() => 'File too large: $name (${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB)';
 }

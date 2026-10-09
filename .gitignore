@@ -6,3 +6,4 @@ cryptic/
 .cursor
 .vscode
 cryptic
+**/ios/build/

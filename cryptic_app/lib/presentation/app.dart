@@ -12,15 +12,18 @@ import '../core/theme/app_theme.dart';
 import '../core/update/update_prompt.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
+import '../data/services/incoming_share_service.dart';
 import '../data/services/notification_service.dart';
 import '../data/storage/media_store.dart';
 import '../domain/models/message.dart';
 import 'providers/auth_provider.dart';
 import 'providers/engine_provider.dart';
 import 'providers/enrollment_provider.dart';
+import 'providers/incoming_share_provider.dart';
 import 'providers/messages_provider.dart';
 import 'screens/enrollment/enrollment_flow_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/share_target_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/users_screen.dart';
 
@@ -56,6 +59,11 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
   int _loginKey = 0;
   bool _wasBackgrounded = false;
 
+  /// True while the share target picker is open.
+  bool _offeringShares = false;
+
+  StreamSubscription<void>? _shareNoticeSubscription;
+
   /// Lets the startup update check show a dialog with a valid Navigator
   /// context (this State sits above the MaterialApp's own Navigator).
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
@@ -71,12 +79,20 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       if (ctx != null) {
         checkAndPromptForUpdate(ctx);
       }
+      // Listen for files shared from other apps (cold start and warm start).
+      // Subscribe before start() so a notice from the first read is not lost.
+      _shareNoticeSubscription = ref
+          .read(incomingShareServiceProvider)
+          .unsupportedShares
+          .listen((_) => _showShareNotice());
+      unawaited(ref.read(incomingShareProvider.notifier).start());
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_shareNoticeSubscription?.cancel());
     super.dispose();
   }
 
@@ -111,6 +127,10 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
     // Without this, messages arriving while the ChatScreen is not mounted
     // (e.g. pending messages delivered on connect) would be lost.
     ref
+      // Offer the peer picker when shares arrive while logged in.
+      ..listen<List<IncomingShare>>(incomingShareProvider, (previous, next) {
+        if (next.isNotEmpty) _scheduleShareOffer();
+      })
       ..listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
         next.whenData((event) {
           if (event is MessageReceived) {
@@ -187,6 +207,8 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
           setState(() {
             _currentScreen = AppScreen.home;
           });
+          // A share may have arrived before login: offer it now.
+          _scheduleShareOffer();
         } else if (!next.isAuthenticated && _currentScreen == AppScreen.home) {
           ref.read(conversationsProvider.notifier).clear();
           setState(() {
@@ -202,6 +224,42 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: _buildCurrentScreen(),
+    );
+  }
+
+  /// Tells the user that text or links in a share were not taken.
+  void _showShareNotice() {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(content: Text('Text and link shares are not supported')),
+    );
+  }
+
+  /// Opens the share target picker after the current frame, if needed.
+  void _scheduleShareOffer() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offerPendingShares());
+  }
+
+  /// Opens the peer picker when shares are waiting and the user is logged in.
+  /// Pending shares stay in the provider until the user picks a peer.
+  void _offerPendingShares() {
+    if (!mounted || _offeringShares) return;
+    if (_currentScreen != AppScreen.home) return;
+    if (!ref.read(authProvider).isAuthenticated) return;
+    if (ref.read(incomingShareProvider).isEmpty) return;
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
+    _offeringShares = true;
+    unawaited(
+      navigator
+          .push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const ShareTargetScreen(),
+            ),
+          )
+          .whenComplete(() => _offeringShares = false),
     );
   }
 
