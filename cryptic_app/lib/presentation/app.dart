@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
-import '../core/utils/external_activity_guard.dart';
 import '../core/update/update_prompt.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
@@ -91,7 +90,6 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       case AppLifecycleState.resumed:
         if (_wasBackgrounded) {
           _wasBackgrounded = false;
-          if (ExternalActivityGuard.isActive) break;
           final engine = ref.read(authenticatedEngineProvider);
           if (engine != null) {
             unawaited(_evictMediaCache());
