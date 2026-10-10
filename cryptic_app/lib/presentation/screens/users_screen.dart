@@ -13,6 +13,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 import 'diagnostics_screen.dart';
+import 'event_log_screen.dart';
 
 /// The app version injected at release build time via `--dart-define`.
 /// Local builds fall back to the `dev` sentinel.
@@ -56,6 +57,15 @@ class UsersScreen extends ConsumerWidget {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => const DiagnosticsScreen(),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.receipt_long),
+            tooltip: 'Event log',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const EventLogScreen(),
               ),
             ),
           ),

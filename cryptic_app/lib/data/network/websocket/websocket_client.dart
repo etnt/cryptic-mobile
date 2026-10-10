@@ -7,6 +7,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import '../../../core/utils/event_log.dart';
 import '../../../core/utils/logger.dart';
 import '../protocol/protocol_codec.dart';
 import '../protocol/protocol_message.dart';
@@ -196,6 +197,7 @@ class WebSocketClient {
     }
 
     final json = ProtocolCodec.encode(message);
+    EventLog.add('TX', summarizeFrame(json));
     AppLogger.debug('WebSocket TX: ${message.type}', tag: 'WebSocket');
     print('[WebSocket] Sending: $json');
     _socket!.add(json);
@@ -249,11 +251,16 @@ class WebSocketClient {
     print(
         '[WebSocket] State change: $_state -> $newState${error != null ? ' (error: $error)' : ''}');
     _state = newState;
+    EventLog.add(
+      'WS',
+      '$newState${error != null ? ' error: $error' : ''}',
+    );
     _eventController.add(ConnectionStateEvent(newState, error));
   }
 
   void _onData(dynamic data) {
     if (data is String) {
+      EventLog.add('RX', summarizeFrame(data));
       print(
           '[WebSocket] _onData received: ${data.length > 200 ? data.substring(0, 200) : data}');
       final message = ProtocolCodec.decode(data);
@@ -262,6 +269,7 @@ class WebSocketClient {
         AppLogger.debug('WebSocket RX: ${message.type}', tag: 'WebSocket');
         _eventController.add(MessageReceivedEvent(message));
       } else {
+        EventLog.add('RX', 'frame could not be decoded');
         print('[WebSocket] Failed to decode message');
         AppLogger.debug(
             'WebSocket RX (raw): ${data.substring(0, data.length > 100 ? 100 : data.length)}...',
@@ -269,6 +277,7 @@ class WebSocketClient {
         _eventController.add(RawMessageEvent(data));
       }
     } else {
+      EventLog.add('RX', 'binary frame ${data.runtimeType}');
       print('[WebSocket] _onData received binary: ${data.runtimeType}');
       AppLogger.debug('WebSocket RX (binary): ${data.runtimeType}',
           tag: 'WebSocket');
@@ -288,6 +297,7 @@ class WebSocketClient {
     AppLogger.warning(
         'WebSocket connection closed (_onDone called, code=$closeCode, reason=$closeReason)',
         tag: 'WebSocket');
+    EventLog.add('WS', 'socket closed (code=$closeCode, reason=$closeReason)');
     _socket = null;
     _socketSubscription = null;
     if (_state != ConnectionState.disconnected) {

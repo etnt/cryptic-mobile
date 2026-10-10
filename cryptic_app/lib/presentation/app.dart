@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/update/update_prompt.dart';
+import '../core/utils/event_log.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
 import '../data/services/incoming_share_service.dart';
@@ -135,6 +136,11 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
         next.whenData((event) {
           if (event is MessageReceived) {
             final repo = ref.read(messageRepositoryProvider);
+            EventLog.add(
+              'UI',
+              'message from ${event.fromUser} id=${event.messageId} '
+                  '${repo == null ? 'DROPPED: message database not open' : 'stored'}',
+            );
             if (repo != null) {
               final msg = ChatMessage(
                 id: event.messageId.isNotEmpty
@@ -161,6 +167,11 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
             }
           } else if (event is FileReceived) {
             final repo = ref.read(messageRepositoryProvider);
+            EventLog.add(
+              'UI',
+              'file ${event.fileId} from ${event.fromUser} '
+                  '${repo == null ? 'DROPPED: message database not open' : 'stored'}',
+            );
             if (repo != null) {
               final message = ChatMessage(
                 id: event.fileId,

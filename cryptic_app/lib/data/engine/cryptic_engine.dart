@@ -11,6 +11,7 @@ import 'dart:typed_data';
 
 import 'package:uuid/uuid.dart';
 
+import '../../core/utils/event_log.dart';
 import '../../core/utils/logger.dart';
 import '../crypto/keys/key_bundle.dart';
 import '../crypto/keys/key_generator.dart';
@@ -226,14 +227,17 @@ class CrypticEngine {
       await _webSocketClient.connect();
 
       // Upload identity keys after connecting
+      EventLog.add('ENGINE', 'connected, uploading keys');
       await _uploadIdentityKeys();
 
       // Request pending messages that arrived while offline
+      EventLog.add('ENGINE', 'keys uploaded, requesting pending messages');
       _webSocketClient.send(protocol.RequestPendingMessagesMessage());
 
       // Request user list
       await requestUserList();
     } catch (e) {
+      EventLog.add('ENGINE', 'connect failed: $e');
       _updateState(_state.withError('Connection failed: $e'));
       _emitEvent(EngineError('Connection failed: $e'));
       rethrow;
@@ -606,6 +610,7 @@ class CrypticEngine {
       try {
         await _handleServerMessage(message);
       } catch (e, st) {
+        EventLog.add('ENGINE', 'error while handling ${message.type}: $e');
         AppLogger.error(
           'Error processing server message',
           tag: 'Engine',
@@ -616,6 +621,15 @@ class CrypticEngine {
     });
   }
 
+  static String _describeResult(ProcessingResult result) => switch (result) {
+        ProcessingSuccess(:final event) =>
+          'ok${event == null ? ' (no event, e.g. file chunk)' : ' (${event.runtimeType})'}',
+        ProcessingDuplicate() => 'duplicate, re-acked',
+        ProcessingFailure(:final error, :final cause) =>
+          'FAILED: $error${cause != null ? ' ($cause)' : ''}',
+        ProcessingPending(:final action) => 'pending: $action',
+      };
+
   Future<void> _handleServerMessage(ServerMessage message) async {
     // Handle key bundle specially for X3DH initiation
     if (message is KeyBundleMessage) {
@@ -625,6 +639,14 @@ class CrypticEngine {
 
     // Delegate other messages to processor
     final result = await _messageProcessor.processMessage(message);
+
+    if (message is IncomingMessage) {
+      EventLog.add(
+        'ENGINE',
+        '${message.messageType.name} from ${message.fromUser} '
+            'id=${message.messageId} -> ${_describeResult(result)}',
+      );
+    }
 
     if (message is IncomingMessage &&
         message.messageId.isNotEmpty &&
