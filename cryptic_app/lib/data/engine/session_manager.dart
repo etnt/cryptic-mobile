@@ -8,6 +8,7 @@ library;
 
 import 'dart:typed_data';
 
+import '../../core/utils/event_log.dart';
 import '../crypto/ratchet/double_ratchet.dart';
 import '../crypto/ratchet/ratchet_message.dart';
 import '../crypto/ratchet/ratchet_state.dart';
@@ -99,6 +100,7 @@ class SessionManager {
       throw StateError('SessionManager not initialized');
     }
 
+    EventLog.add('RATCHET', 'new session with $peerUsername as initiator');
     // Initialize Double Ratchet as Alice (initiator)
     final state = await _doubleRatchet.initSender(
       rootKey: sharedSecret,
@@ -130,6 +132,11 @@ class SessionManager {
       throw StateError('SessionManager not initialized');
     }
 
+    EventLog.add(
+      'RATCHET',
+      'new session with $peerUsername as responder'
+          '${_sessions.containsKey(peerUsername) ? ' (replaces existing)' : ''}',
+    );
     // Initialize Double Ratchet as Bob (responder)
     var state = await _doubleRatchet.initReceiver(
       rootKey: sharedSecret,
@@ -234,6 +241,14 @@ class SessionManager {
       state: state,
     );
 
+    EventLog.add(
+      'RATCHET',
+      'encrypt $peerUsername: out dh=${_fp(message.dhPublic)} '
+          'step=${message.dhStep} n=${message.messageNumber} '
+          'prev=${message.prevChainLength} '
+          '| after: ${_describeState(newState)}',
+    );
+
     // Update in-memory cache and persist
     _sessions[peerUsername] = newState;
     await _saveSession(peerUsername, newState);
@@ -254,9 +269,28 @@ class SessionManager {
       throw SessionNotFoundException(peerUsername);
     }
 
-    final (plaintext, newState) = await _doubleRatchet.decryptMessage(
-      message: message,
-      state: state,
+    final before = _describeState(state);
+    final incoming = 'in dh=${_fp(message.dhPublic)} '
+        'step=${message.dhStep} n=${message.messageNumber} '
+        'prev=${message.prevChainLength}';
+    final RatchetState newState;
+    final Uint8List plaintext;
+    try {
+      (plaintext, newState) = await _doubleRatchet.decryptMessage(
+        message: message,
+        state: state,
+      );
+    } catch (e) {
+      EventLog.add(
+        'RATCHET',
+        'decrypt FAILED $peerUsername: $incoming | state before: $before',
+      );
+      rethrow;
+    }
+    EventLog.add(
+      'RATCHET',
+      'decrypt ok $peerUsername: $incoming | before: $before '
+          '| after: ${_describeState(newState)}',
     );
 
     // Update in-memory cache and persist
@@ -265,6 +299,21 @@ class SessionManager {
 
     return plaintext;
   }
+
+  /// Short hex fingerprint of a public key (safe to show).
+  static String _fp(Uint8List? key) {
+    if (key == null) return 'none';
+    return key
+        .take(4)
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+  }
+
+  /// Ratchet counters and public-key fingerprints. No secrets.
+  static String _describeState(RatchetState s) =>
+      'step=${s.dhRatchetStep} send#=${s.sendMessageNumber} '
+      'recv#=${s.recvMessageNumber} skipped=${s.skippedKeys.length} '
+      'self=${_fp(s.dhSelf.$1)} remote=${_fp(s.dhRemote)}';
 
   /// Whether an incoming message has already been processed successfully.
   Future<bool> hasProcessedMessage(String messageId) async =>
@@ -281,6 +330,7 @@ class SessionManager {
 
   /// Delete a session.
   Future<void> deleteSession(String peerUsername) async {
+    EventLog.add('RATCHET', 'session with $peerUsername deleted');
     _sessions.remove(peerUsername);
 
     if (_currentUsername != null) {
