@@ -110,6 +110,63 @@ void main() {
     await harness.engine.dispose();
   });
 
+  test('messages decrypted before any UI listener are replayed to it',
+      () async {
+    final keyGenerator = KeyGenerator();
+    final senderKeys = await keyGenerator.generateFullKeyBundle();
+    final receiverKeys = await keyGenerator.generateFullKeyBundle();
+    final harness = _createHarness(ownKeys: receiverKeys);
+    await harness.engine.initialize();
+    final sessionCreated = Completer<void>();
+    final stateSubscription = harness.engine.stateChanges.listen((state) {
+      if ((state.sessions['alice']?.hasSession ?? false) &&
+          !sessionCreated.isCompleted) {
+        sessionCreated.complete();
+      }
+    });
+
+    final encrypted = await X3dhEngine().senderInit(
+      senderKeys: senderKeys,
+      recipientBundle: receiverKeys.toPublicBundle('bob'),
+      plaintext: PayloadCodec.encodeText('hello while offline'),
+    );
+    final blob = encrypted.messageBlob;
+    // No engine.events listener exists yet, as during login.
+    harness.webSocketMessages.add(
+      IncomingMessage(
+        messageType: EncryptedMessageType.x3dh,
+        fromUser: 'alice',
+        toUser: 'bob',
+        rawData: {
+          'message_type': 'x3dh',
+          'message_id': 'pending-1',
+          'from': 'alice',
+          'to': 'bob',
+          'metadata':
+              base64Encode(utf8.encode(jsonEncode(blob.metadata.toMap()))),
+          'signature': base64Encode(blob.signature),
+          'ciphertext': base64Encode(blob.ciphertext),
+          'nonce': base64Encode(blob.nonce),
+        },
+      ),
+    );
+    await sessionCreated.future.timeout(const Duration(seconds: 5));
+
+    final received = Completer<MessageReceived>();
+    final subscription = harness.engine.events.listen((event) {
+      if (event is MessageReceived && !received.isCompleted) {
+        received.complete(event);
+      }
+    });
+    final event = await received.future.timeout(const Duration(seconds: 5));
+
+    expect(event.fromUser, 'alice');
+    expect(event.plaintext, 'hello while offline');
+    await subscription.cancel();
+    await stateSubscription.cancel();
+    await harness.engine.dispose();
+  });
+
   test('key-bundle timeout emits file failure and engine error at 30 seconds',
       () {
     fakeAsync((async) {

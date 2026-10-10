@@ -134,7 +134,17 @@ class CrypticEngine {
   StreamSubscription<ServerMessage>? _messageSubscription;
   StreamSubscription<WebSocketEvent>? _connectionSubscription;
 
-  final _eventController = StreamController<EngineEvent>.broadcast();
+  /// Broadcast stream of engine events.
+  ///
+  /// A broadcast stream drops events nobody listens to. During login the
+  /// engine connects, and the server delivers queued messages, before the UI
+  /// subscribes. [_emitEvent] therefore parks received messages in
+  /// [_undeliveredEvents] while there is no listener, and [_flushUndelivered]
+  /// replays them to the first listener.
+  late final StreamController<EngineEvent> _eventController =
+      StreamController<EngineEvent>.broadcast(onListen: _flushUndelivered);
+  final List<EngineEvent> _undeliveredEvents = [];
+  static const int _maxUndeliveredEvents = 1000;
   final _stateController = StreamController<EngineState>.broadcast();
 
   /// Current engine state.
@@ -984,7 +994,27 @@ class CrypticEngine {
   }
 
   void _emitEvent(EngineEvent event) {
+    if (!_eventController.hasListener &&
+        (event is MessageReceived || event is FileReceived)) {
+      // Nobody can show or store this yet. The message is already acked to
+      // the server, so dropping it here would lose it for good.
+      if (_undeliveredEvents.length < _maxUndeliveredEvents) {
+        _undeliveredEvents.add(event);
+      }
+      return;
+    }
     _eventController.add(event);
+  }
+
+  void _flushUndelivered() {
+    if (_undeliveredEvents.isEmpty) return;
+    final pending = List<EngineEvent>.of(_undeliveredEvents);
+    _undeliveredEvents.clear();
+    // Deliver after the new listener is fully attached.
+    scheduleMicrotask(() {
+      if (_eventController.isClosed) return;
+      pending.forEach(_eventController.add);
+    });
   }
 
   String _generateMessageId() {

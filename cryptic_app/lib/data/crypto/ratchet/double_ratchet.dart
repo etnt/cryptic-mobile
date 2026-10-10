@@ -442,7 +442,13 @@ class DoubleRatchet {
       }
     }
 
-    return state.copyWith(recvChainKey: chainKey);
+    // The chain key now sits at [incomingMsgNum], so the counter must follow.
+    // Message keys are derived with the counter as KDF input; leaving it
+    // behind makes this message (and every later one) fail to decrypt.
+    return state.copyWith(
+      recvChainKey: chainKey,
+      recvMessageNumber: incomingMsgNum,
+    );
   }
 
   /// Removes the oldest skipped key.

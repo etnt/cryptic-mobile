@@ -142,6 +142,63 @@ void main() {
         expect(bobState.recvMessageNumber, 3);
       });
 
+      test('decrypts after a gap and then out-of-order and later messages',
+          () async {
+        final sharedSecret = Uint8List(32)..fillRange(0, 32, 0x42);
+        final aliceKeyPair = await x25519.generateKeyPair();
+        var aliceState = await ratchet.initSender(
+          rootKey: sharedSecret,
+          dhKeyPair: (aliceKeyPair.publicKey, aliceKeyPair.privateKey),
+        );
+        final bobKeyPair = await x25519.generateKeyPair();
+        var bobState = await ratchet.initReceiver(
+          rootKey: sharedSecret,
+          dhKeyPair: (bobKeyPair.publicKey, bobKeyPair.privateKey),
+        );
+
+        final encrypted = <dynamic>[];
+        for (var i = 0; i < 5; i++) {
+          final (m, s) = await ratchet.encryptMessage(
+            plaintext: Uint8List.fromList('msg $i'.codeUnits),
+            state: aliceState,
+          );
+          aliceState = s;
+          encrypted.add(m);
+        }
+
+        // Messages 0 and 1 are lost for now; message 2 arrives first.
+        var (plain, s) = await ratchet.decryptMessage(
+          message: encrypted[2],
+          state: bobState,
+        );
+        bobState = s;
+        expect(String.fromCharCodes(plain), 'msg 2');
+        expect(bobState.recvMessageNumber, 3);
+
+        // Next in-order message still works.
+        (plain, s) = await ratchet.decryptMessage(
+          message: encrypted[3],
+          state: bobState,
+        );
+        bobState = s;
+        expect(String.fromCharCodes(plain), 'msg 3');
+
+        // Late messages come from the skipped-key cache.
+        (plain, s) = await ratchet.decryptMessage(
+          message: encrypted[0],
+          state: bobState,
+        );
+        bobState = s;
+        expect(String.fromCharCodes(plain), 'msg 0');
+
+        (plain, s) = await ratchet.decryptMessage(
+          message: encrypted[4],
+          state: bobState,
+        );
+        bobState = s;
+        expect(String.fromCharCodes(plain), 'msg 4');
+      });
+
       test('bidirectional communication', () async {
         final sharedSecret = Uint8List(32)..fillRange(0, 32, 0x42);
 
