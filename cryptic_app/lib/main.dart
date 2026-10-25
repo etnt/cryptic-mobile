@@ -7,8 +7,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/config/app_config.dart';
+import 'core/update/update_service.dart';
 import 'core/utils/logger.dart';
 import 'data/services/background_service.dart';
 import 'data/services/notification_service.dart';
@@ -35,6 +37,20 @@ Future<void> main() async {
   // TODO(M3): Initialize database
   // TODO(M5): Load cached sessions
 
+  // Preferences for the update-check throttle. A failure must not block
+  // startup: fall back to a checker without a store (throttle disabled).
+  SharedPreferences? prefs;
+  try {
+    prefs = await SharedPreferences.getInstance();
+  } catch (error, stackTrace) {
+    AppLogger.warning(
+      'SharedPreferences unavailable; update-check throttle disabled',
+      tag: 'App',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
   // Initialize local notifications
   await NotificationService.instance.initialize();
 
@@ -45,9 +61,14 @@ Future<void> main() async {
   FlutterForegroundTask.initCommunicationPort();
 
   runApp(
-    // ProviderScope enables Riverpod throughout the app
-    const ProviderScope(
-      child: CrypticApp(),
+    // ProviderScope enables Riverpod throughout the app. The update checker
+    // is overridden with a prefs-backed store so the check is throttled to
+    // once per 24h.
+    ProviderScope(
+      overrides: [
+        releaseCheckerProvider.overrideWithValue(buildReleaseChecker(prefs)),
+      ],
+      child: const CrypticApp(),
     ),
   );
 }

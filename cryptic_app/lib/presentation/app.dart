@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/update/update_prompt.dart';
+import '../core/update/update_service.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
 import '../data/engine/incoming_event_handler.dart';
@@ -86,7 +87,13 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = _navigatorKey.currentContext;
       if (ctx != null) {
-        checkAndPromptForUpdate(ctx);
+        unawaited(
+          maybeShowUpdateDialog(
+            ctx,
+            checker: ref.read(releaseCheckerProvider),
+            onUpdate: openReleasePage,
+          ),
+        );
       }
       // Listen for files shared from other apps (cold start and warm start).
       // Subscribe before start() so a notice from the first read is not lost.

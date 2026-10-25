@@ -1,14 +1,26 @@
 // This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
+// utility in your test. For example, you can send tap and scroll
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:auto_upgrade/auto_upgrade.dart';
+import 'package:cryptic_app/core/update/update_service.dart';
 import 'package:cryptic_app/presentation/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// A no-op checker so the smoke test never touches the network, even though
+/// the default provider's `dev` sentinel already short-circuits the check.
+class _NoOpChecker extends ReleaseChecker {
+  _NoOpChecker()
+      : super(owner: 'etnt', repo: 'cryptic-mobile', currentVersion: 'dev');
+
+  @override
+  Future<UpdateCheckResult> check() async => const CheckSkipped();
+}
 
 void main() {
   testWidgets('CrypticApp smoke test', (tester) async {
@@ -23,8 +35,11 @@ void main() {
 
     // Build our app and trigger a frame.
     await tester.pumpWidget(
-      const ProviderScope(
-        child: CrypticApp(),
+      ProviderScope(
+        overrides: [
+          releaseCheckerProvider.overrideWithValue(_NoOpChecker()),
+        ],
+        child: const CrypticApp(),
       ),
     );
 
