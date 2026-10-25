@@ -79,7 +79,8 @@ void main() {
   group('AppConfig', () {
     test('development config should have correct defaults', () {
       expect(AppConfig.development.environment, Environment.development);
-      expect(AppConfig.development.serverHost, 'localhost');
+      // 10.0.2.2 is the Android emulator's alias for the host machine.
+      expect(AppConfig.development.serverHost, '10.0.2.2');
       expect(AppConfig.development.serverPort, 8443);
       expect(AppConfig.development.useTls, isTrue);
       expect(AppConfig.development.logLevel, LogLevel.debug);
@@ -88,7 +89,7 @@ void main() {
     test('websocketUrl should generate correct URL', () {
       expect(
         AppConfig.development.websocketUrl,
-        equals('wss://localhost:8443/ws'),
+        equals('wss://10.0.2.2:8443/ws'),
       );
     });
 

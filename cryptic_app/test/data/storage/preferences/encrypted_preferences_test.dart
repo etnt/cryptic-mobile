@@ -335,6 +335,40 @@ void main() {
       });
     });
 
+    group('Background connection', () {
+      test('backgroundConnectionEnabled defaults to true', () async {
+        when(mockStorage.read(key: PreferenceKeys.backgroundConnectionEnabled))
+            .thenAnswer((_) async => null);
+
+        final result = await prefs.backgroundConnectionEnabled;
+
+        expect(result, isTrue);
+      });
+
+      test('backgroundConnectionEnabled round-trips', () async {
+        when(mockStorage.write(
+                key: PreferenceKeys.backgroundConnectionEnabled,
+                value: 'false'))
+            .thenAnswer((_) async {});
+
+        await prefs.setBackgroundConnectionEnabled(false);
+
+        verify(mockStorage.write(
+          key: PreferenceKeys.backgroundConnectionEnabled,
+          value: 'false',
+        )).called(1);
+      });
+
+      test('batteryPromptShown defaults to false', () async {
+        when(mockStorage.read(key: PreferenceKeys.batteryPromptShown))
+            .thenAnswer((_) async => null);
+
+        final result = await prefs.batteryPromptShown;
+
+        expect(result, isFalse);
+      });
+    });
+
     group('Bulk operations', () {
       test('resetToDefaults removes all preference keys', () async {
         when(mockStorage.readAll()).thenAnswer(

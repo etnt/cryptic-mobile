@@ -392,7 +392,7 @@ void main() {
 
       expect(sessionManager.hasSession('bob'), isTrue);
 
-      sessionManager.dispose();
+      await sessionManager.dispose();
 
       expect(sessionManager.peerUsernames, isEmpty);
     });

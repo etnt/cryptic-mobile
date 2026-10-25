@@ -1,7 +1,58 @@
 # Plan: Incoming Message Notifications Without Google Play Services
 
-**Status:** Draft · **Date:** 2026-04
+**Status:** Implemented (M1–M3 + toggle, battery UX, diagnostics) · **Date:** 2026-04
 **Scope:** Android first (iOS noted at the end — it is a different problem)
+
+---
+
+## 0. Implemented design (update to the original draft)
+
+The original draft described running the connection in a **background
+isolate** hosted by `flutter_foreground_task`. The shipped design deviates
+from that wording on purpose:
+
+- The foreground service is a **keep-alive only**. It runs a no-op
+  `TaskHandler`; it does not host the WebSocket, the crypto engine, or any
+  storage.
+- The **engine stays in the UI isolate**. When the service keeps the process
+  alive, Android does not suspend the isolate, so the existing WebSocket,
+  Double Ratchet sessions, and the encrypted SQLite handle keep working
+  unchanged while the app is backgrounded.
+- **No passphrase is persisted.** A second isolate (or a headless engine)
+  would need passphrase-derived key material resident in service memory, or a
+  Keystore-wrapped derived key. Neither is implemented; see Risks.
+
+Consequences of this design:
+
+- Reboot restart (M4) and survival of the engine after a swipe-away are
+  **deferred**. After a reboot or force-stop the user must re-open the app and
+  log in; the service alone cannot rebuild an encrypted session because there
+  is no credential store.
+- Wake lock is **not** held continuously (`allowWakeLock: false`), and no
+  per-reconnect wake lock is acquired in v1: the foreground service already
+  prevents process death, and the Doze exemption handles radio throttling.
+- `dataSync` is the declared service type. Android 15 caps `dataSync` runtime
+  at about 6 hours/day; if real-device profiling (M5) hits the cap, switch the
+  type to `specialUse` with a declared justification.
+- The 30 s heartbeat is unchanged: `WebSocketClient.pingInterval` sends
+  protocol-level ping frames (cheap), not app-level JSON.
+
+Implementation map:
+
+| Piece | File |
+|---|---|
+| Foreground-service wrapper (init/start/stop/battery) | `cryptic_app/lib/data/services/background_service.dart` |
+| Shared incoming-event handler (persist → state → notify, ordered) | `cryptic_app/lib/data/engine/incoming_event_handler.dart` |
+| Notification permission + resumed-state suppression | `cryptic_app/lib/data/services/notification_service.dart` |
+| Preference: `backgroundConnectionEnabled`, battery prompt flag | `cryptic_app/lib/data/storage/preferences/encrypted_preferences.dart` |
+| Unlimited reconnect (0 = unlimited) + 60 s backoff cap | `cryptic_app/lib/data/engine/cryptic_engine.dart` |
+| Auth wiring of the reconnect policy | `cryptic_app/lib/data/services/authentication_service.dart` |
+| Auth-listener service start/stop + battery prompt | `cryptic_app/lib/presentation/app.dart` |
+| Settings toggle + battery tile + OEM hints | `cryptic_app/lib/presentation/screens/settings_screen.dart` |
+| Diagnostics: background OK / paused / stopped row | `lib/presentation/providers/diagnostics_provider.dart`, `screens/diagnostics_screen.dart` |
+| Manifest permissions + typed service declaration | `cryptic_app/android/app/src/main/AndroidManifest.xml` |
+
+---
 
 ---
 

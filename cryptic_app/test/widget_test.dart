@@ -31,7 +31,8 @@ void main() {
     // Verify the app renders correctly
     expect(find.byType(MaterialApp), findsOneWidget);
 
-    // Pump and settle to let all timers complete (splash screen animation)
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    // The splash screen shows a CircularProgressIndicator, which animates
+    // forever, so pumpAndSettle would never return. Pump a fixed duration.
+    await tester.pump(const Duration(seconds: 2));
   });
 }

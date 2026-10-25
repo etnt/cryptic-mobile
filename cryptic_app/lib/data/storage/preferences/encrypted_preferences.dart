@@ -68,6 +68,13 @@ abstract class PreferenceKeys {
   /// Maximum reconnect attempts.
   static const maxReconnectAttempts = '${prefix}max_reconnect_attempts';
 
+  /// Whether the Android foreground service keeps the background message
+  /// connection alive (default true).
+  static const backgroundConnectionEnabled = '${prefix}background_connection_enabled';
+
+  /// Whether the one-time battery-optimization prompt has been shown.
+  static const batteryPromptShown = '${prefix}battery_prompt_shown';
+
   // ─────────────────────────────────────────────────────────────────────────
   // Data Management
   // ─────────────────────────────────────────────────────────────────────────
@@ -287,6 +294,23 @@ class EncryptedPreferences {
   Future<void> setMaxReconnectAttempts(int attempts) =>
       setInt(PreferenceKeys.maxReconnectAttempts, attempts);
 
+  /// Whether the background connection (foreground service) is enabled.
+  /// Defaults to true so new installs get background notifications.
+  Future<bool> get backgroundConnectionEnabled =>
+      getBool(PreferenceKeys.backgroundConnectionEnabled, defaultValue: true);
+
+  /// Sets background connection enabled.
+  Future<void> setBackgroundConnectionEnabled(bool value) =>
+      setBool(PreferenceKeys.backgroundConnectionEnabled, value);
+
+  /// Whether the one-time battery-optimization prompt has been shown.
+  Future<bool> get batteryPromptShown =>
+      getBool(PreferenceKeys.batteryPromptShown);
+
+  /// Sets the battery-optimization prompt shown flag.
+  Future<void> setBatteryPromptShown(bool value) =>
+      setBool(PreferenceKeys.batteryPromptShown, value);
+
   // ─────────────────────────────────────────────────────────────────────────
   // Data Management
   // ─────────────────────────────────────────────────────────────────────────
@@ -380,6 +404,8 @@ class EncryptedPreferences {
         'connection_timeout': await connectionTimeout,
         'auto_reconnect': await autoReconnect,
         'max_reconnect_attempts': await maxReconnectAttempts,
+        'background_connection_enabled': await backgroundConnectionEnabled,
+        'battery_prompt_shown': await batteryPromptShown,
         'message_retention_days': await messageRetentionDays,
         'max_media_cache_mb': await maxMediaCacheMb,
         'auto_download_media': await autoDownloadMedia,

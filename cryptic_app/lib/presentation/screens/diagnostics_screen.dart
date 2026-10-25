@@ -151,8 +151,20 @@ class _ConnectionSection extends StatelessWidget {
         _Row('Reconnect attempts', '${conn.reconnectAttempts}'),
         _Row('Keys uploaded', conn.keysUploaded ? 'yes' : 'no'),
         _Row('Online users', '${conn.onlineUserCount}'),
+        _Row('Background connection', _backgroundLabel(conn),
+            valueColor: _backgroundLabel(conn) == 'OK'
+                ? theme.colorScheme.primary
+                : null),
       ],
     );
+  }
+
+  /// 'OK' = service running with exemption, 'paused' = service running but
+  /// throttled (no battery exemption), 'stopped' = service not running.
+  String _backgroundLabel(ConnectionDiag conn) {
+    if (!conn.backgroundPrefEnabled) return 'disabled in settings';
+    if (!conn.backgroundServiceRunning) return 'stopped';
+    return conn.batteryExempt ? 'OK' : 'paused (battery optimized)';
   }
 }
 

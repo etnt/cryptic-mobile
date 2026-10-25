@@ -89,3 +89,30 @@ cryptic_app/lib/
 ## License
 
 See [LICENSE](LICENSE).
+
+## Background message connection (tradeoffs)
+
+Android delivery without Google Play services works by keeping an encrypted
+WebSocket alive around the clock inside a foreground service. The service is
+a **keep-alive only**: the crypto engine, its WebSocket, and the encrypted
+database stay in the UI isolate. There is no second engine and no stored
+passphrase. See
+[the notification plan](docs/INCOMING-MESSAGE-NOTIFICATION-PLAN.md) for the
+full design and verification matrix.
+
+Accepted tradeoffs:
+
+- **Battery:** the radio and CPU wake regularly for heartbeats; deep sleep is
+  prevented while the connection lives. Expect measurable extra drain
+  (roughly 1–4 %/hour with aggressive tuning, more on poor networks).
+  Users can opt out any time via Settings → "Keep background connection on".
+- **Big-tech-free:** no Google infrastructure; no third party sees connection
+  metadata — consistent with the project threat model.
+- **Status-bar icon:** permanent, silent notification required by Android as
+  the price of the surviving connection.
+- **Known limitations:** after a device reboot or a force-stop the background
+  connection does not restart by itself; the user must re-open the app and
+  log in. A swipe-away may also kill the engine even though the service
+  survives, because there is no stored credential to rebuild the session.
+  Fixing this needs a Keystore-wrapped derived key and a headless engine, so
+  it is deferred.

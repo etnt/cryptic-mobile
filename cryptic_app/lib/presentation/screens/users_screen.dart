@@ -14,6 +14,7 @@ import '../widgets/user_avatar.dart';
 import 'chat_screen.dart';
 import 'diagnostics_screen.dart';
 import 'event_log_screen.dart';
+import 'settings_screen.dart';
 
 /// The app version injected at release build time via `--dart-define`.
 /// Local builds fall back to the `dev` sentinel.
@@ -51,6 +52,15 @@ class UsersScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Settings',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: 'Diagnostics',

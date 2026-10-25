@@ -72,17 +72,14 @@ void main() {
     test('should parse key bundle message', () {
       final json = {
         'type': 'key_bundle',
-        'username': 'bob',
-        'identity_sign_key': base64Encode(utf8.encode('sign_key')),
-        'identity_dh_key': base64Encode(utf8.encode('dh_key')),
-        'signed_prekey': {
-          'key_id': 1,
-          'public_key': base64Encode(utf8.encode('prekey')),
-          'signature': base64Encode(utf8.encode('signature')),
-        },
+        'user': 'bob',
+        'identity_sign_public': base64Encode(utf8.encode('sign_key')),
+        'identity_dh_public': base64Encode(utf8.encode('dh_key')),
+        'signed_prekey': base64Encode(utf8.encode('prekey')),
+        'signed_prekey_signature': base64Encode(utf8.encode('signature')),
         'one_time_prekey': {
-          'key_id': 5,
-          'public_key': base64Encode(utf8.encode('otpk')),
+          'id': base64Encode(utf8.encode('5')),
+          'public': base64Encode(utf8.encode('otpk')),
         },
       };
 
@@ -92,20 +89,17 @@ void main() {
       final bundle = message! as KeyBundleMessage;
       expect(bundle.username, 'bob');
       expect(bundle.signedPrekey.keyId, 1);
-      expect(bundle.oneTimePrekey?.keyId, 5);
+      expect(bundle.oneTimePrekey?.keyId, base64Encode(utf8.encode('5')));
     });
 
     test('should parse key bundle without one-time prekey', () {
       final json = {
         'type': 'key_bundle',
-        'username': 'bob',
-        'identity_sign_key': 'sign',
-        'identity_dh_key': 'dh',
-        'signed_prekey': {
-          'key_id': 1,
-          'public_key': 'pk',
-          'signature': 'sig',
-        },
+        'user': 'bob',
+        'identity_sign_public': 'sign',
+        'identity_dh_public': 'dh',
+        'signed_prekey': 'pk',
+        'signed_prekey_signature': 'sig',
       };
 
       final message = ServerMessage.fromJson(json);
@@ -225,10 +219,10 @@ void main() {
       final json = {
         'type': 'message',
         'message_type': 'x3dh',
-        'from_user': 'alice',
-        'to_user': 'bob',
+        'from': 'alice',
+        'to': 'bob',
         'identity_key': base64Encode(utf8.encode('ik')),
-        'ephemeral_key': base64Encode(utf8.encode('ek')),
+        'ephemeral_public': base64Encode(utf8.encode('ek')),
         'used_one_time_prekey_id': 3,
         'ciphertext': base64Encode(utf8.encode('ct')),
       };
@@ -247,11 +241,11 @@ void main() {
       final json = {
         'type': 'message',
         'message_type': 'ratchet',
-        'from_user': 'bob',
-        'to_user': 'alice',
+        'from': 'bob',
+        'to': 'alice',
         'dh_public': base64Encode(utf8.encode('dh')),
-        'previous_chain_length': 5,
-        'message_number': 3,
+        'prev_chain_length': 5,
+        'msg_number': 3,
         'ciphertext': base64Encode(utf8.encode('ct')),
       };
 
@@ -267,11 +261,11 @@ void main() {
   group('IncomingX3dhMessage', () {
     test('should parse from raw data', () {
       final data = {
-        'from_user': 'alice',
-        'to_user': 'bob',
+        'from': 'alice',
+        'to': 'bob',
         'identity_key': base64Encode(utf8.encode('identity')),
-        'ephemeral_key': base64Encode(utf8.encode('ephemeral')),
-        'used_one_time_prekey_id': 7,
+        'ephemeral_public': base64Encode(utf8.encode('ephemeral')),
+        'otpk_id': base64Encode([0, 0, 0, 7]),
         'ciphertext': base64Encode(utf8.encode('cipher')),
       };
 
@@ -285,12 +279,28 @@ void main() {
       expect(x3dh.ciphertextBytes, utf8.encode('cipher'));
     });
 
+    test('reads otpk_id from the metadata blob when not top-level', () {
+      final metadataJson = jsonEncode({
+        'otpk_id': base64Encode([0, 0, 1, 2]),
+      });
+      final data = {
+        'from': 'alice',
+        'to': 'bob',
+        'metadata': base64Encode(utf8.encode(metadataJson)),
+        'ciphertext': base64Encode(utf8.encode('cipher')),
+      };
+
+      final x3dh = IncomingX3dhMessage.fromRawData(data);
+
+      expect(x3dh.usedOneTimePrekeyId, 258);
+    });
+
     test('should handle null one-time prekey id', () {
       final data = {
-        'from_user': 'alice',
-        'to_user': 'bob',
+        'from': 'alice',
+        'to': 'bob',
         'identity_key': base64Encode([1, 2, 3]),
-        'ephemeral_key': base64Encode([4, 5, 6]),
+        'ephemeral_public': base64Encode([4, 5, 6]),
         'ciphertext': base64Encode([7, 8, 9]),
       };
 
@@ -303,11 +313,11 @@ void main() {
   group('IncomingRatchetMessage', () {
     test('should parse from raw data', () {
       final data = {
-        'from_user': 'bob',
-        'to_user': 'alice',
+        'from': 'bob',
+        'to': 'alice',
         'dh_public': base64Encode(utf8.encode('dh_key')),
-        'previous_chain_length': 10,
-        'message_number': 5,
+        'prev_chain_length': 10,
+        'msg_number': 5,
         'ciphertext': base64Encode(utf8.encode('encrypted')),
       };
 
@@ -344,14 +354,11 @@ void main() {
 
       final json = {
         'type': 'key_bundle',
-        'username': 'bob',
-        'identity_sign_key': base64Encode(signKey),
-        'identity_dh_key': base64Encode(dhKey),
-        'signed_prekey': {
-          'key_id': 1,
-          'public_key': 'pk',
-          'signature': 'sig',
-        },
+        'user': 'bob',
+        'identity_sign_public': base64Encode(signKey),
+        'identity_dh_public': base64Encode(dhKey),
+        'signed_prekey': 'pk',
+        'signed_prekey_signature': 'sig',
       };
 
       final message = ServerMessage.fromJson(json)! as KeyBundleMessage;

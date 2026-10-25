@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/engine/cryptic_engine.dart';
 import '../../data/services/authentication_service.dart';
+import '../../data/services/background_service.dart';
 import '../../data/storage/message_database.dart';
 import '../../data/storage/repositories/message_repository.dart';
 
@@ -208,6 +209,9 @@ class AuthNotifier extends StateNotifier<AuthStatus> {
       await _engine!.dispose();
       _engine = null;
     }
+    // Safety net: stop the background keep-alive service on logout even if
+    // the app-level auth listener misses the transition.
+    await BackgroundService.instance.stop();
     await _messageDb.close();
     state = AuthStatus.initial;
   }

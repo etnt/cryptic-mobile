@@ -19,6 +19,13 @@ import 'package:cryptic_app/data/storage/secure_storage/key_storage_service.dart
 @GenerateMocks([SecureStorageService])
 import 'key_storage_service_test.mocks.dart';
 
+IdentityKeyPair _sampleKeyPair() => IdentityKeyPair(
+      signPublicKey: Uint8List(32)..fillRange(0, 32, 1),
+      signPrivateKey: Uint8List(64)..fillRange(0, 64, 2),
+      dhPublicKey: Uint8List(32)..fillRange(0, 32, 3),
+      dhPrivateKey: Uint8List(32)..fillRange(0, 32, 4),
+    );
+
 void main() {
   late MockSecureStorageService mockSecureStorage;
   late KeyStorageService keyStorage;
@@ -65,8 +72,8 @@ void main() {
       });
 
       test('hasIdentityKeys returns true when keys exist', () async {
-        when(mockSecureStorage.containsKey(key: KeyStorageKeys.identityKeys))
-            .thenAnswer((_) async => true);
+        when(mockSecureStorage.readJson(key: KeyStorageKeys.identityKeys))
+            .thenAnswer((_) async => _sampleKeyPair().toMap());
 
         final result = await keyStorage.hasIdentityKeys();
 
@@ -74,8 +81,8 @@ void main() {
       });
 
       test('hasIdentityKeys returns false when no keys', () async {
-        when(mockSecureStorage.containsKey(key: KeyStorageKeys.identityKeys))
-            .thenAnswer((_) async => false);
+        when(mockSecureStorage.readJson(key: KeyStorageKeys.identityKeys))
+            .thenAnswer((_) async => null);
 
         final result = await keyStorage.hasIdentityKeys();
 
@@ -341,8 +348,8 @@ void main() {
 
     group('Initialization', () {
       test('isInitialized returns true when identity keys exist', () async {
-        when(mockSecureStorage.containsKey(key: KeyStorageKeys.identityKeys))
-            .thenAnswer((_) async => true);
+        when(mockSecureStorage.readJson(key: KeyStorageKeys.identityKeys))
+            .thenAnswer((_) async => _sampleKeyPair().toMap());
 
         final result = await keyStorage.isInitialized();
 
@@ -350,8 +357,8 @@ void main() {
       });
 
       test('isInitialized returns false when no identity keys', () async {
-        when(mockSecureStorage.containsKey(key: KeyStorageKeys.identityKeys))
-            .thenAnswer((_) async => false);
+        when(mockSecureStorage.readJson(key: KeyStorageKeys.identityKeys))
+            .thenAnswer((_) async => null);
 
         final result = await keyStorage.isInitialized();
 

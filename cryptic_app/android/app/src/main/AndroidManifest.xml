@@ -2,6 +2,12 @@
     <!-- Required in release builds (debug/profile overlays add it only for development). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Background message connection (foreground service keeps the WebSocket alive). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <application
         android:label="cryptic_app"
         android:name="${applicationName}"
@@ -42,6 +48,18 @@
                 <data android:mimeType="*/*"/>
             </intent-filter>
         </activity>
+        <!-- Foreground service hosting the background message connection.
+             dataSync is the correct typed service for a messaging connection on
+             Android 14+; it must be started while the app is in the foreground
+             (login/start toggle satisfies this). stopWithTask=false lets the
+             service attempt to survive a swipe-away (the Flutter engine itself
+             may still be killed - documented limitation). -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false"
+            android:exported="false"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -11,6 +11,7 @@ import '../engine/cryptic_engine.dart';
 import '../engine/engine_state.dart';
 import '../network/websocket/mtls_config.dart';
 import '../network/websocket/websocket_client.dart';
+import '../storage/preferences/encrypted_preferences.dart';
 import '../storage/repositories/key_repository.dart';
 import '../storage/repositories/session_repository.dart';
 import '../storage/secure_storage/certificate_storage_service.dart';
@@ -175,7 +176,12 @@ class AuthenticationService {
       // Create WebSocket client
       final webSocketClient = WebSocketClient(mtlsConfig: mtlsConfig);
 
-      // Create engine
+      // Create engine. When the user enabled the background connection the
+      // Android foreground service keeps the process alive, so the engine
+      // should reconnect indefinitely (0 = unlimited) instead of giving up
+      // after the default 10 attempts.
+      final backgroundEnabled =
+          await EncryptedPreferences().backgroundConnectionEnabled;
       final engine = CrypticEngine(
         username: username,
         serverConfig: ServerConfig(
@@ -185,6 +191,8 @@ class AuthenticationService {
         keyRepository: keyRepository,
         sessionRepository: sessionRepository,
         webSocketClient: webSocketClient,
+        maxReconnectAttempts:
+            backgroundEnabled ? 0 : CrypticEngine.defaultMaxReconnectAttempts,
       );
 
       // Initialize and connect

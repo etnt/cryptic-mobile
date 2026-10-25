@@ -52,6 +52,10 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^18.0.0
 
+  # Background connection: keeps the UI isolate (and its WebSocket) alive via
+  # an Android foreground service. See docs/INCOMING-MESSAGE-NOTIFICATION-PLAN.md
+  flutter_foreground_task: ^11.0.3
+
   # UI
   cupertino_icons: ^1.0.6
   receive_sharing_intent: ^1.9.0

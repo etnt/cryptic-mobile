@@ -90,12 +90,19 @@ class WebSocketClient {
   /// When set, the socket sends periodic ping frames and closes the
   /// connection if the server does not answer with a pong within the same
   /// interval. `null` disables protocol pings.
+  ///
+  /// Background-connection note: the 30 s default sends cheap WebSocket
+  /// PROTOCOL ping frames (not app-level JSON). This is what keeps carrier
+  /// NAT mappings alive during Doze-exempt background operation. Verified
+  /// for the notification work (docs/INCOMING-MESSAGE-NOTIFICATION-PLAN.md);
+  /// no functional change was needed here.
   final Duration? pingInterval;
 
   WebSocket? _socket;
   ConnectionState _state = ConnectionState.disconnected;
   final _eventController = StreamController<WebSocketEvent>.broadcast();
   StreamSubscription<dynamic>? _socketSubscription;
+  Future<void>? _connectInFlight;
 
   /// Current connection state.
   ConnectionState get state => _state;
@@ -118,13 +125,33 @@ class WebSocketClient {
   /// Throws [WebSocketException] if connection fails.
   Future<void> connect() async {
     if (_state == ConnectionState.connecting) {
-      return; // Already connecting
+      // Wait for the attempt already under way instead of returning before
+      // the socket is open.
+      final inFlight = _connectInFlight;
+      if (inFlight != null) return inFlight;
+      return;
     }
 
     if (_state == ConnectionState.connected) {
       return; // Already connected
     }
 
+    final attempt = Completer<void>();
+    _connectInFlight = attempt.future;
+    // Callers that joined the attempt handle the error themselves.
+    unawaited(attempt.future.then((_) {}, onError: (_) {}));
+    try {
+      await _connectSocket();
+      attempt.complete();
+    } catch (e) {
+      attempt.completeError(e);
+      rethrow;
+    } finally {
+      _connectInFlight = null;
+    }
+  }
+
+  Future<void> _connectSocket() async {
     _setState(ConnectionState.connecting);
 
     try {

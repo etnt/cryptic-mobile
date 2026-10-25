@@ -69,11 +69,13 @@ class CrypticEngine {
     KeyGenerator? keyGenerator,
     X3dhEngine? x3dhEngine,
     DoubleRatchet? doubleRatchet,
+    int maxReconnectAttempts = defaultMaxReconnectAttempts,
   })  : _username = username,
         _keyRepository = keyRepository,
         _webSocketClient = webSocketClient,
         _keyGenerator = keyGenerator ?? KeyGenerator(),
         _x3dhEngine = x3dhEngine ?? X3dhEngine(),
+        _maxReconnectAttempts = maxReconnectAttempts,
         _state = EngineState(
           serverConfig: serverConfig,
         ) {
@@ -123,7 +125,32 @@ class CrypticEngine {
   Timer? _reconnectTimer;
   bool _resumeReconnectInProgress = false;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 10;
+
+  /// Maximum reconnect attempts before giving up.
+  ///
+  /// `0` means unlimited - used when the Android foreground service keeps the
+  /// background connection alive, so the engine retries until the process is
+  /// explicitly stopped. Backoff is still capped at [_maxReconnectDelay].
+  ///
+  /// Mutable via [maxReconnectAttempts] so the settings toggle can change the
+  /// policy of the live engine without a re-login.
+  int _maxReconnectAttempts;
+
+  /// Default reconnect cap when the engine is created without configuration.
+  static const int defaultMaxReconnectAttempts = 10;
+
+  /// Sets the reconnect policy of the live engine.
+  ///
+  /// `0` switches to unlimited retries (background connection enabled);
+  /// any positive value caps the attempts (background connection disabled).
+  /// Matches the policy authentication_service passes at login.
+  set maxReconnectAttempts(int value) {
+    _maxReconnectAttempts = value;
+    AppLogger.info(
+      'Engine: reconnect policy updated to maxAttempts=$value',
+      tag: 'Engine',
+    );
+  }
   static const Duration _initialReconnectDelay = Duration(seconds: 1);
   static const Duration _maxReconnectDelay = Duration(seconds: 60);
 
@@ -205,8 +232,24 @@ class CrypticEngine {
     }
   }
 
+  Future<void>? _connectInFlight;
+
   /// Connect to the server.
-  Future<void> connect({bool resetReconnectAttempts = true}) async {
+  ///
+  /// Concurrent calls (for example an app-resume reconnect racing a scheduled
+  /// reconnect) share one attempt. Otherwise the key upload and the pending
+  /// message request would run twice on the same socket, or run before the
+  /// socket is open.
+  Future<void> connect({bool resetReconnectAttempts = true}) {
+    final inFlight = _connectInFlight;
+    if (inFlight != null) return inFlight;
+    final attempt = _connectOnce(resetReconnectAttempts: resetReconnectAttempts)
+        .whenComplete(() => _connectInFlight = null);
+    _connectInFlight = attempt;
+    return attempt;
+  }
+
+  Future<void> _connectOnce({required bool resetReconnectAttempts}) async {
     if (!_isInitialized) {
       throw StateError('CrypticEngine not initialized');
     }
@@ -550,7 +593,8 @@ class CrypticEngine {
   void _scheduleReconnect() {
     if (_reconnectTimer?.isActive ?? false) return;
 
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
+    // 0 = unlimited attempts (background connection mode); never give up.
+    if (_maxReconnectAttempts > 0 && _reconnectAttempts >= _maxReconnectAttempts) {
       AppLogger.warning(
         'Engine: Max reconnect attempts ($_maxReconnectAttempts) reached, giving up',
         tag: 'Engine',
@@ -588,11 +632,16 @@ class CrypticEngine {
 
   Duration _calculateBackoff() {
     final baseMs = _initialReconnectDelay.inMilliseconds;
-    final multiplier = pow(2, _reconnectAttempts - 1);
+    // Clamp the exponent so unlimited mode (attempt counts in the thousands)
+    // cannot overflow pow() to Infinity, which would make .round() throw an
+    // UnsupportedError and silently stop reconnects. Once clamped the delay
+    // is already far above the 60 s cap applied below.
+    final multiplier = pow(2, min(_reconnectAttempts - 1, 6));
     final delayMs = (baseMs * multiplier).round();
     final maxMs = _maxReconnectDelay.inMilliseconds;
     // Add ±10% jitter
     final jitter = (delayMs * 0.1 * (Random().nextDouble() * 2 - 1)).round();
+    // Cap at 60 s so unlimited-reconnect mode stays battery-friendly.
     return Duration(milliseconds: min(delayMs + jitter, maxMs));
   }
 

@@ -140,10 +140,10 @@ void main() {
         rawData: {
           'type': 'message',
           'message_type': 'x3dh',
-          'from_user': 'alice',
-          'to_user': 'bob',
+          'from': 'alice',
+          'to': 'bob',
           'identity_key': 'aWs=', // 'ik' in base64
-          'ephemeral_key': 'ZWs=', // 'ek' in base64
+          'ephemeral_public': 'ZWs=', // 'ek' in base64
           'ciphertext': 'Y3Q=', // 'ct' in base64
         },
       );
@@ -176,11 +176,11 @@ void main() {
         rawData: {
           'type': 'message',
           'message_type': 'ratchet',
-          'from_user': 'bob',
-          'to_user': 'alice',
+          'from': 'bob',
+          'to': 'alice',
           'dh_public': 'ZGg=', // 'dh' in base64
-          'previous_chain_length': 5,
-          'message_number': 3,
+          'prev_chain_length': 5,
+          'msg_number': 3,
           'ciphertext': 'Y3Q=', // 'ct' in base64
         },
       );

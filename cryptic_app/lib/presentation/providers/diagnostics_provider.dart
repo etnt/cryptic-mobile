@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/utils/crypto_utils.dart';
+import '../../data/services/background_service.dart';
+import '../../data/storage/preferences/encrypted_preferences.dart';
 import '../../data/storage/secure_storage/certificate_storage_service.dart';
 import 'engine_provider.dart';
 
@@ -59,6 +61,9 @@ class ConnectionDiag {
     this.reconnectAttempts = 0,
     this.keysUploaded = false,
     this.onlineUserCount = 0,
+    this.backgroundServiceRunning = false,
+    this.batteryExempt = false,
+    this.backgroundPrefEnabled = true,
   });
 
   final String engineStatus;
@@ -68,6 +73,15 @@ class ConnectionDiag {
   final int reconnectAttempts;
   final bool keysUploaded;
   final int onlineUserCount;
+
+  /// Android foreground service keep-alive state.
+  final bool backgroundServiceRunning;
+
+  /// Whether the app is exempt from battery optimization (Doze whitelist).
+  final bool batteryExempt;
+
+  /// The user's background-connection preference.
+  final bool backgroundPrefEnabled;
 }
 
 class KeysDiag {
@@ -144,6 +158,7 @@ final diagnosticsProvider = FutureProvider<DiagnosticsData>((ref) async {
 
   // Connection diagnostics
   final config = AppConfig.current;
+  final prefs = EncryptedPreferences();
   final connectionDiag = ConnectionDiag(
     engineStatus: engineState.status.name,
     connectionStatus: engineState.connectionStatus.name,
@@ -152,6 +167,9 @@ final diagnosticsProvider = FutureProvider<DiagnosticsData>((ref) async {
     reconnectAttempts: engineState.reconnectAttempts,
     keysUploaded: engineState.keysUploaded,
     onlineUserCount: engineState.users.length,
+    backgroundServiceRunning: await BackgroundService.instance.isRunning,
+    batteryExempt: await BackgroundService.instance.isBatteryExempt,
+    backgroundPrefEnabled: await prefs.backgroundConnectionEnabled,
   );
 
   // Session diagnostics

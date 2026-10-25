@@ -5,10 +5,12 @@
 //
 
 import 'package:flutter/material.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/app_config.dart';
 import 'core/utils/logger.dart';
+import 'data/services/background_service.dart';
 import 'data/services/notification_service.dart';
 import 'presentation/app.dart';
 
@@ -35,6 +37,12 @@ Future<void> main() async {
 
   // Initialize local notifications
   await NotificationService.instance.initialize();
+
+  // Initialize the Android foreground-service wrapper (keep-alive for the
+  // background message connection). The engine itself stays in this isolate.
+  BackgroundService.instance.init();
+  // Required by flutter_foreground_task v11 for TaskHandler<->UI port setup.
+  FlutterForegroundTask.initCommunicationPort();
 
   runApp(
     // ProviderScope enables Riverpod throughout the app

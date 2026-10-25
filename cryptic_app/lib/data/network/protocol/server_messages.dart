@@ -402,9 +402,51 @@ class IncomingX3dhMessage {
       toUser: IncomingMessage._asString(data['to']) ?? '',
       identityKey: IncomingMessage._asString(data['identity_key']) ?? '',
       ephemeralKey: IncomingMessage._asString(data['ephemeral_public']) ?? '',
-      usedOneTimePrekeyId: null,
+      usedOneTimePrekeyId: _usedOneTimePrekeyIdFrom(data),
       ciphertext: IncomingMessage._asString(data['ciphertext']) ?? '',
     );
+  }
+
+  /// Reads the one-time prekey ID the sender used.
+  ///
+  /// Checks the top-level `otpk_id` first, then the `otpk_id` inside the
+  /// base64 JSON `metadata` blob (the copy the decrypt path uses). Returns
+  /// null when the message used no one-time prekey.
+  static int? _usedOneTimePrekeyIdFrom(Map<String, dynamic> data) {
+    final topLevel = IncomingMessage._asString(data['otpk_id']);
+    if (topLevel != null && topLevel.isNotEmpty) {
+      return _keyIdFromBase64(topLevel);
+    }
+
+    final metadataB64 = IncomingMessage._asString(data['metadata']);
+    if (metadataB64 == null || metadataB64.isEmpty) return null;
+    try {
+      final metadata = jsonDecode(utf8.decode(base64Decode(metadataB64)));
+      if (metadata is! Map<String, dynamic>) return null;
+      final otpk = IncomingMessage._asString(metadata['otpk_id']);
+      if (otpk == null || otpk.isEmpty) return null;
+      return _keyIdFromBase64(otpk);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Converts base64 key-ID bytes to an int (big-endian, up to 8 bytes).
+  ///
+  /// Same conversion as `X3dhEngine` uses on the decrypt path, so the ID
+  /// consumed here matches the prekey that decryption looked up.
+  static int? _keyIdFromBase64(String b64) {
+    try {
+      final bytes = base64Decode(b64);
+      if (bytes.isEmpty) return null;
+      var value = 0;
+      for (var i = 0; i < bytes.length && i < 8; i++) {
+        value = (value << 8) | bytes[i];
+      }
+      return value;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Creates an X3DH incoming message.

@@ -4,19 +4,21 @@
 //
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/update/update_prompt.dart';
-import '../core/utils/event_log.dart';
 import '../core/utils/logger.dart';
 import '../data/engine/engine_state.dart';
+import '../data/engine/incoming_event_handler.dart';
+import '../data/services/background_service.dart';
 import '../data/services/incoming_share_service.dart';
 import '../data/services/notification_service.dart';
 import '../data/storage/media_store.dart';
-import '../domain/models/message.dart';
+import '../data/storage/preferences/encrypted_preferences.dart';
 import 'providers/auth_provider.dart';
 import 'providers/engine_provider.dart';
 import 'providers/enrollment_provider.dart';
@@ -73,6 +75,12 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A cold start starts with the app in the foreground: sync the static
+    // flag with the current lifecycle state so notifications do not fire
+    // while the user is looking at the app (the flag defaults to false and
+    // is only updated on lifecycle changes afterwards).
+    NotificationService.appResumed =
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     // Check GitHub Releases for a newer side-loaded APK once, after first
     // frame so a Navigator/Overlay is available for the prompt.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -103,14 +111,24 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
         _wasBackgrounded = true;
+        // Background delivery is the point of the foreground service: the
+        // shade notification is the primary surface while paused/hidden.
+        NotificationService.appResumed = false;
         break;
       case AppLifecycleState.resumed:
+        NotificationService.appResumed = true;
         if (_wasBackgrounded) {
           _wasBackgrounded = false;
           final engine = ref.read(authenticatedEngineProvider);
           if (engine != null) {
             unawaited(_evictMediaCache());
             unawaited(engine.reconnectAfterAppResume());
+            // The OS can kill the foreground service (Android 15 dataSync
+            // runtime cap); restart it on resume when the user wants background
+            // delivery. start() no-ops if the service is already running.
+            // Only do this with an engine behind it: without a logged-in user
+            // the service would just show an empty keep-alive notification.
+            unawaited(_restartBackgroundServiceIfNeeded());
           }
         }
         break;
@@ -134,74 +152,15 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       })
       ..listen<AsyncValue<EngineEvent>>(engineEventsProvider, (previous, next) {
         next.whenData((event) {
-          if (event is MessageReceived) {
+          if (event is MessageReceived || event is FileReceived) {
             final repo = ref.read(messageRepositoryProvider);
-            EventLog.add(
-              'UI',
-              'message from ${event.fromUser} id=${event.messageId} '
-                  '${repo == null ? 'DROPPED: message database not open' : 'stored'}',
-            );
-            if (repo != null) {
-              final msg = ChatMessage(
-                id: event.messageId.isNotEmpty
-                    ? event.messageId
-                    : DateTime.now().microsecondsSinceEpoch.toString(),
-                conversationId: event.fromUser,
-                senderId: event.fromUser,
-                content: event.plaintext,
-                timestamp: event.timestamp,
-                direction: MessageDirection.incoming,
-                status: MessageStatus.delivered,
-              );
-              repo.saveIncomingMessage(msg);
-              ref.read(conversationsProvider.notifier).addMessage(
-                    event.fromUser,
-                    msg,
-                  );
-
-              // Show local notification (suppressed if that chat is open)
-              NotificationService.instance.showMessageNotification(
-                fromUser: event.fromUser,
-                messageBody: event.plaintext,
-              );
-            }
-          } else if (event is FileReceived) {
-            final repo = ref.read(messageRepositoryProvider);
-            EventLog.add(
-              'UI',
-              'file ${event.fileId} from ${event.fromUser} '
-                  '${repo == null ? 'DROPPED: message database not open' : 'stored'}',
-            );
-            if (repo != null) {
-              final message = ChatMessage(
-                id: event.fileId,
-                fileId: event.fileId,
-                conversationId: event.fromUser,
-                senderId: event.fromUser,
-                content: event.fileName,
-                timestamp: event.timestamp,
-                direction: MessageDirection.incoming,
-                status: MessageStatus.delivered,
-                kind: event.mimeType.startsWith('image/')
-                    ? MessageKind.image
-                    : MessageKind.file,
-                fileName: event.fileName,
-                mimeType: event.mimeType,
-                sizeBytes: event.sizeBytes,
-                localPath: event.localPath,
-                transferProgress: 1,
-                transferStatus: TransferStatus.complete,
-              );
-              repo.saveIncomingMessage(message);
-              ref.read(conversationsProvider.notifier).addMessage(
-                    event.fromUser,
-                    message,
-                  );
-              NotificationService.instance.showMessageNotification(
-                fromUser: event.fromUser,
-                messageBody: 'Attachment: ${event.fileName}',
-              );
-            }
+            final notifier = ref.read(conversationsProvider.notifier);
+            unawaited(handleIncomingEvent(
+              event,
+              repo: repo,
+              addMessage: notifier.addMessage,
+              notificationService: NotificationService.instance,
+            ));
           }
         });
       })
@@ -215,6 +174,9 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
           if (repo != null) {
             ref.read(conversationsProvider.notifier).loadConversations(repo);
           }
+          // Start the background connection (Android only): ask for the
+          // notification permission first, then start the keep-alive service.
+          unawaited(_startBackgroundConnection());
           setState(() {
             _currentScreen = AppScreen.home;
           });
@@ -222,6 +184,7 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
           _scheduleShareOffer();
         } else if (!next.isAuthenticated && _currentScreen == AppScreen.home) {
           ref.read(conversationsProvider.notifier).clear();
+          unawaited(BackgroundService.instance.stop());
           setState(() {
             _currentScreen = AppScreen.login;
           });
@@ -235,6 +198,94 @@ class _CrypticAppState extends ConsumerState<CrypticApp>
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       home: _buildCurrentScreen(),
+    );
+  }
+
+  /// Restarts the keep-alive service if the OS killed it (dataSync timeout).
+  /// No-op when the user disabled the background connection.
+  Future<void> _restartBackgroundServiceIfNeeded() async {
+    if (!Platform.isAndroid) return;
+    try {
+      if (!(await EncryptedPreferences().backgroundConnectionEnabled)) return;
+      if (BackgroundService.instance.timedOut) {
+        AppLogger.warning(
+          'Restarting background service after OS timeout',
+          tag: 'App',
+        );
+      }
+      await BackgroundService.instance.start();
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'Background service restart failed',
+        tag: 'App',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Requests the notification permission (Android 13+) and starts the
+  /// foreground-service keep-alive when the user enabled background delivery.
+  /// Shows the one-time battery-optimization prompt afterwards.
+  Future<void> _startBackgroundConnection() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final prefs = EncryptedPreferences();
+      if (!(await prefs.backgroundConnectionEnabled)) return;
+
+      await NotificationService.instance.requestPermission();
+      await BackgroundService.instance.start();
+
+      // One-time battery prompt: without the Doze exemption the background
+      // connection gets throttled on many OEMs. The flag is set after the
+      // dialog is dismissed so a failed/absent UI can prompt again later.
+      final exempt = await BackgroundService.instance.isBatteryExempt;
+      final promptShown = await prefs.batteryPromptShown;
+      if (!exempt && !promptShown && _navigatorKey.currentContext != null) {
+        // Await the dialog so the flag is only set after the user has seen
+        // it: if the UI fails to show, the prompt is offered again later.
+        await _showBatteryPrompt();
+        await prefs.setBatteryPromptShown(true);
+      }
+    } catch (error, stackTrace) {
+      AppLogger.warning(
+        'Background connection startup failed',
+        tag: 'App',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Explains why the app asks for battery-optimization exemption and opens
+  /// the system request dialog. Completes when the dialog is dismissed.
+  Future<void> _showBatteryPrompt() {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return Future.value();
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Receive messages in the background'),
+        content: const Text(
+          'Cryptic keeps an encrypted connection alive so messages arrive '
+          'while the app is closed. Android may pause this connection to save '
+          'battery. Allow Cryptic to run unrestricted for reliable delivery - '
+          'you can change this later in Settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              unawaited(BackgroundService.instance.requestBatteryExemption());
+            },
+            child: const Text('Allow'),
+          ),
+        ],
+      ),
     );
   }
 
