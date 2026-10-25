@@ -13,10 +13,11 @@ import 'package:auto_upgrade/auto_upgrade.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// GitHub repository that publishes the release APKs.
+/// GitHub account or organization that owns [releaseRepo].
 const releaseOwner = 'etnt';
 
-/// GitHub repository that publishes the release APKs.
+/// Name of the GitHub repository (under [releaseOwner]) that publishes the
+/// release APKs.
 const releaseRepo = 'cryptic-mobile';
 
 /// App version injected at release build time via `--dart-define`.

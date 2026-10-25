@@ -1,7 +1,7 @@
 // This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
-// utility in your test. For example, you can send tap and scroll
+// utility in the flutter_test package. For example, you can send tap and scroll
 // gestures. You can also use WidgetTester to find child widgets in the widget
 // tree, read text, and verify that the values of widget properties are correct.
 
@@ -22,7 +22,50 @@ class _NoOpChecker extends ReleaseChecker {
   Future<UpdateCheckResult> check() async => const CheckSkipped();
 }
 
+/// Reports a newer release, so the startup prompt must appear.
+class _UpdateAvailableChecker extends ReleaseChecker {
+  _UpdateAvailableChecker()
+      : super(owner: 'etnt', repo: 'cryptic-mobile', currentVersion: '1.0.0');
+
+  @override
+  Future<UpdateCheckResult> check() async => const UpdateAvailable(
+        UpdateInfo(
+          latestVersion: '1.2.0',
+          currentVersion: '1.0.0',
+          releasePageUrl:
+              'https://github.com/etnt/cryptic-mobile/releases/tag/v1.2.0',
+          releaseNotes: 'Faster encryption.',
+        ),
+      );
+}
+
 void main() {
+  testWidgets('startup shows the update dialog when a newer release exists',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 1920);
+    tester.view.devicePixelRatio = 1.0;
+
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          releaseCheckerProvider.overrideWithValue(_UpdateAvailableChecker()),
+        ],
+        child: const CrypticApp(),
+      ),
+    );
+    // Post-frame check plus the dialog transition; the splash animates
+    // forever, so do not use pumpAndSettle.
+    await tester.pump(const Duration(seconds: 2));
+
+    expect(find.text('Update available'), findsOneWidget);
+    expect(find.text('Open'), findsOneWidget);
+  });
+
   testWidgets('CrypticApp smoke test', (tester) async {
     // Set a larger surface size to avoid overflow issues
     tester.view.physicalSize = const Size(1080, 1920);
