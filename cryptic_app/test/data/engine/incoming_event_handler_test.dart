@@ -104,6 +104,8 @@ void main() {
 
   test('persists but suppresses the notification for the open chat', () async {
     NotificationService.instance.activeChatPeer = 'alice';
+    NotificationService.appResumed = true;
+    addTearDown(() => NotificationService.appResumed = false);
 
     final result = await handleIncomingEvent(
       messageEvent(),

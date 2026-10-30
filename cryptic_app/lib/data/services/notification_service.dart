@@ -31,7 +31,9 @@ class NotificationService {
   /// - the user currently has that peer's chat open, or
   /// - the app is resumed (the in-app view already surfaces the message).
   static bool isSuppressed(String fromUser) =>
-      instance.activeChatPeer == fromUser || appResumed;
+      // activeChatPeer only matters while the app is visible: a chat screen
+      // left open when the app is backgrounded must still notify.
+      appResumed;
 
   /// Ask Android 13+ for the POST_NOTIFICATIONS runtime permission.
   ///
@@ -86,8 +88,16 @@ class NotificationService {
     required String fromUser,
     required String messageBody,
   }) async {
-    if (!_initialized) return;
-    if (isSuppressed(fromUser)) return;
+    if (!_initialized) {
+      AppLogger.warning('Notification skipped: service not initialized',
+          tag: 'NotificationService');
+      return;
+    }
+    if (isSuppressed(fromUser)) {
+      AppLogger.debug('Notification suppressed (app resumed)',
+          tag: 'NotificationService');
+      return;
+    }
 
     const androidDetails = AndroidNotificationDetails(
       'cryptic_messages',
@@ -105,6 +115,12 @@ class NotificationService {
       macOS: iosDetails,
     );
 
+    final enabled = await _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.areNotificationsEnabled();
+    AppLogger.info('Showing notification (enabled=$enabled)',
+        tag: 'NotificationService');
     await _plugin.show(
       fromUser.hashCode,
       fromUser,
