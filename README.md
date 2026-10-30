@@ -13,6 +13,8 @@ This is educational software. Nobody audited it for security. You use it at your
 - Key storage encrypted with Argon2id and AES-256-CBC
 - Online user list
 - Session persistence
+- Notifications for incoming messages on Android, also while the app is in the background (see [Background message connection](#background-message-connection-tradeoffs))
+- Tappable links in chat messages: tap an `http` or `https` link to open it in the browser, or long-press it to copy it
 
 Pending work: certificate renewal and on-device message history.
 
@@ -99,6 +101,13 @@ database stay in the UI isolate. There is no second engine and no stored
 passphrase. See
 [the notification plan](docs/INCOMING-MESSAGE-NOTIFICATION-PLAN.md) for the
 full design and verification matrix.
+
+What you see:
+
+- **Notifications:** an incoming message posts a notification, also while the app is in the background. No notification appears for the chat you have open, or while the app is in the foreground, because the message is already on screen.
+- **Permission:** turning on "Keep background connection on" in Settings asks for notification permission (Android 13 and newer). Without it, no message notifications appear.
+- **Settings:** turn off "Keep background connection on" in Settings to stop the background connection and its status-bar icon. Incoming messages are then delivered only while the app is open.
+- **Diagnostics:** the Diagnostics screen shows whether the background connection is running. Notification problems are written to the app's event log.
 
 Accepted tradeoffs:
 

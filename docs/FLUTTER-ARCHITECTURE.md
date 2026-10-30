@@ -21,9 +21,11 @@ implements the Cryptic end-to-end encrypted messaging protocol.
 | Message History | 🔄 Partial | In-memory only (SQLCipher DB pending) |
 | Mobile Enrollment | ✅ Complete | QR scan → ECDSA P-256 CSR (Ed25519-signed) → mTLS cert |
 | Certificate Storage | ✅ Complete | Cert/key in iOS Keychain via flutter_secure_storage |
-| Settings Screen | 🔄 Planned | Basic structure only |
+| Settings Screen | ✅ Complete | Background connection toggle, battery optimisation prompt |
 | Certificate Renewal | 📋 Planned | No renewal flow yet |
-| Notifications | 📋 Planned | Not yet implemented |
+| Incoming Notifications | ✅ Android | Background keep-alive service and local notifications; not on iOS |
+| Link Handling | ✅ Complete | Tap `http`/`https` links to open in browser; long-press copies the link |
+| Diagnostics | ✅ Complete | Background connection status (Diagnostics screen); event log is a separate screen |
 
 ## Overview
 
@@ -130,6 +132,7 @@ lib/
 │   │   ├── cryptic_engine.dart           // CrypticEngine - main orchestrator
 │   │   ├── engine_state.dart             // EngineState, EngineEvent, enums
 │   │   ├── message_processor.dart        // MessageProcessor (decode+decrypt)
+│   │   ├── incoming_event_handler.dart   // Ordered persist → state → notify
 │   │   ├── session_manager.dart          // SessionManager (per-peer ratchets)
 │   │   └── engine.dart                   // Barrel export
 │   │
@@ -152,7 +155,10 @@ lib/
 │   │       └── message_queue.dart        // MessageQueue (offline outbound)
 │   │
 │   ├── services/
-│   │   └── authentication_service.dart   // AuthenticationService (cert → engine)
+│   │   ├── authentication_service.dart   // AuthenticationService (cert → engine)
+│   │   ├── background_service.dart       // Android keep-alive foreground service
+│   │   ├── notification_service.dart     // Local notifications + suppression
+│   │   └── incoming_share_service.dart   // Share-target intake
 │   │
 │   └── storage/
 │       ├── storage.dart                  // Barrel export
@@ -195,6 +201,7 @@ lib/
 │       ├── empty_state.dart              // Empty state placeholder
 │       ├── loading_overlay.dart          // Loading overlay
 │       ├── message_bubble.dart           // Chat message bubble
+│       ├── linkified_text.dart           // Tappable links, long-press copy
 │       ├── message_input.dart            // Text input + send button
 │       ├── user_avatar.dart              // Avatar with initials
 │       └── widgets.dart                  // Barrel export
@@ -205,6 +212,41 @@ lib/
         ├── client.crt
         └── client.key
 ```
+## Notifications and Background Connection
+
+Android only. The design follows
+[docs/INCOMING-MESSAGE-NOTIFICATION-PLAN.md](INCOMING-MESSAGE-NOTIFICATION-PLAN.md).
+
+- **Keep-alive service:** `background_service.dart` runs an Android
+  foreground service (`dataSync`). Its task handler is a no-op. The service
+  keeps the process alive, so the UI isolate's WebSocket and crypto engine
+  keep running while the app is backgrounded.
+- **No second engine:** the engine, WebSocket, and encrypted database stay in
+  the UI isolate. No passphrase is stored, so the service cannot rebuild a
+  session on its own. After a reboot or force-stop, the user must open the app
+  and log in again.
+- **Ordered handling:** `incoming_event_handler.dart` processes each incoming
+  event in arrival order: persist, update state, then notify. A failure is
+  logged and does not stop the chain.
+- **Notifications:** `notification_service.dart` (flutter_local_notifications)
+  posts to the `cryptic_messages` channel at high importance. The title is the
+  sender's username and the body is the plaintext message text.
+- **Suppression:** no notification is posted for the chat that is open, or
+  while the app is resumed. The in-app view already shows the message.
+- **Reconnect:** when the background connection is on, the engine retries
+  without limit, with capped backoff (`maxReconnectAttempts = 0`).
+- **Permission and toggle:** turning on "Keep background connection on" in
+  Settings asks for `POST_NOTIFICATIONS` (Android 13+) and starts the service.
+  Turning it off stops the service.
+
+**Privacy trade-off:** the notification shows the sender name and the message
+text. The app does not set a visibility level, so Android's default lock-screen
+rules apply.
+
+**Not supported:** iOS has no equivalent foreground service and no push without
+APNs, so it gets no background delivery or notifications (see Limitations
+below).
+
 ## Core Components
 
 > **Note**: The code samples below are illustrative pseudocode showing the
@@ -1305,8 +1347,7 @@ void main() {
 7. 🔄 **Phase 7**: Polish and extended features
    - Message persistence to SQLCipher database
    - Certificate renewal flow
-   - Push notifications
-   - Settings screen
+   - Push notifications for iOS (Android local notifications are done, see [Notifications and Background Connection](#notifications-and-background-connection))
    - Contact management
    - Key verification UI
 
@@ -1475,7 +1516,7 @@ The Cryptic mobile app should prioritize:
 - Avatar with first letter of username (no photos for privacy)
 - Connection status indicator (🟢 connected, 🔴 offline, 🟡 reconnecting)
 - Encryption status (🔒 encrypted, 🔓 establishing session)
-- Message preview (truncated, no sensitive data in notifications)
+- Message notifications show the sender name and full message text on Android (see [Notifications and Background Connection](#notifications-and-background-connection))
 - Timestamp (smart formatting: time, yesterday, date)
 - Delivery status: ✓ sent, ✓✓ delivered (no read receipts for privacy)
 - Unread badge count
