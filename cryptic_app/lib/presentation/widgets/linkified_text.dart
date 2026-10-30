@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// A validated HTTP(S) URL found in text.
@@ -75,7 +77,8 @@ bool _isTrailingPunctuation(String url, int index) {
   return true;
 }
 
-/// Displays text with validated HTTP(S) URLs that open in the external browser.
+/// Displays text with validated HTTP(S) URLs that open in the external
+/// browser and can be copied with a long press.
 class LinkifiedText extends StatefulWidget {
   /// Creates rich text with tappable links.
   const LinkifiedText({
@@ -83,6 +86,9 @@ class LinkifiedText extends StatefulWidget {
     required this.style,
     required this.linkStyle,
     this.onOpen,
+    this.onCopy,
+    this.onLongPressLink,
+    this.onNonLinkLongPress,
     super.key,
   });
 
@@ -98,11 +104,26 @@ class LinkifiedText extends StatefulWidget {
   /// Optional URL opener. Defaults to opening the URL in the external browser.
   final Future<bool> Function(Uri uri)? onOpen;
 
+  /// Optional copy handler invoked when a link is long-pressed. Defaults to
+  /// copying the link URL to the clipboard with haptic feedback and a
+  /// "Link copied" snackbar.
+  final Future<void> Function(Uri uri)? onCopy;
+
+  /// Optional callback invoked when a link is long-pressed, in addition to
+  /// the copy action.
+  final void Function(Uri uri)? onLongPressLink;
+
+  /// Optional callback invoked when a long press lands on plain (non-link)
+  /// text. Used to forward the gesture to the surrounding message bubble so
+  /// message selection keeps working outside of links.
+  final VoidCallback? onNonLinkLongPress;
+
   @override
   State<LinkifiedText> createState() => _LinkifiedTextState();
 }
 
 class _LinkifiedTextState extends State<LinkifiedText> {
+  final GlobalKey _textKey = GlobalKey();
   List<LinkMatch> _links = const [];
   List<TapGestureRecognizer> _recognizers = [];
 
@@ -153,6 +174,53 @@ class _LinkifiedTextState extends State<LinkifiedText> {
     super.dispose();
   }
 
+  /// Copies the long-pressed link to the clipboard. Uses the injected
+  /// [LinkifiedText.onCopy] when provided, otherwise the default clipboard
+  /// copy with haptic feedback and a confirmation snackbar.
+  Future<void> _copyLink(LinkMatch link) async {
+    final handler = widget.onCopy;
+    if (handler != null) {
+      await handler(link.uri);
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    await Clipboard.setData(ClipboardData(text: link.url));
+    await HapticFeedback.mediumImpact();
+    messenger?.showSnackBar(
+      const SnackBar(content: Text('Link copied')),
+    );
+  }
+
+  /// Handles a long press anywhere on the text. When the press lands on a
+  /// link it is turned into a copy action; otherwise it is forwarded to the
+  /// surrounding bubble (message selection).
+  void _handleLongPressStart(LongPressStartDetails details) {
+    final link = _linkAt(details.globalPosition);
+    if (link != null) {
+      widget.onLongPressLink?.call(link.uri);
+      unawaited(_copyLink(link));
+    } else {
+      widget.onNonLinkLongPress?.call();
+    }
+  }
+
+  /// Finds the link containing the text position at [globalOffset], if any.
+  /// The offset is screen-based and converted to the paragraph's local
+  /// coordinates so the hit test stays correct even when the GestureDetector
+  /// and the paragraph do not share an origin.
+  LinkMatch? _linkAt(Offset globalOffset) {
+    final renderObject = _textKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderParagraph) return null;
+
+    final local = renderObject.globalToLocal(globalOffset);
+    final index = renderObject.getPositionForOffset(local).offset;
+    for (final link in _links) {
+      if (link.start <= index && index < link.end) return link;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final children = <InlineSpan>[];
@@ -179,9 +247,19 @@ class _LinkifiedTextState extends State<LinkifiedText> {
       children.add(TextSpan(text: widget.text.substring(offset)));
     }
 
-    return Text.rich(
+    final text = Text.rich(
       TextSpan(style: widget.style, children: children),
       softWrap: true,
+    );
+
+    // A TextSpan accepts only one recognizer, so long presses are detected on
+    // the whole text and mapped back to a link through a hit test. This keeps
+    // the per-link tap recognizer intact and does not break line wrapping.
+    // Long presses on links copy the URL; long presses on plain text are
+    // forwarded to the surrounding bubble (message selection).
+    return GestureDetector(
+      onLongPressStart: _handleLongPressStart,
+      child: KeyedSubtree(key: _textKey, child: text),
     );
   }
 }

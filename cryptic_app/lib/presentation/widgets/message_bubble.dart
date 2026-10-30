@@ -28,6 +28,8 @@ class MessageBubble extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.onOpenLink,
+    this.onCopyLink,
+    this.onLongPressLink,
   });
 
   /// The message to display.
@@ -53,6 +55,13 @@ class MessageBubble extends StatelessWidget {
 
   /// Optional handler for opening links in text messages.
   final Future<bool> Function(Uri uri)? onOpenLink;
+
+  /// Optional handler for copying links; overrides the default clipboard
+  /// copy for long presses on links (mainly for tests).
+  final Future<void> Function(Uri uri)? onCopyLink;
+
+  /// Optional handler invoked when a link in the message is long-pressed.
+  final void Function(Uri uri)? onLongPressLink;
 
   @override
   Widget build(BuildContext context) {
@@ -134,6 +143,9 @@ class MessageBubble extends StatelessWidget {
                   decoration: TextDecoration.underline,
                 ),
                 onOpen: onOpenLink,
+                onCopy: onCopyLink,
+                onLongPressLink: onLongPressLink,
+                onNonLinkLongPress: onLongPress,
               )
             else
               _buildAttachment(context, textColor),
@@ -170,6 +182,15 @@ class MessageBubble extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: selectionMode ? onTap : null,
+      // Long presses on the message text are owned by LinkifiedText: links
+      // copy the URL and plain text forwards to [onLongPress] itself. The
+      // inner detector is deeper in the hit-test order, so it wins the
+      // gesture arena and this handler stays silent inside the text/link
+      // area — long presses there never toggle selection twice. This
+      // handler therefore only responds for areas outside the text: sender
+      // name, timestamp/status/lock row, and the bubble padding. In
+      // selection mode the inner widget is wrapped in an IgnorePointer, so
+      // this handler is the only responder there.
       onLongPress: onLongPress,
       child: ColoredBox(
         color: selected
